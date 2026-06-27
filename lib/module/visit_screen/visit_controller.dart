@@ -1,0 +1,149 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../../config/app_shared_pref.dart';
+import '../../../config/app_url.dart';
+import '../../../utils/api_handler.dart';
+import 'model/visit_counts_model.dart';
+import 'model/visit_model.dart';
+import 'model/visit_view_model.dart';
+
+class VisitController extends GetxController {
+  RxBool isLoading = false.obs;
+  RxBool isCountsLoading = false.obs;
+  RxString error = "".obs;
+
+  Rx<VisitCounts?> visitCounts = Rx<VisitCounts?>(null);
+  RxList<VisitDatum> visitList = <VisitDatum>[].obs;
+
+  RxInt selectedTabIndex = 0.obs;
+  Rx<TextEditingController> searchController = TextEditingController().obs;
+
+  // Pagination
+  RxInt currentPage = 1.obs;
+  RxInt totalRecords = 0.obs;
+  RxInt rowsPerPage = 50.obs;
+
+  int get totalPages => (totalRecords.value / rowsPerPage.value).ceil();
+
+  // View Details
+  RxBool isDetailLoading = false.obs;
+  RxString detailError = "".obs;
+  Rx<VisitViewData?> visitDetail = Rx<VisitViewData?>(null);
+
+  @override
+  void onInit() {
+    super.onInit();
+    getVisitCounts();
+    fetchData();
+  }
+
+  Future<void> getVisitCounts() async {
+    isCountsLoading.value = true;
+    try {
+      final response = await ApiHandler.getRequest(
+          "${ApiEndPoint.serviceVisitCounts}?company_id=${Pref.getCompanyId()}&location_id=${Pref.getLocationId()}&fin_year=${Pref.getFinancialYears()}");
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && data['status'] == 200) {
+        visitCounts.value = VisitCounts.fromJson(data['data']);
+        visitCounts.refresh();
+      }
+    } catch (e) {
+      debugPrint("Error fetching visit counts: $e");
+    } finally {
+      isCountsLoading.value = false;
+    }
+  }
+
+  Future<void> fetchData({bool isRefresh = true}) async {
+    if (isRefresh) {
+      currentPage.value = 1;
+      visitList.clear();
+    }
+    isLoading.value = true;
+    error.value = "";
+
+    try {
+      String status = getStatusFromTabIndex(selectedTabIndex.value);
+      final url =
+          "${ApiEndPoint.serviceVisitList}?page=${currentPage.value}&rowsPerPage=${rowsPerPage.value}&search=${searchController.value.text}&status=$status&company_id=${Pref.getCompanyId()}&location_id=${Pref.getLocationId()}&fin_year=${Pref.getFinancialYears()}";
+
+      final response = await ApiHandler.getRequest(url);
+      final data = json.decode(response.data);
+
+      if (response.statusCode == 200 && data['status'] == 200) {
+        VisitModel res = VisitModel.fromJson(data);
+        if (res.data != null) {
+          if (isRefresh) {
+            visitList.assignAll(res.data!);
+          } else {
+            visitList.addAll(res.data!);
+          }
+        }
+        totalRecords.value = res.pagination?.totalRecords ?? 0;
+      } else {
+        error.value = data['message'] ?? "Something went wrong";
+      }
+    } catch (e) {
+      debugPrint("Error fetching visit data: $e");
+      error.value = "Failed to load data";
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> getVisitDetail(String id) async {
+    isDetailLoading.value = true;
+    detailError.value = "";
+    visitDetail.value = null;
+
+    try {
+      final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}service-visit/find/$id");
+      final data = json.decode(response.data);
+
+      if (response.statusCode == 200 && data['status'] == 200) {
+        VisitViewModel res = VisitViewModel.fromJson(data);
+        visitDetail.value = res.data;
+      } else {
+        detailError.value = data['message'] ?? "Failed to load details";
+      }
+    } catch (e) {
+      debugPrint("Error fetching visit detail: $e");
+      detailError.value = "Something went wrong";
+    } finally {
+      isDetailLoading.value = false;
+    }
+  }
+
+  String getStatusFromTabIndex(int index) {
+    switch (index) {
+      case 1:
+        return "PENDING";
+      case 2:
+        return "IN_PROGRESS";
+      case 3:
+        return "COMPLETED";
+      case 4:
+        return "CANCELLED";
+      default:
+        return "";
+    }
+  }
+
+  void onTabChanged(int index) {
+    selectedTabIndex.value = index;
+    fetchData();
+  }
+
+  void onSearch(String query) {
+    fetchData();
+  }
+
+  void onPageChanged(int page) {
+    if (page >= 1 && page <= totalPages) {
+      currentPage.value = page;
+      fetchData(isRefresh: false);
+    }
+  }
+}

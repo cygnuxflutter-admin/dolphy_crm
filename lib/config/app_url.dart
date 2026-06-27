@@ -76,4 +76,8 @@ class ApiEndPoint {
   static String boxSuggestion = "${baseUrl}packing-list/box-suggestion";
   static String updateBoxConfig = "${baseUrl}packing-list/physical-box/update/";
   static String updateBoxSuggestion = "${baseUrl}packing-list/box-suggestion/update/by-packing";
+
+  // Visit Endpoints
+  static String serviceVisitCounts = "${baseUrl}service-visit/counts";
+  static String serviceVisitList = "${baseUrl}service-visit/find";
 }

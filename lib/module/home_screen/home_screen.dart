@@ -452,7 +452,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: GridView.count(
-          crossAxisCount: 2,
+          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
           childAspectRatio: 0.85, // Adjusted for better height distribution
@@ -489,6 +489,12 @@ class _HomeScreenState extends State<HomeScreen> {
               subtitle: "Manage your packing list",
               icon: Icons.inventory_2_outlined,
               onTap: () => Get.toNamed(AppRoutes.packingScreen),
+            ),
+            _dashboardCard(
+              title: "Visits",
+              subtitle: "Track your visits",
+              icon: Icons.directions_walk_outlined,
+              onTap: () => Get.toNamed(AppRoutes.visitScreen),
             ),
           ],
         ),

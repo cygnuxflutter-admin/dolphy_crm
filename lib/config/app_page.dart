@@ -20,6 +20,9 @@ import '../module/profile_screen/profile_binding.dart';
 import '../module/profile_screen/profile_screen.dart';
 import '../module/splash_screen/splash_binding.dart';
 import '../module/splash_screen/splash_screen.dart';
+import '../module/visit_screen/visit_binding.dart';
+import '../module/visit_screen/visit_screen.dart';
+import '../module/visit_screen/sub_screen/visit_view_screen.dart';
 import 'app_routes.dart';
 
 List<GetPage> getPages = [
@@ -36,4 +39,6 @@ List<GetPage> getPages = [
   GetPage(name: AppRoutes.packingScreen, page: () => const PackingScreen(), binding: PackingBinding()),
   GetPage(name: AppRoutes.packingDetailScreen, page: () => const PackingDetailScreen(), binding: PackingBinding()),
   GetPage(name: AppRoutes.packingListScreen, page: () => const PackingListScreen(), binding: PackingBinding()),
+  GetPage(name: AppRoutes.visitScreen, page: () => const VisitScreen(), binding: VisitBinding()),
+  GetPage(name: AppRoutes.visitViewScreen, page: () => const VisitViewScreen(), binding: VisitBinding()),
 ];
