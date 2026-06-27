@@ -12,4 +12,6 @@ class AppRoutes {
   static const String packingScreen = '/packingScreen';
   static const String packingDetailScreen = '/packingDetailScreen';
   static const String packingListScreen = '/packingListScreen';
+  static const String visitScreen = '/visitScreen';
+  static const String visitViewScreen = '/visitViewScreen';
 }
