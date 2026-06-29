@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../../../config/app_shared_pref.dart';
 import '../../../config/app_url.dart';
 import '../../../utils/api_handler.dart';
+import 'model/field_report_model.dart';
 import 'model/visit_counts_model.dart';
 import 'model/visit_model.dart';
 import 'model/visit_view_model.dart';
@@ -31,6 +32,20 @@ class VisitController extends GetxController {
   RxBool isDetailLoading = false.obs;
   RxString detailError = "".obs;
   Rx<VisitViewData?> visitDetail = Rx<VisitViewData?>(null);
+
+  // Field Report Details
+  RxBool isFieldReportLoading = false.obs;
+  RxString fieldReportError = "".obs;
+  Rx<FieldReportData?> fieldReportDetail = Rx<FieldReportData?>(null);
+  RxMap<String, bool> expandedProducts = <String, bool>{}.obs;
+
+  void toggleProductExpansion(String productId) {
+    if (expandedProducts.containsKey(productId)) {
+      expandedProducts[productId] = !expandedProducts[productId]!;
+    } else {
+      expandedProducts[productId] = true;
+    }
+  }
 
   @override
   void onInit() {
@@ -113,6 +128,29 @@ class VisitController extends GetxController {
       detailError.value = "Something went wrong";
     } finally {
       isDetailLoading.value = false;
+    }
+  }
+
+  Future<void> getFieldReport(String id) async {
+    isFieldReportLoading.value = true;
+    fieldReportError.value = "";
+    fieldReportDetail.value = null;
+
+    try {
+      final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}service-visit/$id/field-report");
+      final data = json.decode(response.data);
+
+      if (response.statusCode == 200 && data['status'] == 200) {
+        FieldReportModel res = FieldReportModel.fromJson(data);
+        fieldReportDetail.value = res.data;
+      } else {
+        fieldReportError.value = data['message'] ?? "Failed to load field report";
+      }
+    } catch (e) {
+      debugPrint("Error fetching field report: $e");
+      fieldReportError.value = "Something went wrong";
+    } finally {
+      isFieldReportLoading.value = false;
     }
   }
 

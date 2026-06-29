@@ -205,22 +205,24 @@ class VisitScreen extends GetView<VisitController> {
       onSelected: (value) {
         if (value == 'view') {
           Get.toNamed(AppRoutes.visitViewScreen, arguments: item.id);
+        } else if (value == 'field_report') {
+          Get.toNamed(AppRoutes.visitFieldReportScreen, arguments: item.id);
         }
       },
       itemBuilder: (context) => [
-        if (isCompleted)
-          const PopupMenuItem(
-            value: 'view',
-            child: Row(children: [Icon(Icons.visibility_outlined, size: 16), SizedBox(width: 8), Text("View")]),
-          ),
+        const PopupMenuItem(
+          value: 'view',
+          child: Row(children: [Icon(Icons.visibility_outlined, size: 16), SizedBox(width: 8), Text("View")]),
+        ),
         const PopupMenuItem(
           value: 'field_report',
           child: Row(children: [Icon(Icons.assignment_outlined, size: 16), SizedBox(width: 8), Text("Field Report")]),
         ),
-        const PopupMenuItem(
-          value: 'add_expense',
-          child: Row(children: [Icon(Icons.add_card_outlined, size: 16), SizedBox(width: 8), Text("Add Expense")]),
-        ),
+        if (isCompleted)
+          const PopupMenuItem(
+            value: 'add_expense',
+            child: Row(children: [Icon(Icons.add_card_outlined, size: 16), SizedBox(width: 8), Text("Add Expense")]),
+          ),
       ],
     );
   }
