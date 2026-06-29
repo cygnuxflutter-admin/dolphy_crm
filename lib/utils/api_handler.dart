@@ -87,6 +87,24 @@ class ApiHandler {
     }
   }
 
+  static Future<Response> putRequest({required String url, required Map body, Map<String, dynamic>? headers}) async {
+    logger.i("post $url");
+    logger.i(JsonEncoder.withIndent("" * 4).convert(body));
+    Response? response;
+    try {
+      response = await createRequest().put(
+        url,
+        data: body,
+        options: Options(headers: headers ?? await getHeaders()),
+      );
+      logger.i(JsonEncoder.withIndent(" " * 4).convert(json.encode(response.data)));
+      return response;
+    } catch (e) {
+      print("error === $e");
+      return Response(requestOptions: RequestOptions(data: {"message": "Something went wrong!"}));
+    }
+  }
+
   /// patch api
   static Future<Response> patchRequest({required String url, required Map body, Map<String, dynamic>? headers}) async {
     logger.i("patch $url");

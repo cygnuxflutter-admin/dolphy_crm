@@ -1,10 +1,12 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../config/app_shared_pref.dart';
 import '../../../config/app_url.dart';
 import '../../../utils/api_handler.dart';
+import '../../../widget/toast_message.dart';
 import 'model/field_report_model.dart';
 import 'model/visit_counts_model.dart';
 import 'model/visit_model.dart';
@@ -38,12 +40,21 @@ class VisitController extends GetxController {
   RxString fieldReportError = "".obs;
   Rx<FieldReportData?> fieldReportDetail = Rx<FieldReportData?>(null);
   RxMap<String, bool> expandedProducts = <String, bool>{}.obs;
+  RxMap<String, bool> expandedTechLogs = <String, bool>{}.obs;
 
   void toggleProductExpansion(String productId) {
     if (expandedProducts.containsKey(productId)) {
       expandedProducts[productId] = !expandedProducts[productId]!;
     } else {
       expandedProducts[productId] = true;
+    }
+  }
+
+  void toggleTechLogExpansion(String techId) {
+    if (expandedTechLogs.containsKey(techId)) {
+      expandedTechLogs[techId] = !expandedTechLogs[techId]!;
+    } else {
+      expandedTechLogs[techId] = true;
     }
   }
 
@@ -58,7 +69,8 @@ class VisitController extends GetxController {
     isCountsLoading.value = true;
     try {
       final response = await ApiHandler.getRequest(
-          "${ApiEndPoint.serviceVisitCounts}?company_id=${Pref.getCompanyId()}&location_id=${Pref.getLocationId()}&fin_year=${Pref.getFinancialYears()}");
+        "${ApiEndPoint.serviceVisitCounts}?company_id=${Pref.getCompanyId()}&location_id=${Pref.getLocationId()}&fin_year=${Pref.getFinancialYears()}",
+      );
       final data = json.decode(response.data);
       if (response.statusCode == 200 && data['status'] == 200) {
         visitCounts.value = VisitCounts.fromJson(data['data']);
@@ -182,6 +194,28 @@ class VisitController extends GetxController {
     if (page >= 1 && page <= totalPages) {
       currentPage.value = page;
       fetchData(isRefresh: false);
+    }
+  }
+
+  Future<void> cancelVisit(String visitId, String remarks) async {
+    isLoading.value = true;
+    try {
+      final body = {"cancel_remarks": remarks};
+      final response = await ApiHandler.postRequest(url: "${ApiEndPoint.baseUrl}service-visit/$visitId/cancel", body: body);
+
+      final data = response.data;
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        toastMessage(text: data['message'] ?? "Visit cancelled successfully");
+        fetchData();
+        getVisitCounts();
+      } else {
+        toastMessage(text: data['message'] ?? "Failed to cancel visit");
+      }
+    } catch (e) {
+      debugPrint("Error cancelling visit: $e");
+      toastMessage(text: "Something went wrong");
+    } finally {
+      isLoading.value = false;
     }
   }
 }

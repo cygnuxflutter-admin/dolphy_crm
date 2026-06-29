@@ -65,6 +65,17 @@ class VisitScreen extends GetView<VisitController> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final result = await Get.toNamed(AppRoutes.addVisitScreen);
+          if (result == true) {
+            controller.fetchData();
+            controller.getVisitCounts();
+          }
+        },
+        backgroundColor: AppColors.indigo600Main,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 
@@ -140,12 +151,7 @@ class VisitScreen extends GetView<VisitController> {
                 Row(
                   children: [
                     Expanded(
-                      child: _infoCell(
-                        Icons.currency_rupee,
-                        "Total Expense",
-                        item.totalExpense ?? "0.00",
-                        valueColor: AppColors.indigo600Main,
-                      ),
+                      child: _infoCell(Icons.currency_rupee, "Total Expense", item.totalExpense ?? "0.00", valueColor: AppColors.indigo600Main),
                     ),
                     Expanded(
                       child: _infoCell(
@@ -197,16 +203,26 @@ class VisitScreen extends GetView<VisitController> {
   Widget _buildActionMenu(BuildContext context, VisitDatum item) {
     final status = (item.status ?? "").toUpperCase();
     final bool isCompleted = status == "COMPLETED";
+    final bool isPending = status == "PENDING";
+    final bool isCancelled = status == "CANCELLED";
 
     return PopupMenuButton<String>(
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(),
       icon: const Icon(Icons.more_vert, color: AppColors.indigo600Main, size: 20),
-      onSelected: (value) {
+      onSelected: (value) async {
         if (value == 'view') {
           Get.toNamed(AppRoutes.visitViewScreen, arguments: item.id);
         } else if (value == 'field_report') {
           Get.toNamed(AppRoutes.visitFieldReportScreen, arguments: item.id);
+        } else if (value == 'cancel') {
+          _showCancelVisitDialog(context, item);
+        } else if (value == 'edit') {
+          final result = await Get.toNamed(AppRoutes.addVisitScreen, arguments: item.id);
+          if (result == true) {
+            controller.fetchData();
+            controller.getVisitCounts();
+          }
         }
       },
       itemBuilder: (context) => [
@@ -223,7 +239,149 @@ class VisitScreen extends GetView<VisitController> {
             value: 'add_expense',
             child: Row(children: [Icon(Icons.add_card_outlined, size: 16), SizedBox(width: 8), Text("Add Expense")]),
           ),
+        if (isCancelled)
+          const PopupMenuItem(
+            value: 'edit',
+            child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text("Edit")]),
+          ),
+        if (isPending)
+          const PopupMenuItem(
+            value: 'cancel',
+            child: Row(
+              children: [
+                Icon(Icons.cancel_outlined, size: 16, color: AppColors.red500),
+                SizedBox(width: 8),
+                Text("Cancel Visit", style: TextStyle(color: AppColors.red500)),
+              ],
+            ),
+          ),
       ],
+    );
+  }
+
+  void _showCancelVisitDialog(BuildContext context, VisitDatum item) {
+    final TextEditingController remarksController = TextEditingController();
+    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: AppColors.red500.withOpacity(0.1), shape: BoxShape.circle),
+                      child: const Icon(Icons.cancel_outlined, color: AppColors.red500, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Cancel Visit",
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                          ),
+                          Text("Visit ${item.visitNo} will be marked as cancelled", style: const TextStyle(fontSize: 12, color: AppColors.gray500)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20, color: AppColors.gray400),
+                      onPressed: () => Get.back(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  "Cancellation Remarks *",
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: remarksController,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    hintText: "Why are you cancelling this visit?",
+                    hintStyle: const TextStyle(fontSize: 13, color: AppColors.gray400),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.gray200),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.gray200),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.red500, width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return "Please enter cancellation remarks";
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Get.back(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.gray100,
+                          foregroundColor: AppColors.textPrimary,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text("Close", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (formKey.currentState!.validate()) {
+                            Get.back();
+                            controller.cancelVisit(item.id!, remarksController.text.trim());
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.red500,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.cancel_outlined, size: 16),
+                            SizedBox(width: 8),
+                            Text("Confirm Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
