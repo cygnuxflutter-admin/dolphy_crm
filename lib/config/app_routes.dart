@@ -15,4 +15,5 @@ class AppRoutes {
   static const String visitScreen = '/visitScreen';
   static const String visitViewScreen = '/visitViewScreen';
   static const String visitFieldReportScreen = '/visitFieldReportScreen';
+  static const String addVisitScreen = '/addVisitScreen';
 }
