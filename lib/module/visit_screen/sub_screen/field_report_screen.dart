@@ -113,18 +113,23 @@ class FieldReportScreen extends GetView<VisitController> {
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Visit Field Report", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                const SizedBox(height: 4),
-                Text(
-                  "${data.visitNo ?? ''}  Complaint ${data.complaintNo ?? ''}",
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Visit Field Report", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  const SizedBox(height: 4),
+                  Text(
+                    "${data.visitNo ?? ''}  Complaint ${data.complaintNo ?? ''}",
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -272,10 +277,15 @@ class FieldReportScreen extends GetView<VisitController> {
                               ),
                               const SizedBox(width: 4),
                               if (p.productCode != null)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: AppColors.indigo50, borderRadius: BorderRadius.circular(4)),
-                                  child: Text(p.productCode!, style: const TextStyle(fontSize: 9, color: AppColors.indigo600Main, fontWeight: FontWeight.bold)),
+                                Flexible(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(color: AppColors.indigo50, borderRadius: BorderRadius.circular(4)),
+                                    child: Text(p.productCode!,
+                                        style: const TextStyle(fontSize: 9, color: AppColors.indigo600Main, fontWeight: FontWeight.bold),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1),
+                                  ),
                                 ),
                             ],
                           ),
@@ -301,18 +311,20 @@ class FieldReportScreen extends GetView<VisitController> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (p.isAddedOnVisit == true)
-                          _tagBadge("Added on Visit", AppColors.blue500),
-                        if (p.needsComplaintSync == true)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: _tagBadge("Sync Required", AppColors.orangeColor),
-                          ),
-                        Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: AppColors.indigo600Main),
-                      ],
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (p.isAddedOnVisit == true)
+                            _tagBadge("Added on Visit", AppColors.blue500),
+                          if (p.needsComplaintSync == true)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: _tagBadge("Sync Required", AppColors.orangeColor),
+                            ),
+                          Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: AppColors.indigo600Main),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -574,8 +586,8 @@ class FieldReportScreen extends GetView<VisitController> {
             width: double.infinity,
             padding: const EdgeInsets.all(30),
             decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.gray200)),
-            child: Column(
-              children: const [
+            child: const Column(
+              children: [
                 Icon(Icons.inventory_2_outlined, color: AppColors.gray300, size: 40),
                 SizedBox(height: 12),
                 Text("No parts requested yet.", style: TextStyle(color: AppColors.gray400, fontSize: 13)),
