@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/app_colors.dart';
+import '../../../config/app_routes.dart';
 import '../model/visit_view_model.dart';
 import '../visit_controller.dart';
 
@@ -773,6 +774,7 @@ class VisitViewScreen extends GetView<VisitController> {
   Widget _buildHeaderButtons(VisitViewData? data) {
     final bool isCancelled = (data?.status ?? "").toUpperCase() == "CANCELLED";
     final bool isCompleted = (data?.status ?? "").toUpperCase() == "COMPLETED";
+    final bool isPending = (data?.status ?? "").toUpperCase() == "PENDING";
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -781,6 +783,21 @@ class VisitViewScreen extends GetView<VisitController> {
         children: [
           _headerButton(onTap: () {}, icon: Icons.sync, label: "Sync (1)", color: AppColors.indigo600Main),
           const SizedBox(width: 4),
+          if (isCancelled || isPending)
+            _headerButton(
+              onTap: () async {
+                final result = await Get.toNamed(AppRoutes.addVisitScreen, arguments: data?.id);
+                if (result == true) {
+                  controller.getVisitDetail(data?.id ?? "");
+                  controller.fetchData();
+                  controller.getVisitCounts();
+                }
+              },
+              icon: Icons.edit_outlined,
+              label: "Edit",
+              color: AppColors.indigo600Main,
+            ),
+          if (isCancelled || isPending) const SizedBox(width: 4),
           if (!isCancelled && isCompleted) _headerButton(onTap: () {}, icon: Icons.add, label: "Add Expense", color: AppColors.indigo600Main),
           if (!isCancelled && isCompleted) const SizedBox(width: 4),
           _headerButton(onTap: () => Get.back(), label: "Back", color: AppColors.red500, isOutline: false, bgColor: AppColors.red100),
@@ -1171,10 +1188,18 @@ class VisitViewScreen extends GetView<VisitController> {
 
   Widget _statusBadge(VisitViewData item) {
     String label = item.statusName ?? item.status ?? "-";
+    String status = (item.status ?? "").toUpperCase();
+
+    if (status == "IN_PROGRESS") {
+      final myTech = item.visitTechnicians.firstWhereOrNull((tech) => tech.isCurrentUser == true);
+      if (myTech != null && (myTech.fieldStatus ?? "").toUpperCase() == "COMPLETED") {
+        label = "Completed(My Task)";
+      }
+    }
+
     Color color = AppColors.gray500;
 
-    String status = (item.status ?? "").toUpperCase();
-    if (status == "COMPLETED") {
+    if (label.toUpperCase().contains("COMPLETED")) {
       color = AppColors.green500Success;
     } else if (status == "PENDING") {
       color = AppColors.orangeColor;

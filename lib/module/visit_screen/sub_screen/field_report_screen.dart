@@ -1,10 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../config/app_colors.dart';
+import '../../../config/app_shared_pref.dart';
 import '../model/field_report_model.dart';
 import '../visit_controller.dart';
+import '../widget/add_product_to_visit_dialog.dart';
 
 class FieldReportScreen extends GetView<VisitController> {
   const FieldReportScreen({super.key});
@@ -43,6 +48,10 @@ class FieldReportScreen extends GetView<VisitController> {
           return const Center(child: Text("No Report Data Found"));
         }
 
+        final currentUserId = Pref.getUserId();
+        final bool canAddProduct = (data.status?.toUpperCase() != "CANCELLED") &&
+            ((data.createdBy == currentUserId) || (data.technicians?.any((t) => t.id == currentUserId && t.isPrimary == true) ?? false));
+
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -55,21 +64,28 @@ class FieldReportScreen extends GetView<VisitController> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    "Product Complaint Details",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFEAB308)),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text("Add Product"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.indigo600Main,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  const Expanded(
+                    child: Text(
+                      "Product Complaint Details",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFEAB308)),
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  if (canAddProduct)
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        controller.clearAddProductForm();
+                        Get.dialog(AddProductToVisitDialog(visitId: visitId));
+                      },
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text("Add Product"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.indigo600Main,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -114,21 +130,31 @@ class FieldReportScreen extends GetView<VisitController> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Visit Field Report", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                const SizedBox(height: 4),
-                Text(
-                  "${data.visitNo ?? ''}  Complaint ${data.complaintNo ?? ''}",
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Visit Field Report",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "${data.visitNo ?? ''}  Complaint ${data.complaintNo ?? ''}",
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Text("ACTIVE DURATION", style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold)),
+                const Text(
+                  "ACTIVE DURATION",
+                  style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold),
+                ),
                 const Text("00:04:39", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
               ],
             ),
@@ -150,7 +176,10 @@ class FieldReportScreen extends GetView<VisitController> {
                 children: const [
                   Icon(Icons.check_circle, size: 14, color: AppColors.green500Success),
                   SizedBox(width: 6),
-                  Text("Ended", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.green500Success)),
+                  Text(
+                    "Ended",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.green500Success),
+                  ),
                 ],
               ),
             ),
@@ -177,7 +206,10 @@ class FieldReportScreen extends GetView<VisitController> {
             children: const [
               Icon(Icons.assignment_outlined, size: 18, color: AppColors.indigo600Main),
               SizedBox(width: 8),
-              Text("Visit Info", style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.indigo600Main)),
+              Text(
+                "Visit Info",
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+              ),
             ],
           ),
           const Padding(
@@ -190,7 +222,10 @@ class FieldReportScreen extends GetView<VisitController> {
             _infoItem("CUSTOMER", data.customerName ?? "-"),
             _infoItem("STATUS", data.statusName ?? "-"),
             _infoItem("VISIT PURPOSE", data.visitPurposeName ?? "-"),
-            _infoItem("VISIT START DATE & TIME", data.visitStartDatetime != null ? DateFormat('dd/MM/yyyy hh:mm a').format(data.visitStartDatetime!) : "-"),
+            _infoItem(
+              "VISIT START DATE & TIME",
+              data.visitStartDatetime != null ? DateFormat('dd/MM/yyyy hh:mm a').format(data.visitStartDatetime!) : "-",
+            ),
             _infoItem("VISIT END DATE & TIME", data.visitEndDatetime != null ? DateFormat('dd/MM/yyyy hh:mm a').format(data.visitEndDatetime!) : "-"),
             _infoItem("TECHNICIAN", data.technicianNames ?? "-"),
           ]),
@@ -223,7 +258,10 @@ class FieldReportScreen extends GetView<VisitController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 4),
         Text(
           value,
@@ -257,7 +295,10 @@ class FieldReportScreen extends GetView<VisitController> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
-                      child: Text("$index", style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.indigo600Main)),
+                      child: Text(
+                        "$index",
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -267,15 +308,22 @@ class FieldReportScreen extends GetView<VisitController> {
                           Row(
                             children: [
                               Expanded(
-                                child: Text(p.productName ?? "-",
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                child: Text(
+                                  p.productName ?? "-",
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                               const SizedBox(width: 4),
                               if (p.productCode != null)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(color: AppColors.indigo50, borderRadius: BorderRadius.circular(4)),
-                                  child: Text(p.productCode!, style: const TextStyle(fontSize: 9, color: AppColors.indigo600Main, fontWeight: FontWeight.bold)),
+                                  child: Text(
+                                    p.productCode!,
+                                    style: const TextStyle(fontSize: 9, color: AppColors.indigo600Main, fontWeight: FontWeight.bold),
+                                  ),
                                 ),
                             ],
                           ),
@@ -286,8 +334,11 @@ class FieldReportScreen extends GetView<VisitController> {
                               children: [
                                 _miniBadge(Icons.assignment_outlined, "Complaint ${p.complaintQty ?? 0}"),
                                 const SizedBox(width: 6),
-                                _miniBadge(Icons.check_circle_outline, "Solve ${p.solveQty ?? '-'}",
-                                    color: p.solveQty != null ? AppColors.green500Success : AppColors.orangeColor),
+                                _miniBadge(
+                                  Icons.check_circle_outline,
+                                  "Solve ${p.solveQty ?? '-'}",
+                                  color: p.solveQty != null ? AppColors.green500Success : AppColors.orangeColor,
+                                ),
                                 const SizedBox(width: 6),
                                 _miniBadge(Icons.description_outlined, "Invoice ${p.taxInvoiceNo ?? '-'}", color: AppColors.gray500),
                                 if (p.serialNumbers != null && p.serialNumbers!.isNotEmpty) ...[
@@ -304,13 +355,9 @@ class FieldReportScreen extends GetView<VisitController> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        if (p.isAddedOnVisit == true)
-                          _tagBadge("Added on Visit", AppColors.blue500),
+                        if (p.isAddedOnVisit == true) _tagBadge("Added on Visit", AppColors.blue500),
                         if (p.needsComplaintSync == true)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: _tagBadge("Sync Required", AppColors.orangeColor),
-                          ),
+                          Padding(padding: const EdgeInsets.only(top: 4), child: _tagBadge("Sync Required", AppColors.orangeColor)),
                         Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: AppColors.indigo600Main),
                       ],
                     ),
@@ -331,7 +378,11 @@ class FieldReportScreen extends GetView<VisitController> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.gray200)),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.gray200),
+                      ),
                       child: Text(p.issueDescription ?? "No description", style: const TextStyle(fontSize: 13)),
                     ),
                     const SizedBox(height: 20),
@@ -359,9 +410,15 @@ class FieldReportScreen extends GetView<VisitController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("PRODUCT", style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold)),
+          const Text(
+            "PRODUCT",
+            style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
-          Text("[${p.productCode ?? ''}] ${p.productName ?? '-'}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.indigo600Main)),
+          Text(
+            "[${p.productCode ?? ''}] ${p.productName ?? '-'}",
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.indigo600Main),
+          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 12,
@@ -383,7 +440,10 @@ class FieldReportScreen extends GetView<VisitController> {
       children: [
         Icon(icon, size: 14, color: AppColors.gray500),
         const SizedBox(width: 4),
-        Text(text, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+        ),
       ],
     );
   }
@@ -401,7 +461,10 @@ class FieldReportScreen extends GetView<VisitController> {
         children: [
           Icon(text.contains("Visit") ? Icons.add_circle_outline : Icons.sync, size: 10, color: color),
           const SizedBox(width: 4),
-          Text(text, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color)),
+          Text(
+            text,
+            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color),
+          ),
         ],
       ),
     );
@@ -413,33 +476,55 @@ class FieldReportScreen extends GetView<VisitController> {
       children: [
         _formLabelWithIcon(Icons.qr_code, "Serial Numbers"),
         const SizedBox(height: 8),
-        ...List.generate(p.serialNumbers?.length ?? 0, (i) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            children: [
-              Container(
-                width: 24,
-                height: 24,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(4)),
-                child: Text("${i + 1}", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(border: Border.all(color: AppColors.gray200), borderRadius: BorderRadius.circular(8)),
-                  child: Text(p.serialNumbers![i], style: const TextStyle(fontSize: 13)),
+        ...List.generate(
+          p.serialNumbers?.length ?? 0,
+          (i) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(4)),
+                  child: Text("${i + 1}", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    initialValue: p.serialNumbers![i],
+                    style: const TextStyle(fontSize: 13),
+                    onChanged: (val) => controller.updateSerialNumber(p.id ?? "", i, val),
+                    decoration: InputDecoration(
+                      hintText: "Enter serial number",
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.gray200),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.gray200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.indigo600Main),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        )),
+        ),
         if (p.serialNumbers == null || p.serialNumbers!.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(border: Border.all(color: AppColors.gray200), borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.gray200),
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: const Text("No serial numbers entered", style: TextStyle(fontSize: 13, color: AppColors.gray400)),
           ),
       ],
@@ -467,7 +552,14 @@ class FieldReportScreen extends GetView<VisitController> {
             children: [
               Expanded(child: _qtyField("Client Side Qty", "${p.clientSideQty ?? 0}")),
               const SizedBox(width: 12),
-              Expanded(child: _qtyField("Solve Qty *", "${p.solveQty ?? 0}", isEditable: true)),
+              Expanded(
+                child: _qtyField(
+                  "Solve Qty *",
+                  "${p.solveQty ?? 0}",
+                  isEditable: true,
+                  onChanged: (val) => controller.updateSolveQty(p.id ?? "", val),
+                ),
+              ),
             ],
           ),
         ],
@@ -475,22 +567,49 @@ class FieldReportScreen extends GetView<VisitController> {
     );
   }
 
-  Widget _qtyField(String label, String value, {bool isEditable = false}) {
+  Widget _qtyField(String label, String value, {bool isEditable = false, Function(String)? onChanged}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.gray600)),
-        const SizedBox(height: 6),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: isEditable ? Colors.white : const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.gray200),
-          ),
-          child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.gray600),
         ),
+        const SizedBox(height: 6),
+        isEditable
+            ? TextFormField(
+                initialValue: value,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                onChanged: onChanged,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.gray200),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.gray200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.indigo600Main),
+                  ),
+                ),
+              )
+            : Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.gray200),
+                ),
+                child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+              ),
       ],
     );
   }
@@ -503,57 +622,136 @@ class FieldReportScreen extends GetView<VisitController> {
         children: [
           _formLabelWithIcon(Icons.edit_note, "Work & Attachments"),
           const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("WORK REMARK", style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 6),
-                    Container(
-                      height: 100,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(border: Border.all(color: AppColors.gray200), borderRadius: BorderRadius.circular(8)),
-                      child: Text(p.workRemark ?? "Additional work notes for this product..",
-                          style: TextStyle(fontSize: 12, color: p.workRemark != null ? AppColors.textPrimary : AppColors.gray400)),
-                    ),
-                  ],
-                ),
+          const Text(
+            "WORK REMARK",
+            style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          TextFormField(
+            initialValue: p.workRemark,
+            maxLines: 3,
+            style: const TextStyle(fontSize: 13),
+            onChanged: (val) => controller.updateWorkRemark(p.id ?? "", val),
+            decoration: InputDecoration(
+              hintText: "Additional work notes for this product..",
+              hintStyle: const TextStyle(fontSize: 12, color: AppColors.gray400),
+              contentPadding: const EdgeInsets.all(12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.gray200),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 1,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("ATTACHMENTS", style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 6),
-                    Container(
-                      height: 100,
-                      width: double.infinity,
-                      decoration: BoxDecoration(border: Border.all(color: AppColors.gray200), borderRadius: BorderRadius.circular(8)),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.gray200),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.indigo600Main),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "ATTACHMENTS",
+            style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.gray200),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                InkWell(
+                  onTap: () => _pickFile(p.id ?? ""),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: const BoxDecoration(
+                      color: AppColors.gray50,
+                      borderRadius: BorderRadius.horizontal(left: Radius.circular(8)),
+                      border: Border(right: BorderSide(color: AppColors.gray200)),
+                    ),
+                    child: const Text("Choose Files", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      p.attachments != null && p.attachments!.isNotEmpty ? "${p.attachments!.length} files chosen" : "No file chosen",
+                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (p.attachments != null && p.attachments!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.gray100),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Uploaded files (${p.attachments!.length}):",
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 8),
+                  ...p.attachments!.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final url = entry.value;
+                    final fileName = url.split('/').last;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(color: AppColors.indigo50.withOpacity(0.5), borderRadius: BorderRadius.circular(6)),
+                      child: Row(
                         children: [
-                          const Icon(Icons.cloud_upload_outlined, color: AppColors.gray400),
-                          const SizedBox(height: 4),
-                          const Text("Choose Files", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                          Text(p.attachments != null && p.attachments!.isNotEmpty ? "${p.attachments!.length} files" : "No file chosen",
-                              style: const TextStyle(fontSize: 10, color: AppColors.gray400)),
+                          Expanded(
+                            child: Text(
+                              fileName,
+                              style: const TextStyle(fontSize: 12, color: AppColors.indigo600Main),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => controller.removeProductAttachment(p.id ?? "", index),
+                            child: const Icon(Icons.close, size: 14, color: AppColors.red500),
+                          ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
+                    );
+                  }).toList(),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _pickFile(String productId) async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        controller.uploadProductAttachment(productId, File(image.path));
+      }
+    } catch (e) {
+      debugPrint("Error picking image: $e");
+    }
   }
 
   Widget _buildPartsRequiredSection(Product p) {
@@ -566,14 +764,22 @@ class FieldReportScreen extends GetView<VisitController> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _formLabelWithIcon(Icons.settings_input_component_outlined, "Parts Required"),
-              TextButton.icon(onPressed: () {}, icon: const Icon(Icons.add, size: 14), label: const Text("Add Part", style: TextStyle(fontSize: 12))),
+              TextButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.add, size: 14),
+                label: const Text("Add Part", style: TextStyle(fontSize: 12)),
+              ),
             ],
           ),
           const SizedBox(height: 8),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(30),
-            decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.gray200)),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.gray200),
+            ),
             child: Column(
               children: const [
                 Icon(Icons.inventory_2_outlined, color: AppColors.gray300, size: 40),
@@ -590,7 +796,10 @@ class FieldReportScreen extends GetView<VisitController> {
   Widget _formLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.gray600)),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.gray600),
+      ),
     );
   }
 
@@ -599,7 +808,10 @@ class FieldReportScreen extends GetView<VisitController> {
       children: [
         Icon(icon, size: 16, color: AppColors.indigo600Main),
         const SizedBox(width: 8),
-        Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.indigo600Main)),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+        ),
       ],
     );
   }
@@ -618,7 +830,10 @@ class FieldReportScreen extends GetView<VisitController> {
         children: [
           Icon(icon, size: 12, color: color),
           const SizedBox(width: 4),
-          Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+          Text(
+            text,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+          ),
         ],
       ),
     );
@@ -636,7 +851,10 @@ class FieldReportScreen extends GetView<VisitController> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.3)),
       ),
-      child: Text(status.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+      child: Text(
+        status.toUpperCase(),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+      ),
     );
   }
 }

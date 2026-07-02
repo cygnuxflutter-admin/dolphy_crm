@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 
 import '../config/app_shared_pref.dart';
@@ -170,21 +169,20 @@ class ApiHandler {
 
     return response;
   }  */
-  static Future<http.Response> uploadFile(File file) async {
+  static Future<Response> uploadFile(File file, {String folderName = 'Opportunity'}) async {
     debugPrint("file path ===${file.path}");
+    String fileName = file.path.split('/').last;
 
-    var request = http.MultipartRequest('POST', Uri.parse('https://tradeapi.cygnux.in/api/v1/file/upload'));
-    request.fields.addAll({'foldername': 'Opportunity'});
-    request.files.add(
-      await http.MultipartFile.fromPath('file', file.path, filename: file.path.split("/").last, contentType: http.MediaType('image', 'jpg')),
-    );
+    FormData formData = FormData.fromMap({"foldername": folderName, "file": await MultipartFile.fromFile(file.path, filename: fileName)});
+
     var headers = await getHeaders();
-    request.headers.addAll(headers);
+    headers.remove('Content-Type'); // Important: Remove Content-Type for Multipart requests
 
-    http.StreamedResponse response = await request.send();
-
-    final responses = await http.Response.fromStream(response);
-    return responses;
+    return await createRequest().post(
+      'https://tradeapi.cygnux.in/api/v1/file/upload',
+      data: formData,
+      options: Options(headers: headers),
+    );
   }
 }
 
