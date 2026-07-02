@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -42,6 +43,158 @@ class VisitController extends GetxController {
   RxMap<String, bool> expandedProducts = <String, bool>{}.obs;
   RxMap<String, bool> expandedTechLogs = <String, bool>{}.obs;
 
+  // Add Product to Visit Form
+  Rx<TextEditingController> taxInvoiceNoController = TextEditingController().obs;
+  Rx<TextEditingController> complaintQtyController = TextEditingController(text: "1").obs;
+  Rx<TextEditingController> installedQtyController = TextEditingController(text: "0").obs;
+  Rx<TextEditingController> clientSideQtyController = TextEditingController(text: "0").obs;
+  Rx<TextEditingController> issueDescriptionController = TextEditingController().obs;
+  Rx<TextEditingController> usageCrowdNoteController = TextEditingController().obs;
+
+  RxList<dynamic> taxInvoices = <dynamic>[].obs;
+  Rxn<dynamic> selectedTaxInvoice = Rxn<dynamic>();
+  RxList<dynamic> productList = <dynamic>[].obs;
+  RxList<dynamic> invoiceProducts = <dynamic>[].obs; // Original items from invoice
+  Rxn<dynamic> selectedProduct = Rxn<dynamic>();
+
+  RxBool isTaxInvoiceLoading = false.obs;
+  RxBool isProductSearchLoading = false.obs;
+  RxBool isAddProductLoading = false.obs;
+
+  void clearAddProductForm() {
+    taxInvoiceNoController.value.clear();
+    complaintQtyController.value.text = "1";
+    installedQtyController.value.text = "0";
+    clientSideQtyController.value.text = "0";
+    issueDescriptionController.value.clear();
+    usageCrowdNoteController.value.clear();
+    selectedTaxInvoice.value = null;
+    selectedProduct.value = null;
+    taxInvoices.clear();
+    productList.clear();
+    invoiceProducts.clear();
+  }
+
+  Future<void> searchTaxInvoices(String query) async {
+    isTaxInvoiceLoading.value = true;
+    try {
+      final customerId = fieldReportDetail.value?.customerId ?? "";
+      final customerName = Uri.encodeComponent(fieldReportDetail.value?.customerName ?? "");
+
+      final url =
+          "${ApiEndPoint.baseUrl}invoice/find?search=$query&page=1&limit=20&exportData=false&invoice_type=regular&customer_id=$customerId&customer_name=$customerName";
+
+      final response = await ApiHandler.getRequest(url);
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        taxInvoices.assignAll(data['data'] ?? []);
+      }
+    } catch (e) {
+      debugPrint("Error searching tax invoices: $e");
+    } finally {
+      isTaxInvoiceLoading.value = false;
+    }
+  }
+
+  Future<List<dynamic>> searchProducts(String query, {int page = 1, int limit = 20}) async {
+    // If a tax invoice is selected, we filter the products belonging to that invoice locally
+    if (selectedTaxInvoice.value != null) {
+      if (query.isEmpty) {
+        productList.assignAll(invoiceProducts);
+        return invoiceProducts;
+      }
+      final filtered = invoiceProducts.where((p) {
+        final name = (p['product_name'] ?? "").toString().toLowerCase();
+        final code = (p['product_code'] ?? "").toString().toLowerCase();
+        return name.contains(query.toLowerCase()) || code.contains(query.toLowerCase());
+      }).toList();
+      productList.assignAll(filtered);
+      return filtered;
+    }
+
+    isProductSearchLoading.value = true;
+    try {
+      final response = await ApiHandler.getRequest("${ApiEndPoint.opportunityProduct}?page=$page&limit=$limit&search=$query&exportData=false");
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        final List results = data['data'] ?? [];
+        if (page == 1) {
+          productList.assignAll(results);
+        } else {
+          productList.addAll(results);
+        }
+        return results;
+      }
+    } catch (e) {
+      debugPrint("Error searching products: $e");
+    } finally {
+      isProductSearchLoading.value = false;
+    }
+    return [];
+  }
+
+  Future<void> getInvoiceItems(String invoiceId) async {
+    isProductSearchLoading.value = true;
+    try {
+      final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}invoice/find/$invoiceId");
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        final List items = data['data']['items'] ?? [];
+        final List mappedItems = items.map((item) {
+          return {'id': item['product_id'], 'product_name': item['product_name'], 'product_code': item['product_code']};
+        }).toList();
+
+        invoiceProducts.assignAll(mappedItems);
+        productList.assignAll(mappedItems);
+      }
+    } catch (e) {
+      debugPrint("Error fetching invoice items: $e");
+    } finally {
+      isProductSearchLoading.value = false;
+    }
+  }
+
+  Future<void> addProductToVisit(String visitId) async {
+    if (selectedProduct.value == null) {
+      toastMessage(text: "Please select a product");
+      return;
+    }
+    if (issueDescriptionController.value.text.isEmpty) {
+      toastMessage(text: "Please enter issue description");
+      return;
+    }
+
+    isAddProductLoading.value = true;
+    try {
+      final body = {
+        "product_id": selectedProduct.value['id'],
+        "tax_invoice_id": selectedTaxInvoice.value?['id'],
+        "tax_invoice_no": taxInvoiceNoController.value.text,
+        "complaint_qty": int.tryParse(complaintQtyController.value.text) ?? 1,
+        "installed_qty": int.tryParse(installedQtyController.value.text) ?? 0,
+        "client_side_qty": int.tryParse(clientSideQtyController.value.text) ?? 0,
+        "issue_description": issueDescriptionController.value.text,
+        "usage_note": usageCrowdNoteController.value.text,
+      };
+
+      final response = await ApiHandler.postRequest(url: "${ApiEndPoint.baseUrl}service-visit/$visitId/items", body: body);
+      final data = response.data;
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        toastMessage(text: "Product added to visit successfully");
+        Get.back(); // Close dialog
+        getFieldReport(visitId); // Refresh report
+      } else {
+        toastMessage(text: data['message'] ?? "Failed to add product");
+      }
+    } catch (e) {
+      debugPrint("Error adding product to visit: $e");
+      toastMessage(text: "Something went wrong");
+    } finally {
+      isAddProductLoading.value = false;
+    }
+  }
+
   void toggleProductExpansion(String productId) {
     if (expandedProducts.containsKey(productId)) {
       expandedProducts[productId] = !expandedProducts[productId]!;
@@ -55,6 +208,98 @@ class VisitController extends GetxController {
       expandedTechLogs[techId] = !expandedTechLogs[techId]!;
     } else {
       expandedTechLogs[techId] = true;
+    }
+  }
+
+  void updateSolveQty(String productId, String value) {
+    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
+    int? newQty = int.tryParse(value);
+    if (newQty == null) return;
+
+    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    if (productIndex != -1) {
+      final product = fieldReportDetail.value!.products![productIndex];
+      product.solveQty = newQty;
+
+      // Adjust serial numbers list size
+      List<String> currentSerials = product.serialNumbers ?? [];
+      if (currentSerials.length < newQty) {
+        // Add empty strings
+        currentSerials.addAll(List.generate(newQty - currentSerials.length, (_) => ""));
+      } else if (currentSerials.length > newQty) {
+        // Remove from end
+        currentSerials = currentSerials.sublist(0, newQty);
+      }
+      product.serialNumbers = currentSerials;
+      fieldReportDetail.refresh();
+    }
+  }
+
+  void updateSerialNumber(String productId, int index, String value) {
+    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
+    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    if (productIndex != -1) {
+      final product = fieldReportDetail.value!.products![productIndex];
+      if (product.serialNumbers != null && index < product.serialNumbers!.length) {
+        product.serialNumbers![index] = value;
+      }
+    }
+  }
+
+  void updateWorkRemark(String productId, String value) {
+    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
+    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    if (productIndex != -1) {
+      fieldReportDetail.value!.products![productIndex].workRemark = value;
+    }
+  }
+
+  Future<void> uploadProductAttachment(String productId, File file) async {
+    isLoading.value = true;
+    try {
+      debugPrint("Uploading file for product $productId: ${file.path}");
+      final response = await ApiHandler.uploadFile(file, folderName: 'service-visit-product-attachments');
+      debugPrint("Upload Response Status: ${response.statusCode}");
+      debugPrint("Upload Response Body: ${response.data}");
+
+      final data = response.data;
+
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        String? fileUrl = data['data'] != null ? data['data']['url'] : null;
+        if (fileUrl != null) {
+          final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+          if (productIndex != -1) {
+            final product = fieldReportDetail.value!.products![productIndex];
+            if (product.attachments == null) {
+              product.attachments = [];
+            }
+            product.attachments!.add(fileUrl);
+            fieldReportDetail.refresh();
+            toastMessage(text: "File uploaded successfully");
+          }
+        } else {
+          toastMessage(text: "File URL not found in response");
+        }
+      } else {
+        toastMessage(text: data['message'] ?? "Upload failed");
+      }
+    } catch (e) {
+      debugPrint("Error uploading file: $e");
+      toastMessage(text: "Upload error: $e");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  void removeProductAttachment(String productId, int index) {
+    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
+    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    if (productIndex != -1) {
+      final product = fieldReportDetail.value!.products![productIndex];
+      if (product.attachments != null && index < product.attachments!.length) {
+        product.attachments!.removeAt(index);
+        fieldReportDetail.refresh();
+      }
     }
   }
 

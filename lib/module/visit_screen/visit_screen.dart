@@ -173,10 +173,18 @@ class VisitScreen extends GetView<VisitController> {
 
   Widget _statusBadge(VisitDatum item) {
     String label = item.statusName ?? item.status ?? "-";
+    String status = (item.status ?? "").toUpperCase();
+
+    if (status == "IN_PROGRESS") {
+      final myTech = item.visitTechnicians?.firstWhereOrNull((tech) => tech.isCurrentUser == true);
+      if (myTech != null && (myTech.fieldStatus ?? "").toUpperCase() == "COMPLETED") {
+        label = "Completed(My Task)";
+      }
+    }
+
     Color color = AppColors.gray500;
 
-    String status = (item.status ?? "").toUpperCase();
-    if (status == "COMPLETED") {
+    if (label.toUpperCase().contains("COMPLETED")) {
       color = AppColors.green500Success;
     } else if (status == "PENDING") {
       color = AppColors.orangeColor;
@@ -217,6 +225,8 @@ class VisitScreen extends GetView<VisitController> {
           Get.toNamed(AppRoutes.visitFieldReportScreen, arguments: item.id);
         } else if (value == 'cancel') {
           _showCancelVisitDialog(context, item);
+        } else if (value == 'add_expense') {
+          Get.toNamed(AppRoutes.addExpenseScreen, arguments: item.id);
         } else if (value == 'edit') {
           final result = await Get.toNamed(AppRoutes.addVisitScreen, arguments: item.id);
           if (result == true) {
@@ -239,7 +249,7 @@ class VisitScreen extends GetView<VisitController> {
             value: 'add_expense',
             child: Row(children: [Icon(Icons.add_card_outlined, size: 16), SizedBox(width: 8), Text("Add Expense")]),
           ),
-        if (isCancelled)
+        if (isCancelled || isPending)
           const PopupMenuItem(
             value: 'edit',
             child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text("Edit")]),
