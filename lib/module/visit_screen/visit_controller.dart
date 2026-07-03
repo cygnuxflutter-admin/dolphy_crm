@@ -8,7 +8,9 @@ import '../../../config/app_shared_pref.dart';
 import '../../../config/app_url.dart';
 import '../../../utils/api_handler.dart';
 import '../../../widget/toast_message.dart';
+import '../lead_screen/model/lead_type.dart';
 import 'model/field_report_model.dart';
+import 'model/sync_preview_model.dart';
 import 'model/visit_counts_model.dart';
 import 'model/visit_model.dart';
 import 'model/visit_view_model.dart';
@@ -61,6 +63,22 @@ class VisitController extends GetxController {
   RxBool isProductSearchLoading = false.obs;
   RxBool isAddProductLoading = false.obs;
 
+  // Sync to Complaint
+  RxBool isSyncPreviewLoading = false.obs;
+  Rxn<SyncPreviewData> syncPreviewData = Rxn<SyncPreviewData>();
+  RxList<LeadItem> warrantyTypeList = <LeadItem>[].obs;
+  final RxList<Map<String, String>> repeatServiceStatusList = [
+    {"id": "first_service", "name": "First Service"},
+    {"id": "second_service", "name": "Second Service"},
+    {"id": "third_service", "name": "Third Service"},
+    {"id": "fourth_service", "name": "Fourth Service"},
+    {"id": "fifth_service", "name": "Fifth Service"},
+    {"id": "sixth_service", "name": "Sixth Service"},
+  ].obs;
+  RxBool isSyncing = false.obs;
+
+  Rxn<Map<String, String>> selectedRepeatServiceStatus = Rxn<Map<String, String>>();
+
   void clearAddProductForm() {
     taxInvoiceNoController.value.clear();
     complaintQtyController.value.text = "1";
@@ -70,9 +88,92 @@ class VisitController extends GetxController {
     usageCrowdNoteController.value.clear();
     selectedTaxInvoice.value = null;
     selectedProduct.value = null;
+    selectedRepeatServiceStatus.value = null;
     taxInvoices.clear();
     productList.clear();
     invoiceProducts.clear();
+  }
+
+  Future<void> getWarrantyTypes() async {
+    try {
+      final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}commonMaster/findByGroup?type=Warranty+Type");
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && data['status'] == 200) {
+        LeadType res = LeadType.fromJson(data);
+        if (res.data.isNotEmpty) {
+          warrantyTypeList.assignAll(res.data.first.items);
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching warranty types: $e");
+    }
+  }
+
+  Future<void> getSyncPreview(String visitId, String serviceQueryId) async {
+    isSyncPreviewLoading.value = true;
+    syncPreviewData.value = null; // Clear previous data
+    try {
+      await getWarrantyTypes();
+      final url = "${ApiEndPoint.syncToComplaintPreview.replaceAll("{visit_id}", visitId)}?service_query_id=$serviceQueryId";
+
+      final response = await ApiHandler.getRequest(url);
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        SyncPreviewModel res = SyncPreviewModel.fromJson(data);
+        syncPreviewData.value = res.data;
+      } else {
+        toastMessage(text: data['message'] ?? "Failed to fetch sync preview");
+      }
+    } catch (e, stack) {
+      debugPrint("Error fetching sync preview: $e");
+      debugPrint(stack.toString());
+      toastMessage(text: "Something went wrong while fetching preview");
+    } finally {
+      isSyncPreviewLoading.value = false;
+    }
+  }
+
+  Future<void> performSync(String visitId) async {
+    if (syncPreviewData.value == null) return;
+
+    isSyncing.value = true;
+    try {
+      final body = {
+        "service_query_id": syncPreviewData.value!.complaint.id,
+        "items": syncPreviewData.value!.products.map((p) {
+          return {
+            "visit_item_id": p.id,
+            "product_id": p.productId,
+            "tax_invoice_id": p.taxInvoiceId,
+            "tax_invoice_no": p.taxInvoiceNo,
+            "complaint_qty": p.complaintQty,
+            "installed_qty": p.installedQty,
+            "issue_description": p.issueDescription,
+            "usage_note": p.usageNote,
+            "warranty_type": p.warrantyType,
+            "warranty_type_other": null,
+            "repeat_service_status": p.repeatServiceStatus,
+          };
+        }).toList(),
+      };
+
+      final url = ApiEndPoint.syncToComplaint.replaceAll("{visit_id}", visitId);
+      final response = await ApiHandler.postRequest(url: url, body: body);
+      final data = response.data;
+
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        toastMessage(text: data['message'] ?? "Synced to complaint successfully");
+        Get.back(); // Close dialog
+        getVisitDetail(visitId); // Refresh details
+      } else {
+        toastMessage(text: data['message'] ?? "Failed to sync");
+      }
+    } catch (e) {
+      debugPrint("Error performing sync: $e");
+      toastMessage(text: "Something went wrong");
+    } finally {
+      isSyncing.value = false;
+    }
   }
 
   Future<void> searchTaxInvoices(String query) async {
@@ -173,6 +274,7 @@ class VisitController extends GetxController {
         "complaint_qty": int.tryParse(complaintQtyController.value.text) ?? 1,
         "installed_qty": int.tryParse(installedQtyController.value.text) ?? 0,
         "client_side_qty": int.tryParse(clientSideQtyController.value.text) ?? 0,
+        "repeat_service_status": selectedRepeatServiceStatus.value?['id'],
         "issue_description": issueDescriptionController.value.text,
         "usage_note": usageCrowdNoteController.value.text,
       };

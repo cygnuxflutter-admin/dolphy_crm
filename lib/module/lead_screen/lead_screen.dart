@@ -2,9 +2,11 @@ import 'dart:convert';
 
 import 'package:crm/config/app_colors.dart';
 import 'package:crm/config/app_routes.dart';
+import 'package:crm/module/home_screen/home_controller.dart';
 import 'package:crm/module/lead_screen/lead_controller.dart';
 import 'package:crm/module/lead_screen/sub_screen/add_activity_screen.dart';
 import 'package:crm/module/lead_screen/sub_screen/add_lead_screen.dart';
+import 'package:crm/utils/permission_handler.dart';
 import 'package:crm/widget/button_view.dart';
 import 'package:crm/widget/dropdown.dart';
 import 'package:dropdown_search/dropdown_search.dart';
@@ -26,6 +28,8 @@ class LeadScreen extends StatefulWidget {
 
 class _LeadScreenState extends State<LeadScreen> {
   LeadController leadController = Get.find<LeadController>();
+  PermissionHandler permissionHandler = Get.find<PermissionHandler>();
+  HomeScreenController homeScreenController = Get.find<HomeScreenController>();
 
   final ScrollController scrollController = ScrollController();
   final ScrollController summaryScrollController = ScrollController();
@@ -97,11 +101,15 @@ class _LeadScreenState extends State<LeadScreen> {
             onPressed: () => Get.back(),
           ),
           actions: [
-            IconButton(
-              icon: Icon(Icons.add_circle_outline, color: Colors.white),
-              onPressed: () {
-                Get.toNamed(AppRoutes.AddLeadScreen);
-              },
+            Obx(
+              () => permissionHandler.isLeadCreateAllowed
+                  ? IconButton(
+                      icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+                      onPressed: () {
+                        Get.toNamed(AppRoutes.AddLeadScreen);
+                      },
+                    )
+                  : const SizedBox(),
             ),
           ],
           bottom: const TabBar(

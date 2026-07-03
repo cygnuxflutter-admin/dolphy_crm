@@ -1,3 +1,6 @@
+import 'package:crm/module/home_screen/home_controller.dart';
+import 'package:crm/module/visit_screen/widget/sync_to_complaint_dialog.dart';
+import 'package:crm/utils/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -12,6 +15,8 @@ class VisitScreen extends GetView<VisitController> {
 
   @override
   Widget build(BuildContext context) {
+    HomeScreenController homeScreenController = Get.find<HomeScreenController>();
+    PermissionHandler permissionHandler = Get.find<PermissionHandler>();
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -65,16 +70,20 @@ class VisitScreen extends GetView<VisitController> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Get.toNamed(AppRoutes.addVisitScreen);
-          if (result == true) {
-            controller.fetchData();
-            controller.getVisitCounts();
-          }
-        },
-        backgroundColor: AppColors.indigo600Main,
-        child: const Icon(Icons.add, color: Colors.white),
+      floatingActionButton: Obx(
+        () => permissionHandler.isVisitCreateAllowed
+            ? FloatingActionButton(
+                onPressed: () async {
+                  final result = await Get.toNamed(AppRoutes.addVisitScreen);
+                  if (result == true) {
+                    controller.fetchData();
+                    controller.getVisitCounts();
+                  }
+                },
+                backgroundColor: AppColors.indigo600Main,
+                child: const Icon(Icons.add, color: Colors.white),
+              )
+            : const SizedBox(),
       ),
     );
   }

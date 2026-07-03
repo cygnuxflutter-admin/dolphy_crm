@@ -82,7 +82,7 @@ class AddVisitController extends GetxController {
         addressId = visit.addressId;
         mobileCountryCode = visit.mobileCountryCode;
 
-        selectedComplaint.value = {"id": visit.serviceQueryId, "complaint_no": visit.complaintNo};
+        selectedComplaint.value = {"id": visit.serviceQueryId, "complaint_no": visit.complaintNo, "customer_name": visit.customerName};
         complaintSearchController.value.text = visit.complaintNo;
 
         customerNameController.value.text = visit.customerName;

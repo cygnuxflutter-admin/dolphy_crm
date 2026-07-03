@@ -1,8 +1,10 @@
+import 'package:crm/module/home_screen/home_controller.dart';
 import 'package:crm/module/inquiry_screen/Inquiry_binding.dart';
 import 'package:crm/module/inquiry_screen/sub_screen/Inquiry_view_screen.dart';
 import 'package:crm/module/inquiry_screen/sub_screen/add_Inquiry_screen.dart';
 import 'package:crm/module/lead_screen/lead_binding.dart';
 import 'package:crm/module/lead_screen/sub_screen/add_lead_screen.dart';
+import 'package:crm/utils/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -20,6 +22,8 @@ class InquiryScreen extends StatefulWidget {
 
 class _InquiryScreenState extends State<InquiryScreen> {
   final InquiryScreenController inquiryScreenController = Get.find<InquiryScreenController>();
+  final PermissionHandler permissionHandler = Get.find<PermissionHandler>();
+  final HomeScreenController homeScreenController = Get.find<HomeScreenController>();
 
   final ScrollController scrollController = ScrollController();
 
@@ -78,12 +82,16 @@ class _InquiryScreenState extends State<InquiryScreen> {
           style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.white),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.person_add_alt_1_rounded, // 🔥 NEW ADD ICON
-              color: AppColors.white,
-            ),
-            onPressed: () => Get.to(AddInquiryScreen(), binding: InquiryScreenBinding()),
+          Obx(
+            () => permissionHandler.isInquiryCreateAllowed
+                ? IconButton(
+                    icon: const Icon(
+                      Icons.person_add_alt_1_rounded, // 🔥 NEW ADD ICON
+                      color: AppColors.white,
+                    ),
+                    onPressed: () => Get.to(AddInquiryScreen(), binding: InquiryScreenBinding()),
+                  )
+                : const SizedBox(),
           ),
         ],
       ),
@@ -209,29 +217,32 @@ class _InquiryScreenState extends State<InquiryScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _miniAction(Icons.person_add_alt_1_rounded, AppColors.green500Success, () async {
-                  await inquiryScreenController.getInquiryView(id: data.id);
-                  if (inquiryScreenController.leadViewData.value != null) {
-                    Get.to(() => AddLeadScreen(
-                          isEdit: false,
-                          prefillFromInquiry: inquiryScreenController.leadViewData.value,
-                        ),
+                if (permissionHandler.isLeadCreateAllowed)
+                  _miniAction(Icons.person_add_alt_1_rounded, AppColors.green500Success, () async {
+                    await inquiryScreenController.getInquiryView(id: data.id);
+                    if (inquiryScreenController.leadViewData.value != null) {
+                      Get.to(
+                        () => AddLeadScreen(isEdit: false, prefillFromInquiry: inquiryScreenController.leadViewData.value),
                         binding: LeadBinding(),
-                    );
-                  }
-                }),
-                const SizedBox(width: 12),
+                      );
+                    }
+                  }),
+                if (permissionHandler.isLeadCreateAllowed) const SizedBox(width: 12),
                 _miniAction(Icons.visibility_outlined, AppColors.indigo600Main, () async {
                   await inquiryScreenController.getInquiryView(id: data.id);
                   Get.to(() => InquiryDetailScreen());
                 }),
-                const SizedBox(width: 12),
-                _miniAction(Icons.edit_outlined, AppColors.yellow500, () async {
-                  inquiryScreenController.addAddressList.clear();
-                  Get.to(() => AddInquiryScreen(isEdit: true, id: data.id));
-                }),
-                const SizedBox(width: 12),
-                _miniAction(Icons.delete_outline, AppColors.red600Error, () => _deleteDialog(data.id)),
+                if (permissionHandler.isInquiryUpdateAllowed) ...[
+                  const SizedBox(width: 12),
+                  _miniAction(Icons.edit_outlined, AppColors.yellow500, () async {
+                    inquiryScreenController.addAddressList.clear();
+                    Get.to(() => AddInquiryScreen(isEdit: true, id: data.id));
+                  }),
+                ],
+                if (permissionHandler.isInquiryDeleteAllowed) ...[
+                  const SizedBox(width: 12),
+                  _miniAction(Icons.delete_outline, AppColors.red600Error, () => _deleteDialog(data.id)),
+                ],
               ],
             ),
           ),
