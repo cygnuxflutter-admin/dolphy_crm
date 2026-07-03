@@ -42,14 +42,14 @@ class AddExpenseScreen extends GetView<ExpenseController> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildVisitSelectSection(context),
-              const SizedBox(height: 20),
-              if (controller.selectedVisits.isNotEmpty) ...[_buildSelectedVisitDetails(), const SizedBox(height: 24)],
+              // const SizedBox(height: 10),
+              if (controller.selectedVisits.isNotEmpty) ...[_buildSelectedVisitDetails(), const SizedBox(height: 010)],
               _buildGeneralInfoSection(context),
-              const SizedBox(height: 24),
+              const SizedBox(height: 10),
               _buildExpenseLinesSection(context),
-              const SizedBox(height: 32),
+              const SizedBox(height: 10),
               _buildBottomButtons(),
-              const SizedBox(height: 40),
+              const SizedBox(height: 010),
             ],
           ),
         );
@@ -103,6 +103,7 @@ class AddExpenseScreen extends GetView<ExpenseController> {
   Widget _buildSelectedVisitDetails() {
     return Container(
       width: double.infinity,
+
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -134,7 +135,6 @@ class AddExpenseScreen extends GetView<ExpenseController> {
           const Divider(height: 1),
           ListView.separated(
             shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
             itemCount: controller.selectedVisits.length,
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (context, index) {

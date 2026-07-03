@@ -27,7 +27,7 @@ class VisitViewModel {
 class VisitViewData {
   String id;
   String tenantId;
-  String visitNo;
+  String? visitNo;
   String serviceQueryId;
   String customerId;
   String addressId;
