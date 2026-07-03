@@ -88,7 +88,14 @@ class AddVisitScreen extends GetView<AddVisitController> {
             await controller.getComplaints(filter);
             return controller.complaintList;
           },
-          itemAsString: (dynamic item) => item['complaint_no'] ?? "",
+          itemAsString: (dynamic item) {
+            if (item == null) return "";
+            String complaintNo = item['complaint_no'] ?? "";
+            String customerName = item['customer_name'] ?? "";
+            if (complaintNo.isEmpty) return customerName;
+            if (customerName.isEmpty) return complaintNo;
+            return "$complaintNo — $customerName";
+          },
           onChanged: (val) => controller.onComplaintSelected(val),
           selectedItem: controller.selectedComplaint.value,
           compareFn: (item, selectedItem) => item?['id'] == selectedItem?['id'],

@@ -7,6 +7,7 @@ import '../../../config/app_colors.dart';
 import '../../../config/app_routes.dart';
 import '../model/visit_view_model.dart';
 import '../visit_controller.dart';
+import '../widget/sync_to_complaint_dialog.dart';
 
 class VisitViewScreen extends GetView<VisitController> {
   const VisitViewScreen({super.key});
@@ -94,7 +95,7 @@ class VisitViewScreen extends GetView<VisitController> {
                             children: [
                               Container(
                                 padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(color: AppColors.blueColor.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                                decoration: BoxDecoration(color: AppColors.blueColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
                                 child: const Icon(Icons.info_outline, color: AppColors.blueColor, size: 16),
                               ),
                               const SizedBox(width: 8),
@@ -211,7 +212,7 @@ class VisitViewScreen extends GetView<VisitController> {
         children: [
           _buildEndTrackingCard(data),
           const SizedBox(height: 16),
-          if (data.products == null || data.products!.isEmpty)
+          if (data.products.isEmpty)
             const Center(
               child: Padding(
                 padding: EdgeInsets.only(top: 40),
@@ -219,7 +220,7 @@ class VisitViewScreen extends GetView<VisitController> {
               ),
             )
           else
-            ...data.products!.map((product) => _buildFieldReportCard(product)).toList(),
+            ...data.products.map((product) => _buildFieldReportCard(product)),
         ],
       ),
     );
@@ -263,18 +264,13 @@ class VisitViewScreen extends GetView<VisitController> {
                     Expanded(
                       child: _reportInfoItem("VISIT OUTCOME", (data.visitOutcome == null || data.visitOutcome!.isEmpty) ? "-" : data.visitOutcome!),
                     ),
-                    Expanded(
-                      child: _reportInfoItem(
-                        "SERVICE RECEIVED BY",
-                        (data.siteReceiverName == null || data.siteReceiverName!.isEmpty) ? "-" : data.siteReceiverName!,
-                      ),
-                    ),
+                    Expanded(child: _reportInfoItem("SERVICE RECEIVED BY", data.siteReceiverName.isEmpty ? "-" : data.siteReceiverName)),
                     Expanded(
                       child: _reportInfoItem(
                         "RECEIVER CONTACT",
-                        "${data.siteReceiverMobileCountryCode ?? ''} ${data.siteReceiverMobile ?? ''}".trim().isEmpty
+                        "${data.siteReceiverMobileCountryCode} ${data.siteReceiverMobile}".trim().isEmpty
                             ? "-"
-                            : "${data.siteReceiverMobileCountryCode ?? ''} ${data.siteReceiverMobile ?? ''}",
+                            : "${data.siteReceiverMobileCountryCode} ${data.siteReceiverMobile}",
                       ),
                     ),
                   ],
@@ -390,7 +386,7 @@ class VisitViewScreen extends GetView<VisitController> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    "[${product.productCode ?? '-'}] ${product.productName ?? '-'}",
+                    "[${product.productCode}] ${product.productName}",
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.orangeColor),
                   ),
                 ),
@@ -406,15 +402,27 @@ class VisitViewScreen extends GetView<VisitController> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: _reportInfoItem("COMPLAINT QTY", "${product.complaintQty ?? 0}")),
+                    Expanded(child: _reportInfoItem("COMPLAINT QTY", "${product.complaintQty}")),
                     Expanded(child: _reportInfoItem("SOLVE QTY", "${product.solveQty ?? 0}")),
-                    Expanded(child: _reportInfoItem("INSTALLED QTY", "${product.installedQty ?? 0}")),
+                    Expanded(child: _reportInfoItem("INSTALLED QTY", "${product.installedQty}")),
                   ],
                 ),
                 const SizedBox(height: 20),
-                _reportInfoItem(
-                  "WARRANTY",
-                  (product.warrantyTypeName == null || product.warrantyTypeName!.isEmpty) ? "-" : product.warrantyTypeName!,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _reportInfoItem("WARRANTY", product.warrantyTypeName.isEmpty ? "-" : product.warrantyTypeName)),
+                    Expanded(
+                      child: _reportInfoItem(
+                        "REPEAT SERVICE STATUS",
+                        (product.repeatServiceStatus == null || product.repeatServiceStatus!.isEmpty)
+                            ? "-"
+                            : controller.repeatServiceStatusList.firstWhereOrNull((e) => e['id'] == product.repeatServiceStatus)?['name'] ??
+                                  product.repeatServiceStatus!.replaceAll('_', ' ').capitalizeFirst!,
+                      ),
+                    ),
+                    const Spacer(),
+                  ],
                 ),
                 const SizedBox(height: 20),
                 Row(
@@ -514,7 +522,7 @@ class VisitViewScreen extends GetView<VisitController> {
                     ),
                   ),
                   // Table Rows
-                  ...List.generate(data.visitTechnicians?.length ?? 0, (index) {
+                  ...List.generate(data.visitTechnicians.length, (index) {
                     final tech = data.visitTechnicians![index];
                     return Obx(() {
                       final bool isExpanded = controller.expandedTechLogs[tech.id ?? ""] ?? false;
@@ -541,11 +549,11 @@ class VisitViewScreen extends GetView<VisitController> {
                                       Row(
                                         children: [
                                           if (tech.isPrimary == true) ...[
-                                            _techBadge("Primary", AppColors.indigo600Main.withOpacity(0.1), AppColors.indigo600Main),
+                                            _techBadge("Primary", AppColors.indigo600Main.withValues(alpha: 0.1), AppColors.indigo600Main),
                                             const SizedBox(width: 4),
                                           ],
                                           if (tech.isCurrentUser == true) ...[
-                                            _techBadge("You", AppColors.blueColor.withOpacity(0.1), AppColors.blueColor),
+                                            _techBadge("You", AppColors.blueColor.withValues(alpha: 0.1), AppColors.blueColor),
                                           ],
                                         ],
                                       ),
@@ -676,7 +684,7 @@ class VisitViewScreen extends GetView<VisitController> {
           if (tech.trackingLogs == null || tech.trackingLogs!.isEmpty)
             const Text("No tracking history found", style: TextStyle(fontSize: 12, color: AppColors.textSecondary))
           else
-            ...tech.trackingLogs!.map((log) => _buildTrackingLogEntry(log)).toList(),
+            ...tech.trackingLogs.map((log) => _buildTrackingLogEntry(log)),
         ],
       ),
     );
@@ -740,7 +748,7 @@ class VisitViewScreen extends GetView<VisitController> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.yellow100.withOpacity(0.3),
+                  color: AppColors.yellow100.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(4),
                   border: Border.all(color: AppColors.yellow100, width: 0.5),
                 ),
@@ -781,8 +789,27 @@ class VisitViewScreen extends GetView<VisitController> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _headerButton(onTap: () {}, icon: Icons.sync, label: "Sync (1)", color: AppColors.indigo600Main),
-          const SizedBox(width: 4),
+          Builder(
+            builder: (context) {
+              final int needsSyncCount = data?.products.where((p) => p.needsComplaintSync == true).length ?? 0;
+              if (needsSyncCount == 0) return const SizedBox.shrink();
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: _headerButton(
+                  onTap: () {
+                    if (data != null) {
+                      controller.getSyncPreview(data.id, data.serviceQueryId);
+                      Get.dialog(SyncToComplaintDialog(visitId: data.id));
+                    }
+                  },
+                  icon: Icons.sync,
+                  label: "Sync ($needsSyncCount)",
+                  color: AppColors.indigo600Main,
+                ),
+              );
+            },
+          ),
           if (isCancelled || isPending)
             _headerButton(
               onTap: () async {
@@ -935,7 +962,22 @@ class VisitViewScreen extends GetView<VisitController> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                _headerButton(onTap: () {}, icon: Icons.sync, label: "Sync to Complaint (1)", color: AppColors.indigo600Main),
+                Builder(
+                  builder: (context) {
+                    final int needsSyncCount = data.products.where((p) => p.needsComplaintSync == true).length;
+                    if (needsSyncCount == 0) return const SizedBox.shrink();
+
+                    return _headerButton(
+                      onTap: () {
+                        controller.getSyncPreview(data.id, data.serviceQueryId);
+                        Get.dialog(SyncToComplaintDialog(visitId: data.id));
+                      },
+                      icon: Icons.sync,
+                      label: "Sync to Complaint ($needsSyncCount)",
+                      color: AppColors.indigo600Main,
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -943,9 +985,10 @@ class VisitViewScreen extends GetView<VisitController> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: DataTable(
-              headingRowColor: MaterialStateProperty.all(AppColors.gray50),
+              headingRowColor: WidgetStateProperty.all(AppColors.gray50),
               headingRowHeight: 40,
-              dataRowHeight: 60,
+              dataRowMinHeight: 60,
+              dataRowMaxHeight: 60,
               columnSpacing: 24,
               columns: const [
                 DataColumn(
@@ -1015,7 +1058,7 @@ class VisitViewScreen extends GetView<VisitController> {
                   ),
                 ),
               ],
-              rows: List.generate(data.products?.length ?? 0, (index) {
+              rows: List.generate(data.products.length, (index) {
                 final product = data.products![index];
                 return DataRow(
                   cells: [
@@ -1051,7 +1094,10 @@ class VisitViewScreen extends GetView<VisitController> {
                     ),
                     DataCell(
                       Text(
-                        (product.repeatServiceStatus == null || product.repeatServiceStatus!.isEmpty) ? "-" : product.repeatServiceStatus!,
+                        (product.repeatServiceStatus == null || product.repeatServiceStatus!.isEmpty)
+                            ? "-"
+                            : controller.repeatServiceStatusList.firstWhereOrNull((e) => e['id'] == product.repeatServiceStatus)?['name'] ??
+                                  product.repeatServiceStatus!.replaceAll('_', ' ').capitalizeFirst!,
                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                       ),
                     ),
@@ -1095,7 +1141,7 @@ class VisitViewScreen extends GetView<VisitController> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
       child: Text(
         label,
         style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
@@ -1178,7 +1224,7 @@ class VisitViewScreen extends GetView<VisitController> {
     return Container(
       margin: const EdgeInsets.only(left: 8),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
       child: Text(
         label,
         style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
@@ -1212,9 +1258,9 @@ class VisitViewScreen extends GetView<VisitController> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1249,9 +1295,9 @@ class VisitViewScreen extends GetView<VisitController> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         status.toUpperCase(),

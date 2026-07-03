@@ -45,7 +45,7 @@ class AddProductToVisitDialog extends GetView<VisitController> {
                   border: Border.all(color: AppColors.gray200),
                 ),
                 child: const Text(
-                  "This product will be added only to this visit. Warranty type and repeat service status can be set later when syncing to the complaint from Complaint Tracker.",
+                  "This product will be added to this visit. Please specify the repeat service status if applicable.",
                   style: TextStyle(fontSize: 12, color: AppColors.gray600),
                 ),
               ),
@@ -97,14 +97,40 @@ class AddProductToVisitDialog extends GetView<VisitController> {
                 padding: 0,
               ),
               const SizedBox(height: 16),
-              _buildTextField(
-                label: "Complaint Qty",
-                isRequired: true,
-                controller: controller.complaintQtyController.value,
-                keyboardType: TextInputType.number,
+              _buildLabel("Repeat Service Status"),
+              Obx(
+                () => CustomDropdown<Map<String, String>>(
+                  hintText: "Select status...",
+                  items: (filter, props) async => controller.repeatServiceStatusList,
+                  itemAsString: (item) => item['name'] ?? "",
+                  selectedItem: controller.selectedRepeatServiceStatus.value,
+                  onChanged: (val) => controller.selectedRepeatServiceStatus.value = val,
+                  compareFn: (item, selectedItem) => item?['id'] == selectedItem?['id'],
+                  showSearchBox: false,
+                  padding: 0,
+                ),
               ),
               const SizedBox(height: 16),
-              _buildTextField(label: "Installed Qty", controller: controller.installedQtyController.value, keyboardType: TextInputType.number),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField(
+                      label: "Complaint Qty",
+                      isRequired: true,
+                      controller: controller.complaintQtyController.value,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildTextField(
+                      label: "Installed Qty",
+                      controller: controller.installedQtyController.value,
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               _buildTextField(label: "Client Side Qty", controller: controller.clientSideQtyController.value, keyboardType: TextInputType.number),
               const SizedBox(height: 16),

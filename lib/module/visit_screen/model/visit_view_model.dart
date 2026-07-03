@@ -269,10 +269,10 @@ class Product {
   String productId;
   String? taxInvoiceId;
   String taxInvoiceNo;
-  int complaintQty;
-  int installedQty;
-  int? clientSideQty;
-  int? solveQty;
+  dynamic complaintQty;
+  dynamic installedQty;
+  dynamic clientSideQty;
+  dynamic solveQty;
   String usageNote;
   String? warrantyType;
   dynamic warrantyTypeOther;
@@ -294,7 +294,7 @@ class Product {
   String productImage;
   String warrantyTypeName;
   String? syncType;
-  int suggestedComplaintQty;
+  dynamic suggestedComplaintQty;
   bool needsComplaintSync;
   List<dynamic>? partRequests;
 
