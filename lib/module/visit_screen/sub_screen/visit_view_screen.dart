@@ -107,7 +107,7 @@ class VisitViewScreen extends GetView<VisitController> {
                           ),
                           Padding(
                             padding: const EdgeInsets.only(left: 24),
-                            child: Text(data.visitNo, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                            child: Text(data.visitNo ?? "", style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                           ),
                         ],
                       ),

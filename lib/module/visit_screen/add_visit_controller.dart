@@ -55,9 +55,10 @@ class AddVisitController extends GetxController {
   }
 
   Future<void> initData() async {
+    isLoading.value = true;
     await getVisitPurposes();
     await getTechnicians();
-
+    isLoading.value = false;
     if (Get.arguments != null && Get.arguments is String) {
       isEdit.value = true;
       visitId = Get.arguments;
