@@ -194,15 +194,261 @@ class VisitViewScreen extends GetView<VisitController> {
           ),
           body: TabBarView(
             children: [
-              _buildOverviewTab(data),
+              _buildOverviewTab(data, tabCount),
               _buildFieldTrackingTab(data),
               _buildFieldReportTab(data),
-              if (!isCancelled) const Center(child: Text("Visit Expense Content")),
+              if (!isCancelled) _buildVisitExpenseTab(data),
             ],
           ),
         ),
       );
     });
+  }
+
+  Widget _buildVisitExpenseTab(VisitViewData data) {
+    return Obx(() {
+      if (controller.isExpenseLoading.value) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.gray200, width: 0.8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.receipt_long_outlined, size: 20, color: AppColors.blueColor),
+                        SizedBox(width: 10),
+                        Text(
+                          "Visit Expense",
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.blueColor),
+                        ),
+                      ],
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Get.toNamed(AppRoutes.addExpenseScreen, arguments: data.id);
+                      },
+                      icon: const Icon(Icons.add, size: 16, color: AppColors.white),
+                      label: const Text("Add Expense", style: TextStyle(color: AppColors.white, fontSize: 12)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.blueColor,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        elevation: 0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: AppColors.gray200),
+              // Content
+              if (controller.technicianExpenses.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Center(
+                        child: Text("No technician expenses for this visit yet.", style: TextStyle(color: AppColors.textSecondary, fontSize: 14)),
+                      ),
+                      const SizedBox(height: 16),
+                      Builder(
+                        builder: (context) {
+                          return ElevatedButton(
+                            onPressed: () {
+                              final tabController = DefaultTabController.of(context);
+                              if (tabController != null) {
+                                tabController.animateTo(0);
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.gray100,
+                              foregroundColor: AppColors.textPrimary,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            ),
+                            child: const Text("View Visit", style: TextStyle(fontSize: 12)),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Column(
+                  children: [
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        headingRowColor: WidgetStateProperty.all(AppColors.gray50),
+                        headingRowHeight: 40,
+                        dataRowMinHeight: 50,
+                        dataRowMaxHeight: 60,
+                        columnSpacing: 24,
+                        columns: const [
+                          DataColumn(
+                            label: Text(
+                              "#",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Text(
+                              "Technician Name",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Text(
+                              "Technician Expense No.",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Text(
+                              "Request Amount",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Text(
+                              "Approve Amount",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                          ),
+                          DataColumn(
+                            label: Text(
+                              "Status",
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                          ),
+                        ],
+                        rows: [
+                          ...List.generate(controller.technicianExpenses.length, (index) {
+                            final expense = controller.technicianExpenses[index];
+                            return DataRow(
+                              cells: [
+                                DataCell(Text("${index + 1}", style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                                DataCell(
+                                  Text(
+                                    expense.technicianName,
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                  ),
+                                ),
+                                DataCell(Text(expense.expenseNo, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                                DataCell(
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      expense.totalRequestAmount,
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      double.parse(expense.totalApproveAmount) > 0 ? expense.totalApproveAmount : "-",
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: double.parse(expense.totalApproveAmount) > 0 ? AppColors.green500Success : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(_expenseStatusBadge(expense.status)),
+                              ],
+                            );
+                          }),
+                          DataRow(
+                            color: WidgetStateProperty.all(AppColors.indigo50.withValues(alpha: 0.3)),
+                            cells: [
+                              const DataCell(SizedBox.shrink()),
+                              const DataCell(SizedBox.shrink()),
+                              const DataCell(
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    "GRAND TOTAL",
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    controller.totalExpenseRequestAmount.toStringAsFixed(2),
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    controller.totalExpenseApproveAmount.toStringAsFixed(2),
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.green500Success),
+                                  ),
+                                ),
+                              ),
+                              const DataCell(SizedBox.shrink()),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _expenseStatusBadge(String status) {
+    Color color = AppColors.gray500;
+    if (status.toLowerCase() == "submitted") {
+      color = AppColors.blueColor;
+    } else if (status.toLowerCase() == "approved") {
+      color = AppColors.green500Success;
+    } else if (status.toLowerCase() == "rejected" || status.toLowerCase() == "cancelled") {
+      color = AppColors.red500;
+    } else if (status.toLowerCase() == "draft") {
+      color = AppColors.orangeColor;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        status.toLowerCase(),
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
+      ),
+    );
   }
 
   Widget _buildFieldReportTab(VisitViewData data) {
@@ -825,7 +1071,15 @@ class VisitViewScreen extends GetView<VisitController> {
               color: AppColors.indigo600Main,
             ),
           if (isCancelled || isPending) const SizedBox(width: 4),
-          if (!isCancelled && isCompleted) _headerButton(onTap: () {}, icon: Icons.add, label: "Add Expense", color: AppColors.indigo600Main),
+          if (!isCancelled && isCompleted)
+            _headerButton(
+              onTap: () {
+                Get.toNamed(AppRoutes.addExpenseScreen, arguments: data?.id);
+              },
+              icon: Icons.add,
+              label: "Add Expense",
+              color: AppColors.indigo600Main,
+            ),
           if (!isCancelled && isCompleted) const SizedBox(width: 4),
           _headerButton(onTap: () => Get.back(), label: "Back", color: AppColors.red500, isOutline: false, bgColor: AppColors.red100),
         ],
@@ -864,7 +1118,7 @@ class VisitViewScreen extends GetView<VisitController> {
     );
   }
 
-  Widget _buildOverviewTab(VisitViewData data) {
+  Widget _buildOverviewTab(VisitViewData data, int tabCount) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -896,16 +1150,25 @@ class VisitViewScreen extends GetView<VisitController> {
                 extra: _statusBadgeSmall("0 approved", AppColors.green500Success),
               ),
             ],
-            footer: OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.receipt_long_outlined, size: 16),
-              label: const Text("View Visit Expense"),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.indigo600Main,
-                side: const BorderSide(color: AppColors.indigo600Main, width: 0.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
+            footer: Builder(
+              builder: (context) {
+                return OutlinedButton.icon(
+                  onPressed: () {
+                    final tabController = DefaultTabController.of(context);
+                    if (tabController != null) {
+                      tabController.animateTo(tabCount - 1);
+                    }
+                  },
+                  icon: const Icon(Icons.receipt_long_outlined, size: 16),
+                  label: const Text("View Visit Expense"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.indigo600Main,
+                    side: const BorderSide(color: AppColors.indigo600Main, width: 0.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 16),
@@ -922,7 +1185,11 @@ class VisitViewScreen extends GetView<VisitController> {
             ],
           ),
           const SizedBox(height: 16),
-          _buildDetailCard(title: "Remarks", icon: Icons.notes_outlined, children: [_gridInfoItem("No remarks", "", isFullWidth: true)]),
+          _buildDetailCard(
+            title: "Remarks",
+            icon: Icons.notes_outlined,
+            children: [_gridInfoItem(data.remark ?? "No Remarks", "", isFullWidth: true)],
+          ),
           const SizedBox(height: 16),
           _buildProductComplaintDetails(data),
           const SizedBox(height: 24),

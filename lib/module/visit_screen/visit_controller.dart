@@ -8,6 +8,7 @@ import '../../../config/app_shared_pref.dart';
 import '../../../config/app_url.dart';
 import '../../../utils/api_handler.dart';
 import '../../../widget/toast_message.dart';
+import '../expense_screen/model/technician_expense_model.dart';
 import '../lead_screen/model/lead_type.dart';
 import 'model/field_report_model.dart';
 import 'model/sync_preview_model.dart';
@@ -37,6 +38,13 @@ class VisitController extends GetxController {
   RxBool isDetailLoading = false.obs;
   RxString detailError = "".obs;
   Rx<VisitViewData?> visitDetail = Rx<VisitViewData?>(null);
+
+  // Technician Expenses
+  RxBool isExpenseLoading = false.obs;
+  RxList<TechnicianExpense> technicianExpenses = <TechnicianExpense>[].obs;
+
+  double get totalExpenseRequestAmount => technicianExpenses.fold(0.0, (sum, item) => sum + (double.tryParse(item.totalRequestAmount) ?? 0.0));
+  double get totalExpenseApproveAmount => technicianExpenses.fold(0.0, (sum, item) => sum + (double.tryParse(item.totalApproveAmount) ?? 0.0));
 
   // Field Report Details
   RxBool isFieldReportLoading = false.obs;
@@ -479,6 +487,7 @@ class VisitController extends GetxController {
       if (response.statusCode == 200 && data['status'] == 200) {
         VisitViewModel res = VisitViewModel.fromJson(data);
         visitDetail.value = res.data;
+        getTechnicianExpenses(id); // Fetch expenses along with details
       } else {
         detailError.value = data['message'] ?? "Failed to load details";
       }
@@ -487,6 +496,25 @@ class VisitController extends GetxController {
       detailError.value = "Something went wrong";
     } finally {
       isDetailLoading.value = false;
+    }
+  }
+
+  Future<void> getTechnicianExpenses(String visitId) async {
+    isExpenseLoading.value = true;
+    technicianExpenses.clear();
+    try {
+      final url = "${ApiEndPoint.technicianExpenseList}?page=1&rowsPerPage=100&service_visit_id=$visitId";
+      final response = await ApiHandler.getRequest(url);
+      final data = json.decode(response.data);
+
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        TechnicianExpenseModel res = TechnicianExpenseModel.fromJson(data);
+        technicianExpenses.assignAll(res.data);
+      }
+    } catch (e) {
+      debugPrint("Error fetching technician expenses: $e");
+    } finally {
+      isExpenseLoading.value = false;
     }
   }
 
