@@ -56,12 +56,14 @@ class ExpenseController extends GetxController {
 
   Future<void> getExpenseTypes() async {
     try {
-      final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}commonMaster/findByGroup?type=Technician+Expense+Type");
+      final response = await ApiHandler.getRequest(
+          "${ApiEndPoint.baseUrl}commonMaster/findByGroup?type=Technician+Expense+Type");
       final data = json.decode(response.data);
-      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
-        List<dynamic> types = data['data'] ?? [];
-        if (types.isNotEmpty) {
-          expenseTypes.assignAll(types.map((e) => e['name'].toString()).toList());
+      if (response.statusCode == 200 &&
+          (data['status'] == 200 || data['success'] == true)) {
+        if (data['data'] != null && data['data'].isNotEmpty) {
+          List<dynamic> items = data['data'][0]['items'] ?? [];
+          expenseTypes.assignAll(items.map((e) => e['name'].toString()).toList());
         }
       }
     } catch (e) {
