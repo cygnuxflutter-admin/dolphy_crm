@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 
 import '../../../config/app_shared_pref.dart';
@@ -13,8 +15,8 @@ import '../lead_screen/model/lead_type.dart';
 import 'model/field_report_model.dart';
 import 'model/sync_preview_model.dart';
 import 'model/visit_counts_model.dart';
-import 'model/visit_model.dart';
-import 'model/visit_view_model.dart';
+import 'model/visit_model.dart' hide Technician, VisitTechnician, TrackingLog;
+import 'model/visit_view_model.dart' hide Technician, VisitTechnician, TrackingLog, Product;
 
 class VisitController extends GetxController {
   RxBool isLoading = false.obs;
@@ -86,6 +88,55 @@ class VisitController extends GetxController {
   RxBool isSyncing = false.obs;
 
   Rxn<Map<String, String>> selectedRepeatServiceStatus = Rxn<Map<String, String>>();
+
+  // Real-time Timer
+  Timer? _timer;
+  RxInt currentTimerSeconds = 0.obs;
+
+  void startTimer(List<TrackingLog>? logs) {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      currentTimerSeconds.value = _calculateTotalSeconds(logs);
+    });
+  }
+
+  void stopTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  int _calculateTotalSeconds(List<TrackingLog>? logs) {
+    if (logs == null || logs.isEmpty) return 0;
+    int totalSeconds = 0;
+    DateTime? startTime;
+
+    for (var log in logs) {
+      final action = log.action?.toLowerCase();
+      final time = log.createdAt;
+      if (time == null) continue;
+
+      if (action == 'start' || action == 'resume') {
+        startTime = time;
+      } else if (action == 'pause' || action == 'stop' || action == 'end') {
+        if (startTime != null) {
+          totalSeconds += time.difference(startTime).inSeconds;
+          startTime = null;
+        }
+      }
+    }
+
+    if (startTime != null) {
+      totalSeconds += DateTime.now().toUtc().difference(startTime).inSeconds;
+    }
+
+    return totalSeconds;
+  }
+
+  @override
+  void onClose() {
+    _timer?.cancel();
+    super.onClose();
+  }
 
   void clearAddProductForm() {
     taxInvoiceNoController.value.clear();
@@ -530,6 +581,15 @@ class VisitController extends GetxController {
       if (response.statusCode == 200 && data['status'] == 200) {
         FieldReportModel res = FieldReportModel.fromJson(data);
         fieldReportDetail.value = res.data;
+
+        // Manage Timer
+        final currentUserTech = res.data?.visitTechnicians?.firstWhereOrNull((t) => t.isCurrentUser == true);
+        if (currentUserTech != null && currentUserTech.fieldStatus?.toLowerCase() == "started") {
+          startTimer(currentUserTech.trackingLogs);
+        } else {
+          stopTimer();
+          currentTimerSeconds.value = _calculateTotalSeconds(currentUserTech?.trackingLogs);
+        }
       } else {
         fieldReportError.value = data['message'] ?? "Failed to load field report";
       }
@@ -592,5 +652,73 @@ class VisitController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<Position?> _handleLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      toastMessage(text: "Location services are disabled.");
+      return null;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        toastMessage(text: "Location permissions are denied");
+        return null;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      toastMessage(text: "Location permissions are permanently denied");
+      return null;
+    }
+
+    return await Geolocator.getCurrentPosition();
+  }
+
+  Future<void> _updateVisitStatus(String visitId, String action, String successMsg, {Map<String, dynamic>? extraBody}) async {
+    Position? position = await _handleLocation();
+    if (position == null) return;
+
+    isLoading.value = true;
+    try {
+      final body = {"latitude": position.latitude, "longitude": position.longitude, if (extraBody != null) ...extraBody};
+      final url = "${ApiEndPoint.baseUrl}service-visit/$visitId/$action";
+      final response = await ApiHandler.postRequest(url: url, body: body);
+
+      final data = response.data;
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        toastMessage(text: data['message'] ?? successMsg);
+        getFieldReport(visitId);
+      } else {
+        toastMessage(text: data['message'] ?? "Failed to $action visit");
+      }
+    } catch (e) {
+      debugPrint("Error during $action visit: $e");
+      toastMessage(text: "Something went wrong");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> startVisit(String visitId) async {
+    await _updateVisitStatus(visitId, "start", "Visit started successfully");
+  }
+
+  Future<void> pauseVisit(String visitId, {String? remark}) async {
+    await _updateVisitStatus(visitId, "pause", "Visit paused successfully", extraBody: {"remark": remark ?? ""});
+  }
+
+  Future<void> resumeVisit(String visitId) async {
+    await _updateVisitStatus(visitId, "resume", "Visit resumed successfully");
+  }
+
+  Future<void> stopVisit(String visitId) async {
+    await _updateVisitStatus(visitId, "end", "Visit stopped successfully");
   }
 }

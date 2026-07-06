@@ -239,19 +239,20 @@ class VisitViewScreen extends GetView<VisitController> {
                         ),
                       ],
                     ),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Get.toNamed(AppRoutes.addExpenseScreen, arguments: data.id);
-                      },
-                      icon: const Icon(Icons.add, size: 16, color: AppColors.white),
-                      label: const Text("Add Expense", style: TextStyle(color: AppColors.white, fontSize: 12)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.blueColor,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        elevation: 0,
+                    if ((data.status ?? "").toUpperCase() == "COMPLETED")
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Get.toNamed(AppRoutes.addExpenseScreen, arguments: data.id);
+                        },
+                        icon: const Icon(Icons.add, size: 16, color: AppColors.white),
+                        label: const Text("Add Expense", style: TextStyle(color: AppColors.white, fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.blueColor,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          elevation: 0,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -818,63 +819,70 @@ class VisitViewScreen extends GetView<VisitController> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        "${tech.startLatitude ?? ''}, ${tech.startLongitude ?? ''}".trim().isEmpty
+                                        "${tech.startLatitude ?? ''} ${tech.startLongitude ?? ''}".trim().isEmpty
                                             ? "-"
                                             : "${tech.startLatitude}, ${tech.startLongitude}",
                                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                       ),
-                                      InkWell(
-                                        onTap: () => _openMap(tech.startLatitude, tech.startLongitude),
-                                        child: const Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.location_on_outlined, size: 12, color: AppColors.indigo600Main),
-                                            Text(
-                                              " View on map",
-                                              style: TextStyle(fontSize: 11, color: AppColors.indigo600Main, decoration: TextDecoration.underline),
-                                            ),
-                                          ],
+                                      if ("${tech.startLatitude ?? ''} ${tech.startLongitude ?? ''}".trim().isNotEmpty)
+                                        InkWell(
+                                          onTap: () => _openMap(tech.startLatitude, tech.startLongitude),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.location_on_outlined, size: 12, color: AppColors.indigo600Main),
+
+                                              Text(
+                                                " View on map",
+                                                style: TextStyle(fontSize: 11, color: AppColors.indigo600Main, decoration: TextDecoration.underline),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
                                     ],
                                   ),
                                   200,
                                 ),
+
                                 _tableCellItem(
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        _formatDuration(tech.activeDurationSeconds ?? 0),
+                                        tech.activeDurationSeconds != 0 ? _formatDuration(tech.activeDurationSeconds ?? 0) : "-",
                                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.green500Success),
                                       ),
-                                      InkWell(
-                                        onTap: () => controller.toggleTechLogExpansion(tech.id ?? ""),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                              size: 12,
-                                              color: AppColors.indigo600Main,
-                                            ),
-                                            Text(
-                                              isExpanded ? " Hide Log" : " View Log",
-                                              style: const TextStyle(
-                                                fontSize: 11,
+                                      if (tech.activeDurationSeconds != 0)
+                                        InkWell(
+                                          onTap: () => controller.toggleTechLogExpansion(tech.id ?? ""),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                                size: 12,
                                                 color: AppColors.indigo600Main,
-                                                decoration: TextDecoration.underline,
                                               ),
-                                            ),
-                                          ],
+                                              Text(
+                                                isExpanded ? " Hide Log" : " View Log",
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppColors.indigo600Main,
+                                                  decoration: TextDecoration.underline,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
                                     ],
                                   ),
                                   120,
                                 ),
-                                _tableCellItem(Text(tech.remark ?? "-", style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)), 150),
+                                _tableCellItem(
+                                  Text(tech.remark == "" ? "-" : tech.remark!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                  150,
+                                ),
                               ],
                             ),
                           ),
@@ -1221,7 +1229,7 @@ class VisitViewScreen extends GetView<VisitController> {
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          "Product Complaint Details",
+                          "Product Complaint Details ",
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.orangeColor),
                         ),
                       ),
@@ -1279,6 +1287,12 @@ class VisitViewScreen extends GetView<VisitController> {
                 DataColumn(
                   label: Text(
                     "Tax Invoice No",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    "Tax Invoice Date",
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                 ),
@@ -1350,6 +1364,12 @@ class VisitViewScreen extends GetView<VisitController> {
                     DataCell(
                       Text(
                         (product.taxInvoiceNo == null || product.taxInvoiceNo!.isEmpty) ? "-" : product.taxInvoiceNo!,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        (product.taxInvoiceDate == null || product.taxInvoiceDate!.isEmpty) ? "-" : product.taxInvoiceDate!,
                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                       ),
                     ),
@@ -1574,6 +1594,7 @@ class VisitViewScreen extends GetView<VisitController> {
   }
 
   String _formatDuration(int seconds) {
+    debugPrint("Formate formate ==== ${seconds}");
     final int hours = seconds ~/ 3600;
     final int minutes = (seconds % 3600) ~/ 60;
     final int remainingSeconds = seconds % 60;
