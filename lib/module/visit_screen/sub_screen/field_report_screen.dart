@@ -49,7 +49,8 @@ class FieldReportScreen extends GetView<VisitController> {
         }
 
         final currentUserId = Pref.getUserId();
-        final bool canAddProduct = (data.status?.toUpperCase() != "CANCELLED") &&
+        final bool canAddProduct =
+            (data.status?.toUpperCase() != "CANCELLED") &&
             ((data.createdBy == currentUserId) || (data.technicians?.any((t) => t.id == currentUserId && t.isPrimary == true) ?? false));
 
         return SingleChildScrollView(
@@ -57,7 +58,7 @@ class FieldReportScreen extends GetView<VisitController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTopHeader(data),
+              _buildTopHeader(data, visitId),
               const SizedBox(height: 16),
               _buildVisitInfoCard(data),
               const SizedBox(height: 24),
@@ -123,7 +124,14 @@ class FieldReportScreen extends GetView<VisitController> {
     );
   }
 
-  Widget _buildTopHeader(FieldReportData data) {
+  Widget _buildTopHeader(FieldReportData data, String visitId) {
+    final currentUserTech = data.visitTechnicians?.firstWhereOrNull((t) => t.isCurrentUser == true);
+    final String status = currentUserTech?.fieldStatus?.toLowerCase() ?? "";
+
+    final bool showStartButton = currentUserTech != null && status == "assigned" && currentUserTech.canStart == true;
+    final bool showPauseStopButtons = currentUserTech != null && status == "started" && currentUserTech.canStart == false;
+    final bool showRestartStopButtons = currentUserTech != null && status == "paused" && currentUserTech.canStart == true;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -152,10 +160,13 @@ class FieldReportScreen extends GetView<VisitController> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 const Text(
-                  "ACTIVE DURATION",
+                  "TIMER",
                   style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold),
                 ),
-                const Text("00:04:39", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                Obx(
+                  () =>
+                      Text(_formatDuration(controller.currentTimerSeconds.value), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                ),
               ],
             ),
           ],
@@ -165,24 +176,132 @@ class FieldReportScreen extends GetView<VisitController> {
           children: [
             _statusBadge(data.statusName ?? data.status ?? "Pending"),
             const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.green500Success.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.green500Success.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: const [
-                  Icon(Icons.check_circle, size: 14, color: AppColors.green500Success),
-                  SizedBox(width: 6),
-                  Text(
-                    "Ended",
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.green500Success),
+            if (showStartButton)
+              ElevatedButton.icon(
+                onPressed: () => controller.startVisit(visitId),
+                icon: const Icon(Icons.play_circle_outline, size: 18),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.indigo600Main,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  elevation: 0,
+                ),
+                label: const Text("Start", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              )
+            else if (showPauseStopButtons)
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      final remarkController = TextEditingController();
+                      Get.dialog(
+                        AlertDialog(
+                          title: const Text("Pause Visit"),
+                          content: TextField(
+                            controller: remarkController,
+                            decoration: const InputDecoration(hintText: "Enter remark"),
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+                            ElevatedButton(
+                              onPressed: () {
+                                Get.back();
+                                controller.pauseVisit(visitId, remark: remarkController.text);
+                              },
+                              child: const Text("Pause"),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.pause_circle_outline, size: 18),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.orangeColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 0,
+                    ),
+                    label: const Text("Pause", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => controller.stopVisit(visitId),
+                    icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.redColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 0,
+                    ),
+                    label: const Text("End Tracking", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   ),
                 ],
+              )
+            else if (showRestartStopButtons)
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => controller.resumeVisit(visitId),
+                    icon: const Icon(Icons.play_circle_outline, size: 18),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.green500Success,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 0,
+                    ),
+                    label: const Text("Resume", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => controller.stopVisit(visitId),
+                    icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.redColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 0,
+                    ),
+                    label: const Text("End Tracking", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
+                ],
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: (currentUserTech?.fieldStatus?.toLowerCase() == "completed" ? AppColors.green500Success : AppColors.orangeColor).withOpacity(
+                    0.1,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: (currentUserTech?.fieldStatus?.toLowerCase() == "completed" ? AppColors.green500Success : AppColors.orangeColor)
+                        .withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      currentUserTech?.fieldStatus?.toLowerCase() == "completed" ? Icons.check_circle : Icons.watch_later_outlined,
+                      size: 14,
+                      color: currentUserTech?.fieldStatus?.toLowerCase() == "completed" ? AppColors.green500Success : AppColors.orangeColor,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      (currentUserTech?.fieldStatus ?? "PENDING").toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: currentUserTech?.fieldStatus?.toLowerCase() == "completed" ? AppColors.green500Success : AppColors.orangeColor,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ],
@@ -341,6 +460,8 @@ class FieldReportScreen extends GetView<VisitController> {
                                 ),
                                 const SizedBox(width: 6),
                                 _miniBadge(Icons.description_outlined, "Invoice ${p.taxInvoiceNo ?? '-'}", color: AppColors.gray500),
+                                const SizedBox(width: 6),
+                                _miniBadge(Icons.description_outlined, "Date ${p.taxInvoiceDate ?? '-'}", color: AppColors.gray500),
                                 if (p.serialNumbers != null && p.serialNumbers!.isNotEmpty) ...[
                                   const SizedBox(width: 6),
                                   _miniBadge(Icons.qr_code_scanner, "S/N ${p.serialNumbers!.length}", color: AppColors.gray500),
@@ -425,6 +546,7 @@ class FieldReportScreen extends GetView<VisitController> {
             runSpacing: 8,
             children: [
               _iconText(Icons.receipt_outlined, "Tax Invoice: ${p.taxInvoiceNo ?? '-'}"),
+              _iconText(Icons.receipt_outlined, "Tax Date: ${p.taxInvoiceDate ?? '-'}"),
               _iconText(Icons.verified_user_outlined, "Warranty: ${p.warrantyTypeName ?? '-'}"),
               _iconText(Icons.repeat_on_outlined, "Repeat: ${p.repeatServiceStatus ?? 'First Service'}"),
             ],
@@ -837,6 +959,40 @@ class FieldReportScreen extends GetView<VisitController> {
         ],
       ),
     );
+  }
+
+  int _calculateActiveSeconds(List<TrackingLog>? logs) {
+    if (logs == null || logs.isEmpty) return 0;
+    int totalSeconds = 0;
+    DateTime? startTime;
+
+    for (var log in logs) {
+      final action = log.action?.toLowerCase();
+      final time = log.createdAt;
+      if (time == null) continue;
+
+      if (action == 'start' || action == 'resume') {
+        startTime = time;
+      } else if (action == 'pause' || action == 'stop' || action == 'end') {
+        if (startTime != null) {
+          totalSeconds += time.difference(startTime).inSeconds;
+          startTime = null;
+        }
+      }
+    }
+
+    if (startTime != null) {
+      totalSeconds += DateTime.now().toUtc().difference(startTime).inSeconds;
+    }
+
+    return totalSeconds;
+  }
+
+  String _formatDuration(int seconds) {
+    final int hours = seconds ~/ 3600;
+    final int minutes = (seconds % 3600) ~/ 60;
+    final int remainingSeconds = seconds % 60;
+    return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
   Widget _statusBadge(String status) {
