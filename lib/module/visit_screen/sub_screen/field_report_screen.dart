@@ -130,7 +130,7 @@ class FieldReportScreen extends GetView<VisitController> {
 
     final bool showStartButton = currentUserTech != null && status == "assigned" && currentUserTech.canStart == true;
     final bool showPauseStopButtons = currentUserTech != null && status == "started" && currentUserTech.canStart == false;
-    final bool showRestartStopButtons = currentUserTech != null && status == "paused" && currentUserTech.canStart == true;
+    final bool showRestartStopButtons = currentUserTech != null && status == "paused" && currentUserTech.canStart == false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,7 +236,7 @@ class FieldReportScreen extends GetView<VisitController> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       elevation: 0,
                     ),
-                    label: const Text("End Tracking", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    label: const Text("End", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   ),
                 ],
               )
@@ -253,7 +253,7 @@ class FieldReportScreen extends GetView<VisitController> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       elevation: 0,
                     ),
-                    label: const Text("Resume", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    label: const Text("Restart", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
@@ -266,7 +266,7 @@ class FieldReportScreen extends GetView<VisitController> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       elevation: 0,
                     ),
-                    label: const Text("End Tracking", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    label: const Text("End", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   ),
                 ],
               )
