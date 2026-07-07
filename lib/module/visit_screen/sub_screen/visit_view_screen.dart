@@ -32,7 +32,7 @@ class VisitViewScreen extends GetView<VisitController> {
             backgroundColor: AppColors.white,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary, size: 20),
-              onPressed: () => Get.back(),
+              onPressed: () => Navigator.pop(Get.context!),
             ),
             title: const Text(
               "View Visit",
@@ -46,7 +46,7 @@ class VisitViewScreen extends GetView<VisitController> {
       if (controller.detailError.isNotEmpty) {
         return Scaffold(
           appBar: AppBar(
-            leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Get.back()),
+            leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(Get.context!)),
           ),
           body: Center(child: Text(controller.detailError.value)),
         );
@@ -55,7 +55,7 @@ class VisitViewScreen extends GetView<VisitController> {
       if (data == null) {
         return Scaffold(
           appBar: AppBar(
-            leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Get.back()),
+            leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(Get.context!)),
           ),
           body: const Center(child: Text("No Data Found")),
         );
@@ -72,7 +72,7 @@ class VisitViewScreen extends GetView<VisitController> {
             automaticallyImplyLeading: false,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary, size: 20),
-              onPressed: () => Get.back(),
+              onPressed: () => Navigator.pop(Get.context!),
             ),
             titleSpacing: 0,
             toolbarHeight: 130,
@@ -192,13 +192,15 @@ class VisitViewScreen extends GetView<VisitController> {
               ),
             ),
           ),
-          body: TabBarView(
-            children: [
-              _buildOverviewTab(data, tabCount),
-              _buildFieldTrackingTab(data),
-              _buildFieldReportTab(data),
-              if (!isCancelled) _buildVisitExpenseTab(data),
-            ],
+          body: SafeArea(
+            child: TabBarView(
+              children: [
+                _buildOverviewTab(data, tabCount),
+                _buildFieldTrackingTab(data),
+                _buildFieldReportTab(data),
+                if (!isCancelled) _buildVisitExpenseTab(data),
+              ],
+            ),
           ),
         ),
       );
@@ -1089,7 +1091,7 @@ class VisitViewScreen extends GetView<VisitController> {
               color: AppColors.indigo600Main,
             ),
           if (!isCancelled && isCompleted) const SizedBox(width: 4),
-          _headerButton(onTap: () => Get.back(), label: "Back", color: AppColors.red500, isOutline: false, bgColor: AppColors.red100),
+          _headerButton(onTap: () => Navigator.pop(Get.context!), label: "Back", color: AppColors.red500, isOutline: false, bgColor: AppColors.red100),
         ],
       ),
     );
@@ -1629,13 +1631,13 @@ class VisitViewScreen extends GetView<VisitController> {
               leading: Icon(_getFileIcon(fileName), color: AppColors.indigo600Main, size: 20),
               title: Text(fileName, style: const TextStyle(fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
               onTap: () {
-                Get.back();
+                Navigator.pop(Get.context!);
                 _openFile(url);
               },
             );
           }).toList(),
         ),
-        actions: [TextButton(onPressed: () => Get.back(), child: const Text("Close"))],
+        actions: [TextButton(onPressed: () => Navigator.pop(Get.context!), child: const Text("Close"))],
       ),
     );
   }
