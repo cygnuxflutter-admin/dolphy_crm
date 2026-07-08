@@ -1,5 +1,6 @@
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../../config/app_colors.dart';
@@ -221,6 +222,7 @@ class AddProductToVisitDialog extends GetView<VisitController> {
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
+          inputFormatters: keyboardType == TextInputType.number ? [FilteringTextInputFormatter.digitsOnly] : null,
           style: const TextStyle(fontSize: 14),
           decoration: InputDecoration(
             hintText: hint ?? label,

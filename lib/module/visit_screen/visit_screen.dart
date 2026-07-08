@@ -1,5 +1,4 @@
 import 'package:crm/module/home_screen/home_controller.dart';
-import 'package:crm/module/visit_screen/widget/sync_to_complaint_dialog.dart';
 import 'package:crm/utils/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -221,7 +220,6 @@ class VisitScreen extends GetView<VisitController> {
     final status = (item.status ?? "").toUpperCase();
     final bool isCompleted = status == "COMPLETED";
     final bool isPending = status == "PENDING";
-    final bool isCancelled = status == "CANCELLED";
 
     return PopupMenuButton<String>(
       padding: EdgeInsets.zero,
@@ -258,7 +256,7 @@ class VisitScreen extends GetView<VisitController> {
             value: 'add_expense',
             child: Row(children: [Icon(Icons.add_card_outlined, size: 16), SizedBox(width: 8), Text("Add Expense")]),
           ),
-        if (isCancelled || isPending)
+        if (isPending)
           const PopupMenuItem(
             value: 'edit',
             child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text("Edit")]),

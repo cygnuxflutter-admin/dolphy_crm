@@ -694,9 +694,22 @@ class VisitViewScreen extends GetView<VisitController> {
                   (product.serialNumbers == null || product.serialNumbers!.isEmpty) ? "-" : product.serialNumbers!.join(", "),
                 ),
                 const SizedBox(height: 20),
-                _reportInfoItem(
-                  "PARTS REQUIRED",
-                  (product.partRequests == null || product.partRequests!.isEmpty) ? "No parts requested" : "${product.partRequests!.length} parts",
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "PARTS REQUIRED",
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.gray400),
+                    ),
+                    const SizedBox(height: 8),
+                    if (product.partRequests == null || product.partRequests!.isEmpty)
+                      const Text(
+                        "No Parts Requested",
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      )
+                    else
+                      _buildPartRequestsTable(product.partRequests!),
+                  ],
                 ),
               ],
             ),
@@ -1091,7 +1104,13 @@ class VisitViewScreen extends GetView<VisitController> {
               color: AppColors.indigo600Main,
             ),
           if (!isCancelled && isCompleted) const SizedBox(width: 4),
-          _headerButton(onTap: () => Navigator.pop(Get.context!), label: "Back", color: AppColors.red500, isOutline: false, bgColor: AppColors.red100),
+          _headerButton(
+            onTap: () => Navigator.pop(Get.context!),
+            label: "Back",
+            color: AppColors.red500,
+            isOutline: false,
+            bgColor: AppColors.red100,
+          ),
         ],
       ),
     );
@@ -1662,5 +1681,111 @@ class VisitViewScreen extends GetView<VisitController> {
     } catch (e) {
       Get.snackbar("Error", "An unexpected error occurred", snackPosition: SnackPosition.BOTTOM);
     }
+  }
+
+  Widget _buildPartRequestsTable(List<dynamic> partRequests) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppColors.gray200, width: 0.8),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: WidgetStateProperty.all(AppColors.gray50),
+          headingRowHeight: 35,
+          dataRowMinHeight: 35,
+          dataRowMaxHeight: 45,
+          columnSpacing: 20,
+          horizontalMargin: 12,
+          columns: const [
+            DataColumn(
+              label: Text(
+                "#",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "Part Name",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "Qty",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "Remark",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "Status",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "Requested On",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+          ],
+          rows: List.generate(partRequests.length, (index) {
+            final part = partRequests[index] as Map<String, dynamic>;
+            final String partName = part['part_name'] ?? "-";
+            final String qty = (part['qty'] ?? 0).toString();
+            final String remark = part['remark'] ?? "-";
+            final String status = part['status'] ?? "-";
+            final String requestedOn = part['created_at'] != null ? _formatDateTime(DateTime.tryParse(part['created_at'])) : "-";
+
+            return DataRow(
+              cells: [
+                DataCell(Text("${index + 1}", style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                DataCell(
+                  Text(
+                    partName,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                ),
+                DataCell(Text(qty, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                DataCell(Text(remark, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                DataCell(_partStatusBadge(status)),
+                DataCell(Text(requestedOn, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _partStatusBadge(String status) {
+    Color color = AppColors.orangeColor;
+    if (status.toLowerCase() == "approved") {
+      color = AppColors.green500Success;
+    } else if (status.toLowerCase() == "rejected") {
+      color = AppColors.red500;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        status.capitalizeFirst ?? status,
+        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color),
+      ),
+    );
   }
 }

@@ -554,3 +554,22 @@ class TrackingLog {
     "created_at": createdAt.toIso8601String(),
   };
 }
+
+PartRequestModel partRequestModelFromJson(String str) => PartRequestModel.fromJson(json.decode(str));
+
+String partRequestModelToJson(PartRequestModel data) => json.encode(data.toJson());
+
+class PartRequestModel {
+  String id;
+  String partName;
+  int qty;
+  String remark;
+  String status;
+
+  PartRequestModel({required this.id, required this.partName, required this.qty, required this.remark, required this.status});
+
+  factory PartRequestModel.fromJson(Map<String, dynamic> json) =>
+      PartRequestModel(id: json["id"], partName: json["part_name"], qty: json["qty"], remark: json["remark"], status: json["status"]);
+
+  Map<String, dynamic> toJson() => {"id": id, "part_name": partName, "qty": qty, "remark": remark, "status": status};
+}
