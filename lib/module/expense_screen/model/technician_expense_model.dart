@@ -36,40 +36,68 @@ class TechnicianExpenseModel {
 class TechnicianExpense {
   String id;
   String expenseNo;
+  String visitNo;
+  String complaintNo;
+  String customerName;
   String technicianName;
+  DateTime? expenseDate;
   String totalRequestAmount;
   String totalApproveAmount;
+  String pendingAmount;
+  String paidAmount;
+  String totalClientAmount;
   String status;
-  DateTime? expenseDate;
+  DateTime? createdAt;
 
   TechnicianExpense({
     required this.id,
     required this.expenseNo,
+    required this.visitNo,
+    required this.complaintNo,
+    required this.customerName,
     required this.technicianName,
+    this.expenseDate,
     required this.totalRequestAmount,
     required this.totalApproveAmount,
+    required this.pendingAmount,
+    required this.paidAmount,
+    required this.totalClientAmount,
     required this.status,
-    this.expenseDate,
+    this.createdAt,
   });
 
   factory TechnicianExpense.fromJson(Map<String, dynamic> json) => TechnicianExpense(
     id: json["id"] ?? "",
     expenseNo: json["expense_no"] ?? "",
+    visitNo: json["visit_no"] ?? "",
+    complaintNo: json["complaint_no"] ?? "",
+    customerName: json["customer_name"] ?? "",
     technicianName: json["technician_name"] ?? "",
+    expenseDate: json["expense_date"] != null ? DateTime.parse(json["expense_date"]) : null,
     totalRequestAmount: json["total_request_amount"]?.toString() ?? "0.00",
     totalApproveAmount: json["total_approve_amount"]?.toString() ?? "0.00",
+    pendingAmount: json["pending_amount"]?.toString() ?? "0.00",
+    paidAmount: json["paid_amount"]?.toString() ?? "0.00",
+    totalClientAmount: json["total_client_amount"]?.toString() ?? "0.00",
     status: json["status"] ?? "",
-    expenseDate: json["expense_date"] != null ? DateTime.parse(json["expense_date"]) : null,
+    createdAt: json["created_at"] != null ? DateTime.parse(json["created_at"]) : null,
   );
 
   Map<String, dynamic> toJson() => {
     "id": id,
     "expense_no": expenseNo,
+    "visit_no": visitNo,
+    "complaint_no": complaintNo,
+    "customer_name": customerName,
     "technician_name": technicianName,
+    "expense_date": expenseDate?.toIso8601String(),
     "total_request_amount": totalRequestAmount,
     "total_approve_amount": totalApproveAmount,
+    "pending_amount": pendingAmount,
+    "paid_amount": paidAmount,
+    "total_client_amount": totalClientAmount,
     "status": status,
-    "expense_date": expenseDate?.toIso8601String(),
+    "created_at": createdAt?.toIso8601String(),
   };
 }
 

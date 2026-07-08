@@ -96,6 +96,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icons.directions_walk_outlined,
                   onTap: () => Get.toNamed(AppRoutes.visitScreen),
                 ),
+              if (permissionHandler.isTechnicianExpenseViewAllowed)
+                _dashboardCard(
+                  title: "Visit Technician",
+                  subtitle: "Technician expense",
+                  icon: Icons.engineering_outlined,
+                  onTap: () => Get.toNamed(AppRoutes.technicianExpenseScreen),
+                ),
             ],
           ),
         ),
