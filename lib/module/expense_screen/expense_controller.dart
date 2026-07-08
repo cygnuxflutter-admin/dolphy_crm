@@ -56,11 +56,9 @@ class ExpenseController extends GetxController {
 
   Future<void> getExpenseTypes() async {
     try {
-      final response = await ApiHandler.getRequest(
-          "${ApiEndPoint.baseUrl}commonMaster/findByGroup?type=Technician+Expense+Type");
+      final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}commonMaster/findByGroup?type=Technician+Expense+Type");
       final data = json.decode(response.data);
-      if (response.statusCode == 200 &&
-          (data['status'] == 200 || data['success'] == true)) {
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
         if (data['data'] != null && data['data'].isNotEmpty) {
           List<dynamic> items = data['data'][0]['items'] ?? [];
           expenseTypes.assignAll(items.map((e) => e['name'].toString()).toList());
@@ -154,6 +152,18 @@ class ExpenseController extends GetxController {
 
   double get netExpenseTotal {
     return totalRequestAmount - totalPaidByClient;
+  }
+
+  void clearData() {
+    selectedVisits.clear();
+    expenseDate.value = DateTime.now();
+    remarksController.clear();
+    overallAttachments.clear();
+    overallAttachmentUrls.clear();
+    for (var line in expenseLines) {
+      line.dispose();
+    }
+    expenseLines.assignAll([ExpenseLine()]);
   }
 
   Future<void> submitExpense({bool isDraft = false}) async {

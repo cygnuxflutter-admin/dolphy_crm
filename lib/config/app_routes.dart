@@ -17,4 +17,5 @@ class AppRoutes {
   static const String visitFieldReportScreen = '/visitFieldReportScreen';
   static const String addVisitScreen = '/addVisitScreen';
   static const String addExpenseScreen = '/addExpenseScreen';
+  static const String technicianExpenseScreen = '/technicianExpenseScreen';
 }
