@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/app_colors.dart';
 import '../../../config/app_routes.dart';
+import '../../../config/app_shared_pref.dart';
 import '../model/visit_view_model.dart';
 import '../visit_controller.dart';
 import '../widget/sync_to_complaint_dialog.dart';
@@ -21,7 +22,8 @@ class VisitViewScreen extends GetView<VisitController> {
 
     return Obx(() {
       final data = controller.visitDetail.value;
-      final bool isCancelled = (data?.status ?? "").toUpperCase() == "CANCELLED";
+      final status = (data?.status ?? "").toUpperCase();
+      final bool isCancelled = status == "CANCELLED" || status == "REJECTED";
       final int tabCount = isCancelled ? 3 : 4;
 
       if (controller.isDetailLoading.value) {
@@ -1049,9 +1051,14 @@ class VisitViewScreen extends GetView<VisitController> {
   }
 
   Widget _buildHeaderButtons(VisitViewData? data) {
-    final bool isCancelled = (data?.status ?? "").toUpperCase() == "CANCELLED";
-    final bool isCompleted = (data?.status ?? "").toUpperCase() == "COMPLETED";
-    final bool isPending = (data?.status ?? "").toUpperCase() == "PENDING";
+    final status = (data?.status ?? "").toUpperCase();
+    final bool isCancelled = status == "CANCELLED" || status == "REJECTED";
+    final bool isCompleted = status == "COMPLETED";
+    final bool isPending = status == "PENDING";
+    final String currentUserId = Pref.getUserId();
+    final bool isCreatedByMe = data?.createdBy.toString() == currentUserId.toString();
+
+    final bool showEdit = isPending || (isCancelled && isCreatedByMe);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1079,7 +1086,7 @@ class VisitViewScreen extends GetView<VisitController> {
               );
             },
           ),
-          if (isCancelled || isPending)
+          if (showEdit)
             _headerButton(
               onTap: () async {
                 final result = await Get.toNamed(AppRoutes.addVisitScreen, arguments: data?.id);
@@ -1093,7 +1100,7 @@ class VisitViewScreen extends GetView<VisitController> {
               label: "Edit",
               color: AppColors.indigo600Main,
             ),
-          if (isCancelled || isPending) const SizedBox(width: 4),
+          if (showEdit) const SizedBox(width: 4),
           if (!isCancelled && isCompleted)
             _headerButton(
               onTap: () {

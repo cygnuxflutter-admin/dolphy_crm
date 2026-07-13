@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../config/app_colors.dart';
 import '../../config/app_routes.dart';
+import '../../config/app_shared_pref.dart';
 import 'model/visit_model.dart';
 import 'visit_controller.dart';
 
@@ -220,6 +221,12 @@ class VisitScreen extends GetView<VisitController> {
     final status = (item.status ?? "").toUpperCase();
     final bool isCompleted = status == "COMPLETED";
     final bool isPending = status == "PENDING";
+    final bool isCancelled = status == "CANCELLED" || status == "REJECTED";
+    final String currentUserId = Pref.getUserId();
+    final bool isCreatedByMe = item.createdBy?.toString() == currentUserId.toString();
+
+    final bool showEdit = isPending || (isCancelled && isCreatedByMe);
+    final bool showCancel = isPending;
 
     return PopupMenuButton<String>(
       padding: EdgeInsets.zero,
@@ -256,12 +263,12 @@ class VisitScreen extends GetView<VisitController> {
             value: 'add_expense',
             child: Row(children: [Icon(Icons.add_card_outlined, size: 16), SizedBox(width: 8), Text("Add Expense")]),
           ),
-        if (isPending)
+        if (showEdit)
           const PopupMenuItem(
             value: 'edit',
             child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text("Edit")]),
           ),
-        if (isPending)
+        if (showCancel)
           const PopupMenuItem(
             value: 'cancel',
             child: Row(
