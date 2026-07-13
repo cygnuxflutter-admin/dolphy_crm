@@ -26,10 +26,10 @@ class AddExpenseScreen extends GetView<ExpenseController> {
           icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.white),
           onPressed: () => Get.back(),
         ),
-        title: const Text(
-          "Add Expense",
-          style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.white),
-        ),
+        title: Obx(() => Text(
+          controller.isEdit.value ? "Edit Expense" : "Add Expense",
+          style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.white),
+        )),
       ),
       body: Obx(() {
         if (controller.isLoading.value) {
