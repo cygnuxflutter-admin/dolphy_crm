@@ -7,6 +7,7 @@ import '../../../config/app_routes.dart';
 import './model/technician_expense_model.dart';
 import './technician_expense_controller.dart';
 import './technician_expense_view_screen.dart';
+import '../../../widget/toast_message.dart';
 import 'expense_controller.dart';
 
 class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
@@ -194,6 +195,8 @@ class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
   }
 
   Widget _buildActionMenu(BuildContext context, TechnicianExpense item) {
+    String status = item.status.toUpperCase();
+
     return PopupMenuButton<String>(
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(),
@@ -201,14 +204,251 @@ class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
       onSelected: (value) {
         if (value == 'view') {
           Get.to(() => TechnicianExpenseViewScreen(expenseId: item.id));
+        } else if (value == 'edit') {
+          if (Get.isRegistered<ExpenseController>()) {
+            Get.find<ExpenseController>().clearData();
+          }
+          Get.toNamed(AppRoutes.addExpenseScreen, arguments: {'isEdit': true, 'id': item.id});
+        } else if (value == 'cancel') {
+          _showCancelDialog(context, item);
+        } else if (value == 'submit') {
+          _showSubmitDialog(context, item);
         }
       },
-      itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: 'view',
-          child: Row(children: [Icon(Icons.visibility_outlined, size: 16), SizedBox(width: 8), Text("View")]),
-        ),
-      ],
+      itemBuilder: (context) {
+        List<PopupMenuEntry<String>> menuItems = [
+          const PopupMenuItem(
+            value: 'view',
+            child: Row(children: [Icon(Icons.visibility_outlined, size: 16, color: AppColors.gray600), SizedBox(width: 8), Text("View")]),
+          ),
+        ];
+
+        if (status == "DRAFT") {
+          menuItems.addAll([
+            const PopupMenuItem(
+              value: 'edit',
+              child: Row(children: [Icon(Icons.edit_outlined, size: 16, color: AppColors.gray600), SizedBox(width: 8), Text("Edit")]),
+            ),
+            const PopupMenuItem(
+              value: 'cancel',
+              child: Row(children: [Icon(Icons.cancel_outlined, size: 16, color: AppColors.red500), SizedBox(width: 8), Text("Cancel", style: TextStyle(color: AppColors.red500))]),
+            ),
+            const PopupMenuItem(
+              value: 'submit',
+              child: Row(children: [Icon(Icons.send_outlined, size: 16, color: AppColors.blue500), SizedBox(width: 8), Text("Submit", style: TextStyle(color: AppColors.blue500))]),
+            ),
+          ]);
+        }
+
+        return menuItems;
+      },
+    );
+  }
+
+  void _showCancelDialog(BuildContext context, TechnicianExpense item) {
+    final TextEditingController remarksController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.cancel_outlined, color: Colors.red, size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Cancel Expense",
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Please provide a reason for cancellation",
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(Icons.close, color: Colors.grey.shade500, size: 24),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                RichText(
+                  text: TextSpan(
+                    text: 'Cancellation Remarks ',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+                    children: [
+                      TextSpan(text: '*', style: TextStyle(color: Colors.red.shade400)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: remarksController,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    hintText: "Why are you cancelling this expense?",
+                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade400),
+                    ),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.grey.shade100,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text("Cancel", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        if (remarksController.text.trim().isEmpty) {
+                          toastMessage(text: "Please enter cancellation remarks", color: Colors.red);
+                          return;
+                        }
+                        controller.cancelExpense(item.id, remarksController.text.trim());
+                      },
+                      icon: const Icon(Icons.cancel_outlined, size: 18, color: Colors.white),
+                      label: const Text("Confirm Cancel", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade400,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSubmitDialog(BuildContext context, TechnicianExpense item) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.send_outlined, color: Colors.blue, size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 4),
+                          const Text(
+                            "Submit Expense",
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                          ),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(Icons.close, color: Colors.grey.shade500, size: 24),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  "Are you sure you want to submit this expense? Once submitted, it cannot be edited unless rejected.",
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600, height: 1.4),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.grey.shade100,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text("Cancel", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        controller.submitExpense(item.id);
+                      },
+                      icon: const Icon(Icons.send_outlined, size: 18, color: Colors.white),
+                      label: const Text("Submit", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.blue500,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

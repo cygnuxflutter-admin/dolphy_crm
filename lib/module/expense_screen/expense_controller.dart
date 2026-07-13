@@ -12,6 +12,7 @@ import '../../../widget/toast_message.dart';
 import '../visit_screen/model/visit_model.dart';
 
 class ExpenseLine {
+  String? id;
   Rxn<String> expenseType = Rxn<String>();
   TextEditingController otherDetailController = TextEditingController();
   TextEditingController requestAmountController = TextEditingController(text: "0.00");
@@ -44,13 +45,23 @@ class ExpenseController extends GetxController {
   RxList<ExpenseLine> expenseLines = <ExpenseLine>[ExpenseLine()].obs;
 
   RxList<String> expenseTypes = <String>["Travel", "Food", "Accommodation", "Local Conveyance", "Other"].obs;
+  RxMap<String, String> expenseTypeMap = <String, String>{}.obs;
+
+  RxBool isEdit = false.obs;
+  String? editId;
 
   @override
   void onInit() {
     super.onInit();
     getExpenseTypes();
-    if (Get.arguments != null && Get.arguments is String) {
-      prefillVisit(Get.arguments);
+    if (Get.arguments != null) {
+      if (Get.arguments is Map && Get.arguments['isEdit'] == true) {
+        isEdit.value = true;
+        editId = Get.arguments['id'];
+        fetchExpenseForEdit(editId!);
+      } else if (Get.arguments is String) {
+        prefillVisit(Get.arguments);
+      }
     }
   }
 
@@ -62,6 +73,10 @@ class ExpenseController extends GetxController {
         if (data['data'] != null && data['data'].isNotEmpty) {
           List<dynamic> items = data['data'][0]['items'] ?? [];
           expenseTypes.assignAll(items.map((e) => e['name'].toString()).toList());
+          expenseTypeMap.clear();
+          for (var item in items) {
+            expenseTypeMap[item['name'].toString()] = item['id'].toString();
+          }
         }
       }
     } catch (e) {
@@ -95,6 +110,71 @@ class ExpenseController extends GetxController {
       }
     } catch (e) {
       debugPrint("Error prefilling visit: $e");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> fetchExpenseForEdit(String id) async {
+    isLoading.value = true;
+    try {
+      final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}technician-expense/find/$id");
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        final resData = data['data'];
+        
+        if (resData != null) {
+          // Populate fields
+          expenseDate.value = DateTime.tryParse(resData['expense_date']?.toString() ?? "") ?? DateTime.now();
+          remarksController.text = resData['remarks']?.toString() ?? "";
+          
+          if (resData['attachment_urls'] != null) {
+            overallAttachmentUrls.assignAll(List<String>.from(resData['attachment_urls']));
+          }
+
+          // Populate visits
+          if (resData['visits'] != null) {
+            List<dynamic> visitsData = resData['visits'];
+            selectedVisits.assignAll(visitsData.map((v) => VisitDatum(
+                  id: v['service_visit_id']?.toString(),
+                  visitNo: v['visit_no']?.toString(),
+                  status: v['visit_status']?.toString(),
+                  statusName: v['visit_status']?.toString(),
+                  complaintNo: v['complaint_no']?.toString(),
+                  customerName: v['customer_name']?.toString(),
+                  complaintTakerName: v['complaint_taker_name']?.toString(),
+                  complaintTakerId: v['complaint_taker_id']?.toString(),
+                )).toList());
+          }
+
+          // Populate lines
+          if (resData['lines'] != null && resData['lines'].isNotEmpty) {
+            List<dynamic> linesData = resData['lines'];
+            expenseLines.clear();
+            for (var lineData in linesData) {
+              final line = ExpenseLine();
+              line.id = lineData['id']?.toString();
+              line.expenseType.value = lineData['expense_type_name']?.toString();
+              line.otherDetailController.text = lineData['expense_type_other']?.toString() ?? "";
+              
+              // Handle both amount (edit API) and request_amount
+              var amt = lineData['amount'] ?? lineData['request_amount'] ?? "0.00";
+              line.requestAmountController.text = amt.toString();
+              
+              line.paidByClient.value = lineData['is_paid_by_client'] ?? false;
+              line.clientAmountController.text = (lineData['client_amount'] ?? "0.00").toString();
+              line.descriptionController.text = lineData['description']?.toString() ?? "";
+              
+              if (lineData['attachment_urls'] != null) {
+                line.attachmentUrls.assignAll(List<String>.from(lineData['attachment_urls']));
+              }
+              expenseLines.add(line);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching expense for edit: $e");
     } finally {
       isLoading.value = false;
     }
@@ -155,6 +235,8 @@ class ExpenseController extends GetxController {
   }
 
   void clearData() {
+    isEdit.value = false;
+    editId = null;
     selectedVisits.clear();
     expenseDate.value = DateTime.now();
     remarksController.clear();
@@ -204,31 +286,55 @@ class ExpenseController extends GetxController {
       }
 
       // 3. Submit Expense
-      final body = {
-        "visit_ids": selectedVisits.map((v) => v.id).toList(),
-        "expense_date": DateFormat('yyyy-MM-dd').format(expenseDate.value),
-        "remarks": remarksController.text,
-        "is_draft": isDraft,
-        "lines": expenseLines
-            .map(
-              (line) => {
-                "expense_type": line.expenseType.value,
-                "other_detail": line.otherDetailController.text,
-                "request_amount": double.tryParse(line.requestAmountController.text) ?? 0,
-                "paid_by_client": line.paidByClient.value,
-                "client_amount": double.tryParse(line.clientAmountController.text) ?? 0,
-                "description": line.descriptionController.text,
-                "attachments": line.attachmentUrls,
-              },
-            )
-            .toList(),
-        "attachments": overallAttachmentUrls,
-        "company_id": Pref.getCompanyId(),
-        "location_id": Pref.getLocationId(),
-        "fin_year": Pref.getFinancialYears(),
-      };
-
-      final response = await ApiHandler.postRequest(url: "${ApiEndPoint.baseUrl}expense/create", body: body);
+      var response;
+      if (isEdit.value && editId != null) {
+        final body = {
+          "service_visit_ids": selectedVisits.map((v) => v.id).toList(),
+          "expense_date": DateFormat('yyyy-MM-dd').format(expenseDate.value),
+          "remarks": remarksController.text,
+          "attachment_urls": overallAttachmentUrls,
+          "submit": !isDraft,
+          "lines": expenseLines.map((line) {
+            Map<String, dynamic> lineData = {
+              "expense_type_id": expenseTypeMap[line.expenseType.value] ?? line.expenseType.value,
+              "amount": double.tryParse(line.requestAmountController.text) ?? 0,
+              "is_paid_by_client": line.paidByClient.value,
+              "client_amount": double.tryParse(line.clientAmountController.text) ?? 0,
+              "description": line.descriptionController.text,
+              "attachment_urls": line.attachmentUrls,
+            };
+            if (line.id != null) lineData["id"] = line.id;
+            return lineData;
+          }).toList(),
+        };
+        response = await ApiHandler.putRequest(url: "${ApiEndPoint.baseUrl}technician-expense/$editId", body: body);
+      } else {
+        final body = {
+          "visit_ids": selectedVisits.map((v) => v.id).toList(),
+          "expense_date": DateFormat('yyyy-MM-dd').format(expenseDate.value),
+          "remarks": remarksController.text,
+          "is_draft": isDraft,
+          "lines": expenseLines
+              .map(
+                (line) => {
+                  "expense_type": line.expenseType.value,
+                  "other_detail": line.otherDetailController.text,
+                  "request_amount": double.tryParse(line.requestAmountController.text) ?? 0,
+                  "paid_by_client": line.paidByClient.value,
+                  "client_amount": double.tryParse(line.clientAmountController.text) ?? 0,
+                  "description": line.descriptionController.text,
+                  "attachments": line.attachmentUrls,
+                },
+              )
+              .toList(),
+          "attachments": overallAttachmentUrls,
+          "company_id": Pref.getCompanyId(),
+          "location_id": Pref.getLocationId(),
+          "fin_year": Pref.getFinancialYears(),
+        };
+        response = await ApiHandler.postRequest(url: "${ApiEndPoint.baseUrl}expense/create", body: body);
+      }
+      
       final data = response.data;
 
       if (response.statusCode == 200 || response.statusCode == 201) {

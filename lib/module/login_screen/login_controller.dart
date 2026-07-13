@@ -15,8 +15,8 @@ import '../../utils/permission_handler.dart';
 import '../../widget/toast_message.dart';
 
 class LoginScreenController extends GetxController {
-  Rx<TextEditingController> emailController = TextEditingController(text: "apple@gmail.com").obs;
-  Rx<TextEditingController> passwordController = TextEditingController(text: "TenantAdmin#2025").obs;
+  Rx<TextEditingController> emailController = TextEditingController(text: "binita.s@gmail.com").obs;
+  Rx<TextEditingController> passwordController = TextEditingController(text: "123456").obs;
   RxBool obSecure = true.obs;
   RxBool isLoading = false.obs;
 
