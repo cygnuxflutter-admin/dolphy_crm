@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/app_colors.dart';
 import '../../../config/app_routes.dart';
+import '../../../config/app_shared_pref.dart';
 import '../model/visit_view_model.dart';
 import '../visit_controller.dart';
 import '../widget/sync_to_complaint_dialog.dart';
@@ -21,7 +22,8 @@ class VisitViewScreen extends GetView<VisitController> {
 
     return Obx(() {
       final data = controller.visitDetail.value;
-      final bool isCancelled = (data?.status ?? "").toUpperCase() == "CANCELLED";
+      final status = (data?.status ?? "").toUpperCase();
+      final bool isCancelled = status == "CANCELLED" || status == "REJECTED";
       final int tabCount = isCancelled ? 3 : 4;
 
       if (controller.isDetailLoading.value) {
@@ -241,19 +243,20 @@ class VisitViewScreen extends GetView<VisitController> {
                         ),
                       ],
                     ),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Get.toNamed(AppRoutes.addExpenseScreen, arguments: data.id);
-                      },
-                      icon: const Icon(Icons.add, size: 16, color: AppColors.white),
-                      label: const Text("Add Expense", style: TextStyle(color: AppColors.white, fontSize: 12)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.blueColor,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        elevation: 0,
+                    if ((data.status ?? "").toUpperCase() == "COMPLETED")
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Get.toNamed(AppRoutes.addExpenseScreen, arguments: data.id);
+                        },
+                        icon: const Icon(Icons.add, size: 16, color: AppColors.white),
+                        label: const Text("Add Expense", style: TextStyle(color: AppColors.white, fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.blueColor,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          elevation: 0,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -693,9 +696,22 @@ class VisitViewScreen extends GetView<VisitController> {
                   (product.serialNumbers == null || product.serialNumbers!.isEmpty) ? "-" : product.serialNumbers!.join(", "),
                 ),
                 const SizedBox(height: 20),
-                _reportInfoItem(
-                  "PARTS REQUIRED",
-                  (product.partRequests == null || product.partRequests!.isEmpty) ? "No parts requested" : "${product.partRequests!.length} parts",
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "PARTS REQUIRED",
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.gray400),
+                    ),
+                    const SizedBox(height: 8),
+                    if (product.partRequests == null || product.partRequests!.isEmpty)
+                      const Text(
+                        "No Parts Requested",
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      )
+                    else
+                      _buildPartRequestsTable(product.partRequests!),
+                  ],
                 ),
               ],
             ),
@@ -820,63 +836,70 @@ class VisitViewScreen extends GetView<VisitController> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        "${tech.startLatitude ?? ''}, ${tech.startLongitude ?? ''}".trim().isEmpty
+                                        "${tech.startLatitude ?? ''} ${tech.startLongitude ?? ''}".trim().isEmpty
                                             ? "-"
                                             : "${tech.startLatitude}, ${tech.startLongitude}",
                                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                       ),
-                                      InkWell(
-                                        onTap: () => _openMap(tech.startLatitude, tech.startLongitude),
-                                        child: const Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.location_on_outlined, size: 12, color: AppColors.indigo600Main),
-                                            Text(
-                                              " View on map",
-                                              style: TextStyle(fontSize: 11, color: AppColors.indigo600Main, decoration: TextDecoration.underline),
-                                            ),
-                                          ],
+                                      if ("${tech.startLatitude ?? ''} ${tech.startLongitude ?? ''}".trim().isNotEmpty)
+                                        InkWell(
+                                          onTap: () => _openMap(tech.startLatitude, tech.startLongitude),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.location_on_outlined, size: 12, color: AppColors.indigo600Main),
+
+                                              Text(
+                                                " View on map",
+                                                style: TextStyle(fontSize: 11, color: AppColors.indigo600Main, decoration: TextDecoration.underline),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
                                     ],
                                   ),
                                   200,
                                 ),
+
                                 _tableCellItem(
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        _formatDuration(tech.activeDurationSeconds ?? 0),
+                                        tech.activeDurationSeconds != 0 ? _formatDuration(tech.activeDurationSeconds ?? 0) : "-",
                                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.green500Success),
                                       ),
-                                      InkWell(
-                                        onTap: () => controller.toggleTechLogExpansion(tech.id ?? ""),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                              size: 12,
-                                              color: AppColors.indigo600Main,
-                                            ),
-                                            Text(
-                                              isExpanded ? " Hide Log" : " View Log",
-                                              style: const TextStyle(
-                                                fontSize: 11,
+                                      if (tech.activeDurationSeconds != 0)
+                                        InkWell(
+                                          onTap: () => controller.toggleTechLogExpansion(tech.id ?? ""),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                                size: 12,
                                                 color: AppColors.indigo600Main,
-                                                decoration: TextDecoration.underline,
                                               ),
-                                            ),
-                                          ],
+                                              Text(
+                                                isExpanded ? " Hide Log" : " View Log",
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppColors.indigo600Main,
+                                                  decoration: TextDecoration.underline,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
                                     ],
                                   ),
                                   120,
                                 ),
-                                _tableCellItem(Text(tech.remark ?? "-", style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)), 150),
+                                _tableCellItem(
+                                  Text(tech.remark == "" ? "-" : tech.remark!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                  150,
+                                ),
                               ],
                             ),
                           ),
@@ -1028,9 +1051,14 @@ class VisitViewScreen extends GetView<VisitController> {
   }
 
   Widget _buildHeaderButtons(VisitViewData? data) {
-    final bool isCancelled = (data?.status ?? "").toUpperCase() == "CANCELLED";
-    final bool isCompleted = (data?.status ?? "").toUpperCase() == "COMPLETED";
-    final bool isPending = (data?.status ?? "").toUpperCase() == "PENDING";
+    final status = (data?.status ?? "").toUpperCase();
+    final bool isCancelled = status == "CANCELLED" || status == "REJECTED";
+    final bool isCompleted = status == "COMPLETED";
+    final bool isPending = status == "PENDING";
+    final String currentUserId = Pref.getUserId();
+    final bool isCreatedByMe = data?.createdBy.toString() == currentUserId.toString();
+
+    final bool showEdit = isPending || (isCancelled && isCreatedByMe);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1058,7 +1086,7 @@ class VisitViewScreen extends GetView<VisitController> {
               );
             },
           ),
-          if (isCancelled || isPending)
+          if (showEdit)
             _headerButton(
               onTap: () async {
                 final result = await Get.toNamed(AppRoutes.addVisitScreen, arguments: data?.id);
@@ -1072,7 +1100,7 @@ class VisitViewScreen extends GetView<VisitController> {
               label: "Edit",
               color: AppColors.indigo600Main,
             ),
-          if (isCancelled || isPending) const SizedBox(width: 4),
+          if (showEdit) const SizedBox(width: 4),
           if (!isCancelled && isCompleted)
             _headerButton(
               onTap: () {
@@ -1083,7 +1111,13 @@ class VisitViewScreen extends GetView<VisitController> {
               color: AppColors.indigo600Main,
             ),
           if (!isCancelled && isCompleted) const SizedBox(width: 4),
-          _headerButton(onTap: () => Navigator.pop(Get.context!), label: "Back", color: AppColors.red500, isOutline: false, bgColor: AppColors.red100),
+          _headerButton(
+            onTap: () => Navigator.pop(Get.context!),
+            label: "Back",
+            color: AppColors.red500,
+            isOutline: false,
+            bgColor: AppColors.red100,
+          ),
         ],
       ),
     );
@@ -1223,7 +1257,7 @@ class VisitViewScreen extends GetView<VisitController> {
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          "Product Complaint Details",
+                          "Product Complaint Details ",
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.orangeColor),
                         ),
                       ),
@@ -1281,6 +1315,12 @@ class VisitViewScreen extends GetView<VisitController> {
                 DataColumn(
                   label: Text(
                     "Tax Invoice No",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    "Tax Invoice Date",
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                 ),
@@ -1352,6 +1392,12 @@ class VisitViewScreen extends GetView<VisitController> {
                     DataCell(
                       Text(
                         (product.taxInvoiceNo == null || product.taxInvoiceNo!.isEmpty) ? "-" : product.taxInvoiceNo!,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        (product.taxInvoiceDate == null || product.taxInvoiceDate!.isEmpty) ? "-" : product.taxInvoiceDate!,
                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                       ),
                     ),
@@ -1576,6 +1622,7 @@ class VisitViewScreen extends GetView<VisitController> {
   }
 
   String _formatDuration(int seconds) {
+    debugPrint("Formate formate ==== ${seconds}");
     final int hours = seconds ~/ 3600;
     final int minutes = (seconds % 3600) ~/ 60;
     final int remainingSeconds = seconds % 60;
@@ -1641,5 +1688,111 @@ class VisitViewScreen extends GetView<VisitController> {
     } catch (e) {
       Get.snackbar("Error", "An unexpected error occurred", snackPosition: SnackPosition.BOTTOM);
     }
+  }
+
+  Widget _buildPartRequestsTable(List<dynamic> partRequests) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppColors.gray200, width: 0.8),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: WidgetStateProperty.all(AppColors.gray50),
+          headingRowHeight: 35,
+          dataRowMinHeight: 35,
+          dataRowMaxHeight: 45,
+          columnSpacing: 20,
+          horizontalMargin: 12,
+          columns: const [
+            DataColumn(
+              label: Text(
+                "#",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "Part Name",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "Qty",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "Remark",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "Status",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+            DataColumn(
+              label: Text(
+                "Requested On",
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+            ),
+          ],
+          rows: List.generate(partRequests.length, (index) {
+            final part = partRequests[index] as Map<String, dynamic>;
+            final String partName = part['part_name'] ?? "-";
+            final String qty = (part['qty'] ?? 0).toString();
+            final String remark = part['remark'] ?? "-";
+            final String status = part['status'] ?? "-";
+            final String requestedOn = part['created_at'] != null ? _formatDateTime(DateTime.tryParse(part['created_at'])) : "-";
+
+            return DataRow(
+              cells: [
+                DataCell(Text("${index + 1}", style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                DataCell(
+                  Text(
+                    partName,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                ),
+                DataCell(Text(qty, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                DataCell(Text(remark, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+                DataCell(_partStatusBadge(status)),
+                DataCell(Text(requestedOn, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary))),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _partStatusBadge(String status) {
+    Color color = AppColors.orangeColor;
+    if (status.toLowerCase() == "approved") {
+      color = AppColors.green500Success;
+    } else if (status.toLowerCase() == "rejected") {
+      color = AppColors.red500;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        status.capitalizeFirst ?? status,
+        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: color),
+      ),
+    );
   }
 }

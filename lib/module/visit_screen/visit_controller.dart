@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 
 import '../../../config/app_shared_pref.dart';
@@ -10,11 +12,12 @@ import '../../../utils/api_handler.dart';
 import '../../../widget/toast_message.dart';
 import '../expense_screen/model/technician_expense_model.dart';
 import '../lead_screen/model/lead_type.dart';
+import 'model/dispatched_serial_model.dart';
 import 'model/field_report_model.dart';
 import 'model/sync_preview_model.dart';
 import 'model/visit_counts_model.dart';
-import 'model/visit_model.dart';
-import 'model/visit_view_model.dart';
+import 'model/visit_model.dart' hide Technician, VisitTechnician, TrackingLog;
+import 'model/visit_view_model.dart' hide Technician, VisitTechnician, TrackingLog, Product;
 
 class VisitController extends GetxController {
   RxBool isLoading = false.obs;
@@ -71,6 +74,51 @@ class VisitController extends GetxController {
   RxBool isProductSearchLoading = false.obs;
   RxBool isAddProductLoading = false.obs;
 
+  // End Tracking / Final Report Form
+  final serviceReceivedByController = TextEditingController().obs;
+  final contactNumberController = TextEditingController().obs;
+  final siteReceiverMobileCountryCode = "+91".obs;
+  final visitOutcome = "".obs; // "closed" or "next_visit_required"
+  final overallRemarkController = TextEditingController().obs;
+  final finalUsageNoteController = TextEditingController().obs;
+  RxList<File> finalAttachments = <File>[].obs;
+  RxList<String> finalAttachmentUrls = <String>[].obs;
+
+  // Validation Errors
+  RxString serviceReceivedByError = "".obs;
+  RxString contactNumberError = "".obs;
+  RxString visitOutcomeError = "".obs;
+  RxString overallRemarkError = "".obs;
+  RxString finalUsageNoteError = "".obs;
+
+  Future<void> uploadFinalAttachment(File file) async {
+    isLoading.value = true;
+    try {
+      final response = await ApiHandler.uploadFile(file, folderName: 'service-visit-attachments');
+      final data = response.data;
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        String? fileUrl = data['data'] != null ? data['data']['url'] : null;
+        if (fileUrl != null) {
+          finalAttachmentUrls.add(fileUrl);
+          toastMessage(text: "File uploaded successfully");
+        }
+      } else {
+        toastMessage(text: data['message'] ?? "Upload failed");
+      }
+    } catch (e) {
+      debugPrint("Error uploading file: $e");
+      toastMessage(text: "Upload error: $e");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  void removeFinalAttachment(int index) {
+    if (index < finalAttachmentUrls.length) {
+      finalAttachmentUrls.removeAt(index);
+    }
+  }
+
   // Sync to Complaint
   RxBool isSyncPreviewLoading = false.obs;
   Rxn<SyncPreviewData> syncPreviewData = Rxn<SyncPreviewData>();
@@ -86,6 +134,55 @@ class VisitController extends GetxController {
   RxBool isSyncing = false.obs;
 
   Rxn<Map<String, String>> selectedRepeatServiceStatus = Rxn<Map<String, String>>();
+
+  // Real-time Timer
+  Timer? _timer;
+  RxInt currentTimerSeconds = 0.obs;
+
+  void startTimer(List<TrackingLog>? logs) {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      currentTimerSeconds.value = _calculateTotalSeconds(logs);
+    });
+  }
+
+  void stopTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  int _calculateTotalSeconds(List<TrackingLog>? logs) {
+    if (logs == null || logs.isEmpty) return 0;
+    int totalSeconds = 0;
+    DateTime? startTime;
+
+    for (var log in logs) {
+      final action = log.action?.toLowerCase();
+      final time = log.createdAt;
+      if (time == null) continue;
+
+      if (action == 'start' || action == 'resume') {
+        startTime = time;
+      } else if (action == 'pause' || action == 'stop' || action == 'end') {
+        if (startTime != null) {
+          totalSeconds += time.difference(startTime).inSeconds;
+          startTime = null;
+        }
+      }
+    }
+
+    if (startTime != null) {
+      totalSeconds += DateTime.now().toUtc().difference(startTime).inSeconds;
+    }
+
+    return totalSeconds;
+  }
+
+  @override
+  void onClose() {
+    _timer?.cancel();
+    super.onClose();
+  }
 
   void clearAddProductForm() {
     taxInvoiceNoController.value.clear();
@@ -329,6 +426,13 @@ class VisitController extends GetxController {
     final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
     if (productIndex != -1) {
       final product = fieldReportDetail.value!.products![productIndex];
+
+      if (newQty > (product.clientSideQty ?? 0)) {
+        toastMessage(text: "Solve Qty cannot be greater than Client Side Qty (${product.clientSideQty ?? 0})");
+        fieldReportDetail.refresh(); // Refresh to revert UI value if needed
+        return;
+      }
+
       product.solveQty = newQty;
 
       // Adjust serial numbers list size
@@ -352,6 +456,7 @@ class VisitController extends GetxController {
       final product = fieldReportDetail.value!.products![productIndex];
       if (product.serialNumbers != null && index < product.serialNumbers!.length) {
         product.serialNumbers![index] = value;
+        fieldReportDetail.refresh();
       }
     }
   }
@@ -362,6 +467,30 @@ class VisitController extends GetxController {
     if (productIndex != -1) {
       fieldReportDetail.value!.products![productIndex].workRemark = value;
     }
+  }
+
+  Future<List<DispatchedSerialData>> getDispatchedSerialSuggestions({
+    required String visitId,
+    required String visitItemId,
+    required String productId,
+    required String query,
+  }) async {
+    try {
+      final url =
+          "${ApiEndPoint.dispatchedSerialSuggestions.replaceAll("{visit_id}", visitId)}?visit_item_id=$visitItemId&product_id=$productId&q=$query&limit=25";
+      debugPrint("Fetching serial suggestions from: $url");
+
+      final response = await ApiHandler.getRequest(url);
+      final data = json.decode(response.data);
+
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        final model = DispatchedSerialModel.fromJson(data);
+        return model.data ?? [];
+      }
+    } catch (e) {
+      debugPrint("Error fetching serial suggestions: $e");
+    }
+    return [];
   }
 
   Future<void> uploadProductAttachment(String productId, File file) async {
@@ -380,9 +509,7 @@ class VisitController extends GetxController {
           final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
           if (productIndex != -1) {
             final product = fieldReportDetail.value!.products![productIndex];
-            if (product.attachments == null) {
-              product.attachments = [];
-            }
+            product.attachments ??= [];
             product.attachments!.add(fileUrl);
             fieldReportDetail.refresh();
             toastMessage(text: "File uploaded successfully");
@@ -413,11 +540,66 @@ class VisitController extends GetxController {
     }
   }
 
+  void addPartRequest(String productId) {
+    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
+    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    if (productIndex != -1) {
+      final product = fieldReportDetail.value!.products![productIndex];
+      product.partRequests ??= [];
+      product.partRequests!.add({"product_id": null, "product_name": null, "product_code": null, "qty": 1, "remark": ""});
+      fieldReportDetail.refresh();
+    }
+  }
+
+  void updatePartRequest(String productId, int index, String key, dynamic value) {
+    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
+    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    if (productIndex != -1) {
+      final product = fieldReportDetail.value!.products![productIndex];
+      if (product.partRequests != null && index < product.partRequests!.length) {
+        if (key == 'product') {
+          product.partRequests![index]['product_id'] = value['id'];
+          product.partRequests![index]['product_name'] = value['product_name'];
+          product.partRequests![index]['product_code'] = value['product_code'];
+        } else {
+          product.partRequests![index][key] = value;
+        }
+        fieldReportDetail.refresh();
+      }
+    }
+  }
+
+  void removePartRequest(String productId, int index) {
+    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
+    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    if (productIndex != -1) {
+      final product = fieldReportDetail.value!.products![productIndex];
+      if (product.partRequests != null && index < product.partRequests!.length) {
+        product.partRequests!.removeAt(index);
+        fieldReportDetail.refresh();
+      }
+    }
+  }
+
   @override
   void onInit() {
     super.onInit();
     getVisitCounts();
     fetchData();
+
+    // End Tracking form listeners to clear errors
+    serviceReceivedByController.value.addListener(() {
+      if (serviceReceivedByError.isNotEmpty) serviceReceivedByError.value = "";
+    });
+    contactNumberController.value.addListener(() {
+      if (contactNumberError.isNotEmpty) contactNumberError.value = "";
+    });
+    overallRemarkController.value.addListener(() {
+      if (overallRemarkError.isNotEmpty) overallRemarkError.value = "";
+    });
+    finalUsageNoteController.value.addListener(() {
+      if (finalUsageNoteError.isNotEmpty) finalUsageNoteError.value = "";
+    });
   }
 
   Future<void> getVisitCounts() async {
@@ -530,6 +712,26 @@ class VisitController extends GetxController {
       if (response.statusCode == 200 && data['status'] == 200) {
         FieldReportModel res = FieldReportModel.fromJson(data);
         fieldReportDetail.value = res.data;
+
+        // Pre-fill End Tracking Form
+        if (res.data != null) {
+          serviceReceivedByController.value.text = res.data!.siteReceiverName ?? "";
+          contactNumberController.value.text = res.data!.siteReceiverMobile ?? "";
+          siteReceiverMobileCountryCode.value = res.data!.siteReceiverMobileCountryCode ?? "+91";
+          visitOutcome.value = res.data!.visitOutcome ?? "";
+          overallRemarkController.value.text = res.data!.overallRemark ?? "";
+          // Note: usage_note might be available in data too, check model
+          finalAttachmentUrls.assignAll(res.data!.attachments ?? []);
+        }
+
+        // Manage Timer
+        final currentUserTech = res.data?.visitTechnicians?.firstWhereOrNull((t) => t.isCurrentUser == true);
+        if (currentUserTech != null && currentUserTech.fieldStatus?.toLowerCase() == "started") {
+          startTimer(currentUserTech.trackingLogs);
+        } else {
+          stopTimer();
+          currentTimerSeconds.value = _calculateTotalSeconds(currentUserTech?.trackingLogs);
+        }
       } else {
         fieldReportError.value = data['message'] ?? "Failed to load field report";
       }
@@ -592,5 +794,145 @@ class VisitController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<Position?> _handleLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      toastMessage(text: "Location services are disabled.");
+      return null;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        toastMessage(text: "Location permissions are denied");
+        return null;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      toastMessage(text: "Location permissions are permanently denied");
+      return null;
+    }
+
+    return await Geolocator.getCurrentPosition();
+  }
+
+  Future<void> _updateVisitStatus(String visitId, String action, String successMsg, {Map<String, dynamic>? extraBody}) async {
+    Position? position = await _handleLocation();
+    if (position == null) return;
+
+    isLoading.value = true;
+    try {
+      final body = {"latitude": position.latitude, "longitude": position.longitude, if (extraBody != null) ...extraBody};
+      final url = "${ApiEndPoint.baseUrl}service-visit/$visitId/$action";
+      final response = await ApiHandler.postRequest(url: url, body: body);
+
+      final data = response.data;
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        toastMessage(text: data['message'] ?? successMsg);
+        getFieldReport(visitId);
+      } else {
+        toastMessage(text: data['message'] ?? "Failed to $action visit");
+      }
+    } catch (e) {
+      debugPrint("Error during $action visit: $e");
+      toastMessage(text: "Something went wrong");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> startVisit(String visitId) async {
+    await _updateVisitStatus(visitId, "start", "Visit started successfully");
+  }
+
+  Future<void> pauseVisit(String visitId, {String? remark}) async {
+    await _updateVisitStatus(visitId, "pause", "Visit paused successfully", extraBody: {"remark": remark ?? ""});
+  }
+
+  Future<void> resumeVisit(String visitId) async {
+    await _updateVisitStatus(visitId, "resume", "Visit resumed successfully");
+  }
+
+  Future<void> stopVisit(String visitId) async {
+    // Reset errors
+    serviceReceivedByError.value = "";
+    contactNumberError.value = "";
+    visitOutcomeError.value = "";
+    overallRemarkError.value = "";
+    finalUsageNoteError.value = "";
+
+    bool hasError = false;
+
+    if (serviceReceivedByController.value.text.trim().isEmpty) {
+      serviceReceivedByError.value = "Service received by is required";
+      hasError = true;
+    }
+    if (contactNumberController.value.text.trim().isEmpty) {
+      contactNumberError.value = "Contact number is required";
+      hasError = true;
+    }
+    if (visitOutcome.value.isEmpty) {
+      visitOutcomeError.value = "Please select a visit outcome";
+      hasError = true;
+    }
+    if (overallRemarkController.value.text.trim().isEmpty) {
+      overallRemarkError.value = "Overall remark is required";
+      hasError = true;
+    }
+    if (finalUsageNoteController.value.text.trim().isEmpty) {
+      finalUsageNoteError.value = "Usage / Crowd Note is required";
+      hasError = true;
+    }
+    if (finalAttachmentUrls.isEmpty) {
+      toastMessage(text: "At least one attachment is required");
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    final extraBody = {
+      "site_receiver_name": serviceReceivedByController.value.text.trim(),
+      "site_receiver_mobile_country_code": siteReceiverMobileCountryCode.value,
+      "site_receiver_mobile": contactNumberController.value.text.trim(),
+      "visit_outcome": visitOutcome.value,
+      "overall_remark": overallRemarkController.value.text.trim(),
+      "crowd_note": finalUsageNoteController.value.text.trim(),
+      "attachments": finalAttachmentUrls,
+      "products":
+          fieldReportDetail.value?.products
+              ?.map(
+                (p) => {
+                  "id": p.id,
+                  "product_id": p.productId,
+                  "tax_invoice_id": p.taxInvoiceId,
+                  "tax_invoice_no": p.taxInvoiceNo,
+                  "complaint_qty": p.complaintQty,
+                  "installed_qty": p.installedQty,
+                  "client_side_qty": p.clientSideQty,
+                  "solve_qty": p.solveQty,
+                  "issue_description": p.issueDescription,
+                  "usage_note": p.usageNote ?? "",
+                  "work_remark": p.workRemark ?? "",
+                  "attachments": p.attachments ?? [],
+                  "serial_numbers": (p.serialNumbers ?? []).where((s) => s.trim().isNotEmpty).toList(),
+                  "part_requests": (p.partRequests ?? []).map((pr) {
+                    String name = pr['product_name'] ?? "";
+                    String code = pr['product_code'] ?? "";
+                    return {"part_name": code.isNotEmpty ? "[$code] - $name" : name, "qty": pr['qty'] ?? 1, "remark": pr['remark'] ?? ""};
+                  }).toList(),
+                },
+              )
+              .toList() ??
+          [],
+    };
+
+    await _updateVisitStatus(visitId, "end", "Visit stopped successfully", extraBody: extraBody);
   }
 }

@@ -42,11 +42,15 @@ class PermissionHandler extends GetxService {
     if (rolePermission.isEmpty) return false;
 
     for (var module in rolePermission.values) {
-      if (module is Map && module['name'].toString().toLowerCase() == moduleName.toLowerCase()) {
+      if (module is Map &&
+          (module['name'].toString().toLowerCase() == moduleName.toLowerCase() ||
+              module['identifier'].toString().toLowerCase() == moduleName.toLowerCase())) {
         var childData = module['childData'];
         if (childData is Map) {
           for (var child in childData.values) {
-            if (child is Map && child['name'].toString().toLowerCase() == childName.toLowerCase()) {
+            if (child is Map &&
+                (child['name'].toString().toLowerCase() == childName.toLowerCase() ||
+                    child['identifier'].toString().toLowerCase() == childName.toLowerCase())) {
               var permission = child['permission'];
               if (permission is Map && (permission[permissionType] == true || permission[permissionType].toString() == "true")) {
                 return true;
@@ -55,7 +59,9 @@ class PermissionHandler extends GetxService {
           }
         } else if (childData is List) {
           for (var child in childData) {
-            if (child is Map && child['name'].toString().toLowerCase() == childName.toLowerCase()) {
+            if (child is Map &&
+                (child['name'].toString().toLowerCase() == childName.toLowerCase() ||
+                    child['identifier'].toString().toLowerCase() == childName.toLowerCase())) {
               var permission = child['permission'];
               if (permission is Map && (permission[permissionType] == true || permission[permissionType].toString() == "true")) {
                 return true;
@@ -91,4 +97,7 @@ class PermissionHandler extends GetxService {
   bool get isVisitCreateAllowed => _checkPermission('Service', 'Visits', 'create');
   bool get isVisitUpdateAllowed => _checkPermission('Service', 'Visits', 'update');
   bool get isVisitDeleteAllowed => _checkPermission('Service', 'Visits', 'delete');
+
+  // Technician Expense
+  bool get isTechnicianExpenseViewAllowed => _checkPermission('Service', 'Technician Expense', 'view');
 }

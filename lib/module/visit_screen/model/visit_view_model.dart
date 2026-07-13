@@ -269,6 +269,7 @@ class Product {
   String productId;
   String? taxInvoiceId;
   String taxInvoiceNo;
+  String? taxInvoiceDate;
   dynamic complaintQty;
   dynamic installedQty;
   dynamic clientSideQty;
@@ -304,6 +305,7 @@ class Product {
     this.visitId,
     required this.productId,
     this.taxInvoiceId,
+    this.taxInvoiceDate,
     required this.taxInvoiceNo,
     required this.complaintQty,
     required this.installedQty,
@@ -342,6 +344,7 @@ class Product {
     productId: json["product_id"] ?? "",
     taxInvoiceId: json["tax_invoice_id"],
     taxInvoiceNo: json["tax_invoice_no"] ?? "",
+    taxInvoiceDate: json["tax_invoice_date"] ?? "",
     complaintQty: json["complaint_qty"] ?? 0,
     installedQty: json["installed_qty"] ?? 0,
     clientSideQty: json["client_side_qty"],
@@ -379,6 +382,7 @@ class Product {
     "product_id": productId,
     "tax_invoice_id": taxInvoiceId,
     "tax_invoice_no": taxInvoiceNo,
+    "tax_invoice_date": taxInvoiceDate,
     "complaint_qty": complaintQty,
     "installed_qty": installedQty,
     "client_side_qty": clientSideQty,
@@ -436,7 +440,7 @@ class VisitTechnician {
   DateTime? stoppedAt;
   String? stopLatitude;
   String? stopLongitude;
-  String remark;
+  String? remark;
   int activeDurationSeconds;
   int elapsedSeconds;
   bool canStart;
@@ -549,4 +553,23 @@ class TrackingLog {
     "remark": remark,
     "created_at": createdAt.toIso8601String(),
   };
+}
+
+PartRequestModel partRequestModelFromJson(String str) => PartRequestModel.fromJson(json.decode(str));
+
+String partRequestModelToJson(PartRequestModel data) => json.encode(data.toJson());
+
+class PartRequestModel {
+  String id;
+  String partName;
+  int qty;
+  String remark;
+  String status;
+
+  PartRequestModel({required this.id, required this.partName, required this.qty, required this.remark, required this.status});
+
+  factory PartRequestModel.fromJson(Map<String, dynamic> json) =>
+      PartRequestModel(id: json["id"], partName: json["part_name"], qty: json["qty"], remark: json["remark"], status: json["status"]);
+
+  Map<String, dynamic> toJson() => {"id": id, "part_name": partName, "qty": qty, "remark": remark, "status": status};
 }
