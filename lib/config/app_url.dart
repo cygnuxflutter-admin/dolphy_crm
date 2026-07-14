@@ -80,4 +80,8 @@ class ApiEndPoint {
   // Visit Endpoints
   static String serviceVisitCounts = "${baseUrl}service-visit/counts";
   static String serviceVisitList = "${baseUrl}service-visit/find";
+  static String syncToComplaintPreview = "${baseUrl}service-visit/{visit_id}/sync-to-complaint-preview";
+  static String syncToComplaint = "${baseUrl}service-visit/{visit_id}/sync-to-complaint";
+  static String technicianExpenseList = "${baseUrl}technician-expense/find";
+  static String dispatchedSerialSuggestions = "${baseUrl}service-visit/{visit_id}/dispatched-serial-suggestions";
 }

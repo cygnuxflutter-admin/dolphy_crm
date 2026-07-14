@@ -26,12 +26,12 @@ class LoginScreen extends StatelessWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 16)],
-                    ),
-                    child: Image.asset(AppImages.logo, scale: 10),
+                    // decoration: BoxDecoration(
+                    //   color: Colors.white,
+                    //   shape: BoxShape.circle,
+                    //   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 16)],
+                    // ),
+                    child: Image.asset(AppImages.logo),
                   ),
                   const SizedBox(height: 20),
                   const Text(

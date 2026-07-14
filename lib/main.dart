@@ -1,4 +1,5 @@
 import 'package:crm/config/app_routes.dart';
+import 'package:crm/utils/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:logger/logger.dart';
@@ -13,11 +14,10 @@ final GlobalKey<NavigatorState> navigatorKey = Get.key;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   pref = await SharedPreferences.getInstance();
+  Get.put(PermissionHandler());
 
   runApp(MyApp());
 }
-
-
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});

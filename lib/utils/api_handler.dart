@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 
 import '../config/app_shared_pref.dart';
@@ -87,6 +86,24 @@ class ApiHandler {
     }
   }
 
+  static Future<Response> putRequest({required String url, required Map body, Map<String, dynamic>? headers}) async {
+    logger.i("post $url");
+    logger.i(JsonEncoder.withIndent("" * 4).convert(body));
+    Response? response;
+    try {
+      response = await createRequest().put(
+        url,
+        data: body,
+        options: Options(headers: headers ?? await getHeaders()),
+      );
+      logger.i(JsonEncoder.withIndent(" " * 4).convert(json.encode(response.data)));
+      return response;
+    } catch (e) {
+      print("error === $e");
+      return Response(requestOptions: RequestOptions(data: {"message": "Something went wrong!"}));
+    }
+  }
+
   /// patch api
   static Future<Response> patchRequest({required String url, required Map body, Map<String, dynamic>? headers}) async {
     logger.i("patch $url");
@@ -152,21 +169,20 @@ class ApiHandler {
 
     return response;
   }  */
-  static Future<http.Response> uploadFile(File file) async {
+  static Future<Response> uploadFile(File file, {String folderName = 'Opportunity'}) async {
     debugPrint("file path ===${file.path}");
+    String fileName = file.path.split('/').last;
 
-    var request = http.MultipartRequest('POST', Uri.parse('https://tradeapi.cygnux.in/api/v1/file/upload'));
-    request.fields.addAll({'foldername': 'Opportunity'});
-    request.files.add(
-      await http.MultipartFile.fromPath('file', file.path, filename: file.path.split("/").last, contentType: http.MediaType('image', 'jpg')),
-    );
+    FormData formData = FormData.fromMap({"foldername": folderName, "file": await MultipartFile.fromFile(file.path, filename: fileName)});
+
     var headers = await getHeaders();
-    request.headers.addAll(headers);
+    headers.remove('Content-Type'); // Important: Remove Content-Type for Multipart requests
 
-    http.StreamedResponse response = await request.send();
-
-    final responses = await http.Response.fromStream(response);
-    return responses;
+    return await createRequest().post(
+      'https://tradeapi.cygnux.in/api/v1/file/upload',
+      data: formData,
+      options: Options(headers: headers),
+    );
   }
 }
 

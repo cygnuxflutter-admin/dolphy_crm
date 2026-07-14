@@ -47,5 +47,9 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to scan barcodes.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs access to location when open to track visit status.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>This app needs access to location to track visit status.</string>
 </dict>
 </plist>

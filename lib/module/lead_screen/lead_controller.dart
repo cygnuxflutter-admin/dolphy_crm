@@ -16,7 +16,6 @@ import 'package:crm/utils/api_handler.dart';
 import 'package:crm/widget/toast_message.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:multi_dropdown/multi_dropdown.dart';
@@ -326,9 +325,9 @@ class LeadController extends GetxController {
                 onTap: () async {
                   File? img = await pickFromCamera();
 
-                  http.Response response = await ApiHandler.uploadFile(img!);
-                  var data = json.decode(response.body);
-                  if (response.statusCode == 200 && data['success'] == true) {
+                  var response = await ApiHandler.uploadFile(img!);
+                  var data = response.data;
+                  if (response.statusCode == 200 && (data['success'] == true || data['status'] == 200)) {
                     uploadedImageLink.add(data['data']['url']);
                   } else {
                     toastMessage(text: "Image Upload Failed", color: AppColors.redColor);
@@ -343,9 +342,9 @@ class LeadController extends GetxController {
                 onTap: () async {
                   final img = await pickFromGallery();
 
-                  http.Response response = await ApiHandler.uploadFile(img!);
-                  var data = json.decode(response.body);
-                  if (response.statusCode == 200 && data['success'] == true) {
+                  var response = await ApiHandler.uploadFile(img!);
+                  var data = response.data;
+                  if (response.statusCode == 200 && (data['success'] == true || data['status'] == 200)) {
                     uploadedImageLink.add(data['data']['url']);
                   } else {
                     toastMessage(text: "Image Upload Failed", color: AppColors.redColor);

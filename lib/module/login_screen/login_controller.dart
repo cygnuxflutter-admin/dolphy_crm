@@ -7,14 +7,16 @@ import 'package:get/get.dart';
 
 import '../../config/app_colors.dart';
 import '../../config/app_shared_pref.dart';
+import '../../config/app_strings.dart';
 import '../../config/app_url.dart';
 import '../../main.dart';
 import '../../utils/api_handler.dart';
+import '../../utils/permission_handler.dart';
 import '../../widget/toast_message.dart';
 
 class LoginScreenController extends GetxController {
-  Rx<TextEditingController> emailController = TextEditingController(/*text: "dipl@gmail.com"*/).obs;
-  Rx<TextEditingController> passwordController = TextEditingController(/*text: "TenantAdmin#2025"*/).obs;
+  Rx<TextEditingController> emailController = TextEditingController(text: "binita.s@gmail.com").obs;
+  Rx<TextEditingController> passwordController = TextEditingController(text: "123456").obs;
   RxBool obSecure = true.obs;
   RxBool isLoading = false.obs;
 
@@ -36,21 +38,23 @@ class LoginScreenController extends GetxController {
         await pref!.setString(SharedPrefKey.userName, "${data['data']['first_name']} ${data['data']['last_name']}");
         await pref!.setString(SharedPrefKey.userInfo, json.encode(data['data']));
 
+        Get.find<PermissionHandler>().getUserRolePermission();
+
         debugPrint(data['accessToken']);
         debugPrint(data['data']['id']);
         debugPrint("${data['data']['first_name']} ${data['data']['last_name']}");
 
         isLoading.value = false;
-        toastMessage(text: "Login Successfully", color: AppColors.greenColor, isTop: false);
+        toastMessage(text: AppStrings.loginSuccessfully, color: AppColors.greenColor, isTop: false);
         Get.offAll(() => HomeScreen(), binding: HomeScreenBinding());
       } else {
         isLoading.value = false;
-        toastMessage(text: "Invalid Credential ", color: AppColors.redColor, isTop: false);
+        toastMessage(text: AppStrings.invalidCredential, color: AppColors.redColor, isTop: false);
         debugPrint("not done in else${response.statusCode}");
       }
     } else {
       isLoading.value = false;
-      toastMessage(text: "Invalid Credential", color: AppColors.redColor, isTop: false);
+      toastMessage(text: AppStrings.invalidCredential, color: AppColors.redColor, isTop: false);
       debugPrint("not done ${response.statusCode}");
     }
   }

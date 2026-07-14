@@ -17,6 +17,7 @@ class CustomDropdown<T> extends StatelessWidget {
   final Function()? onClearTap;
   final double? padding;
   final bool Function(T?, T?)? compareFn;
+  final InfiniteScrollProps? infiniteScrollProps;
 
   const CustomDropdown({
     super.key,
@@ -32,6 +33,7 @@ class CustomDropdown<T> extends StatelessWidget {
     this.onClearTap,
     this.padding,
     this.compareFn,
+    this.infiniteScrollProps,
   });
 
   @override
@@ -44,8 +46,6 @@ class CustomDropdown<T> extends StatelessWidget {
         compareFn: compareFn,
         decoratorProps: DropDownDecoratorProps(
           decoration: InputDecoration(
-            labelText: hintText,
-            floatingLabelBehavior: FloatingLabelBehavior.auto,
             errorStyle: const TextStyle(color: AppColors.redColor),
             prefixIcon: prefixImage != null
                 ? Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Image.asset(prefixImage!, height: 20, width: 20))
@@ -55,22 +55,22 @@ class CustomDropdown<T> extends StatelessWidget {
             labelStyle: AppTextStyle.regular.copyWith(fontSize: 14, color: AppColors.textSecondary),
             filled: true,
             fillColor: AppColors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: AppColors.border, width: 1),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: AppColors.indigo600Main, width: 1.6),
             ),
             disabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: AppColors.border.withValues(alpha: .6)),
             ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: AppColors.redColor),
             ),
           ),
@@ -78,6 +78,11 @@ class CustomDropdown<T> extends StatelessWidget {
         popupProps: PopupProps.modalBottomSheet(
           showSearchBox: showSearchBox,
           fit: FlexFit.loose,
+          infiniteScrollProps: infiniteScrollProps,
+          disableFilter: infiniteScrollProps != null,
+          containerBuilder: (context, popupWidget) {
+            return SafeArea(child: popupWidget);
+          },
           modalBottomSheetProps: ModalBottomSheetProps(
             showDragHandle: true,
             isScrollControlled: true,
@@ -125,11 +130,11 @@ class CustomDropdown<T> extends StatelessWidget {
               fillColor: AppColors.white,
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: AppColors.border),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: AppColors.indigo600Main, width: 1.5),
               ),
             ),
@@ -157,6 +162,7 @@ class CustomMultiDropdownSearch<T> extends StatelessWidget {
   final Function()? onClearTap;
   final double? padding;
   final bool Function(T?, T?)? compareFn;
+  final bool Function(T item)? disabledItemFn;
 
   const CustomMultiDropdownSearch({
     super.key,
@@ -172,6 +178,7 @@ class CustomMultiDropdownSearch<T> extends StatelessWidget {
     this.onClearTap,
     this.padding,
     this.compareFn,
+    this.disabledItemFn,
   });
 
   @override
@@ -217,6 +224,10 @@ class CustomMultiDropdownSearch<T> extends StatelessWidget {
         popupProps: PopupPropsMultiSelection.modalBottomSheet(
           showSearchBox: showSearchBox,
           fit: FlexFit.loose,
+          disabledItemFn: disabledItemFn,
+          containerBuilder: (context, popupWidget) {
+            return SafeArea(child: popupWidget);
+          },
           modalBottomSheetProps: ModalBottomSheetProps(
             showDragHandle: true,
             isScrollControlled: true,
@@ -245,12 +256,22 @@ class CustomMultiDropdownSearch<T> extends StatelessWidget {
           itemBuilder: (context, item, isDisabled, isSelected) {
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(color: isSelected ? AppColors.indigo600Main.withValues(alpha: 0.05) : Colors.transparent),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.indigo600Main.withValues(alpha: 0.05)
+                    : isDisabled
+                    ? AppColors.gray100
+                    : Colors.transparent,
+              ),
               child: Text(
                 itemAsString(item),
                 style: AppTextStyle.regular.copyWith(
                   fontSize: 14,
-                  color: isSelected ? AppColors.indigo600Main : AppColors.textPrimary,
+                  color: isDisabled
+                      ? AppColors.gray400
+                      : isSelected
+                      ? AppColors.indigo600Main
+                      : AppColors.textPrimary,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
@@ -264,11 +285,11 @@ class CustomMultiDropdownSearch<T> extends StatelessWidget {
               fillColor: AppColors.white,
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: AppColors.border),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(color: AppColors.indigo600Main, width: 1.5),
               ),
             ),

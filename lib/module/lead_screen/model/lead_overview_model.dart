@@ -27,9 +27,10 @@ class LeadViewResponseModel {
 class LeadViewData {
   final Opportunity opportunity;
   final List<LeadViewActivity> leadViewActivities;
-  final List<dynamic> quotations;
+  final List<Quotation> quotations;
   final List<LeadViewLog> leadViewLogs;
   final List<AssignmentHistory> assignmentHistory;
+  final List<SecondarySalesPerson> secondarySalesPersons;
   final Summary summary;
 
   LeadViewData({
@@ -38,33 +39,127 @@ class LeadViewData {
     required this.quotations,
     required this.leadViewLogs,
     required this.assignmentHistory,
+    required this.secondarySalesPersons,
     required this.summary,
   });
 
   factory LeadViewData.fromJson(Map<String, dynamic> json) => LeadViewData(
     opportunity: Opportunity.fromJson(json["opportunity"] ?? {}),
     leadViewActivities: json["activities"] == null ? [] : List<LeadViewActivity>.from(json["activities"].map((x) => LeadViewActivity.fromJson(x))),
-    quotations: json["quotations"] ?? [],
+    quotations: json["quotations"] == null ? [] : List<Quotation>.from(json["quotations"].map((x) => Quotation.fromJson(x))),
     leadViewLogs: json["logs"] == null ? [] : List<LeadViewLog>.from(json["logs"].map((x) => LeadViewLog.fromJson(x))),
-    assignmentHistory: json["assignment_history"] == null
-        ? []
-        : List<AssignmentHistory>.from(json["assignment_history"].map((x) => AssignmentHistory.fromJson(x))),
+    assignmentHistory: json["assignment_history"] == null ? [] : List<AssignmentHistory>.from(json["assignment_history"].map((x) => AssignmentHistory.fromJson(x))),
+    secondarySalesPersons: json["secondary_sales_persons"] == null ? [] : List<SecondarySalesPerson>.from(json["secondary_sales_persons"].map((x) => SecondarySalesPerson.fromJson(x))),
     summary: Summary.fromJson(json["summary"] ?? {}),
   );
 
   Map<String, dynamic> toJson() => {
     "opportunity": opportunity.toJson(),
     "activities": leadViewActivities.map((x) => x.toJson()).toList(),
-    "quotations": quotations,
-    "opportunityViewLog": leadViewLogs.map((x) => x.toJson()).toList(),
+    "quotations": quotations.map((x) => x.toJson()).toList(),
+    "logs": leadViewLogs.map((x) => x.toJson()).toList(),
     "assignment_history": assignmentHistory.map((x) => x.toJson()).toList(),
+    "secondary_sales_persons": secondarySalesPersons.map((x) => x.toJson()).toList(),
     "summary": summary.toJson(),
+  };
+}
+
+class SecondarySalesPerson {
+  final String id;
+  final String userId;
+  final String assignedBy;
+  final String assignedByName;
+  final String createdAt;
+  final User user;
+
+  SecondarySalesPerson({
+    required this.id,
+    required this.userId,
+    required this.assignedBy,
+    required this.assignedByName,
+    required this.createdAt,
+    required this.user,
+  });
+
+  factory SecondarySalesPerson.fromJson(Map<String, dynamic> json) => SecondarySalesPerson(
+    id: json["id"]?.toString() ?? "",
+    userId: json["user_id"]?.toString() ?? "",
+    assignedBy: json["assigned_by"]?.toString() ?? "",
+    assignedByName: json["assigned_by_name"]?.toString() ?? "",
+    createdAt: json["created_at"]?.toString() ?? "",
+    user: User.fromJson(json["user"] ?? {}),
+  );
+
+  Map<String, dynamic> toJson() => {
+    "id": id,
+    "user_id": userId,
+    "assigned_by": assignedBy,
+    "assigned_by_name": assignedByName,
+    "created_at": createdAt,
+    "user": user.toJson(),
+  };
+}
+
+class User {
+  final String id;
+  final String name;
+  final String email;
+
+  User({
+    required this.id,
+    required this.name,
+    required this.email,
+  });
+
+  factory User.fromJson(Map<String, dynamic> json) => User(
+    id: json["id"]?.toString() ?? "",
+    name: json["name"]?.toString() ?? "",
+    email: json["email"]?.toString() ?? "",
+  );
+
+  Map<String, dynamic> toJson() => {
+    "id": id,
+    "name": name,
+    "email": email,
+  };
+}
+
+class Quotation {
+  final String id;
+  final String quotationNo;
+  final String totalAmount;
+  final String status;
+  final String createdAt;
+
+  Quotation({
+    required this.id,
+    required this.quotationNo,
+    required this.totalAmount,
+    required this.status,
+    required this.createdAt,
+  });
+
+  factory Quotation.fromJson(Map<String, dynamic> json) => Quotation(
+    id: json["id"]?.toString() ?? "",
+    quotationNo: json["quotation_no"]?.toString() ?? "",
+    totalAmount: json["total_amount"]?.toString() ?? "",
+    status: json["status"]?.toString() ?? "",
+    createdAt: json["created_at"]?.toString() ?? "",
+  );
+
+  Map<String, dynamic> toJson() => {
+    "id": id,
+    "quotation_no": quotationNo,
+    "total_amount": totalAmount,
+    "status": status,
+    "created_at": createdAt,
   };
 }
 
 class LeadViewActivity {
   final String id;
   final String activityType;
+  final String activityTypeName;
   final String activityStatus;
   final String invitationStatus;
   final String callMedium;
@@ -86,6 +181,7 @@ class LeadViewActivity {
   LeadViewActivity({
     required this.id,
     required this.activityType,
+    required this.activityTypeName,
     required this.activityStatus,
     required this.invitationStatus,
     required this.callMedium,
@@ -106,30 +202,32 @@ class LeadViewActivity {
   });
 
   factory LeadViewActivity.fromJson(Map<String, dynamic> json) => LeadViewActivity(
-    id: json["id"] ?? "",
-    activityType: json["activity_type"] ?? "",
-    activityStatus: json["activity_status"] ?? "",
-    invitationStatus: json["invitation_status"] ?? "",
-    callMedium: json["call_medium"] ?? "",
-    subject: json["subject"] ?? "",
-    description: json["description"] ?? "",
-    startTime: json["start_time"] ?? "",
-    endTime: json["end_time"] ?? "",
-    location: json["location"] ?? "",
-    link: json["link"] ?? "",
-    followUpDate: json["follow_up_date"] ?? "",
-    reminderTime: json["reminder_time"] ?? "",
+    id: json["id"]?.toString() ?? "",
+    activityType: json["activity_type"]?.toString() ?? "",
+    activityTypeName: json["activity_type_name"]?.toString() ?? "",
+    activityStatus: json["activity_status"]?.toString() ?? "",
+    invitationStatus: json["invitation_status"]?.toString() ?? "",
+    callMedium: json["call_medium"]?.toString() ?? "",
+    subject: json["subject"]?.toString() ?? "",
+    description: json["description"]?.toString() ?? "",
+    startTime: json["start_time"]?.toString() ?? "",
+    endTime: json["end_time"]?.toString() ?? "",
+    location: json["location"]?.toString() ?? "",
+    link: json["link"]?.toString() ?? "",
+    followUpDate: json["follow_up_date"]?.toString() ?? "",
+    reminderTime: json["reminder_time"]?.toString() ?? "",
     isReminderSent: json["is_reminder_sent"] ?? false,
-    createdBy: json["created_by"] ?? "",
-    createdByName: json["created_by_name"] ?? "",
-    createdAt: json["created_at"] ?? "",
-    updatedAt: json["updated_at"] ?? "",
+    createdBy: json["created_by"]?.toString() ?? "",
+    createdByName: json["created_by_name"]?.toString() ?? "",
+    createdAt: json["created_at"]?.toString() ?? "",
+    updatedAt: json["updated_at"]?.toString() ?? "",
     invitees: json["invitees"] ?? [],
   );
 
   Map<String, dynamic> toJson() => {
     "id": id,
     "activity_type": activityType,
+    "activity_type_name": activityTypeName,
     "activity_status": activityStatus,
     "invitation_status": invitationStatus,
     "call_medium": callMedium,
@@ -177,15 +275,15 @@ class AssignmentHistory {
 
   factory AssignmentHistory.fromJson(Map<String, dynamic> json) => AssignmentHistory(
     step: json["step"] ?? 0,
-    id: json["id"] ?? "",
-    assignedFrom: json["assigned_from"] ?? "",
-    assignedFromName: json["assigned_from_name"] ?? "",
-    assignedTo: json["assigned_to"] ?? "",
-    assignedToName: json["assigned_to_name"] ?? "",
-    assignedBy: json["assigned_by"] ?? "",
-    assignedByName: json["assigned_by_name"] ?? "",
-    notes: json["notes"] ?? "",
-    assignedAt: json["assigned_at"] ?? "",
+    id: json["id"]?.toString() ?? "",
+    assignedFrom: json["assigned_from"]?.toString() ?? "",
+    assignedFromName: json["assigned_from_name"]?.toString() ?? "",
+    assignedTo: json["assigned_to"]?.toString() ?? "",
+    assignedToName: json["assigned_to_name"]?.toString() ?? "",
+    assignedBy: json["assigned_by"]?.toString() ?? "",
+    assignedByName: json["assigned_by_name"]?.toString() ?? "",
+    notes: json["notes"]?.toString() ?? "",
+    assignedAt: json["assigned_at"]?.toString() ?? "",
   );
 
   Map<String, dynamic> toJson() => {
@@ -222,13 +320,13 @@ class LeadViewLog {
   });
 
   factory LeadViewLog.fromJson(Map<String, dynamic> json) => LeadViewLog(
-    id: json["id"] ?? "",
-    notes: json["notes"] ?? "",
-    reminderDate: json["reminder_date"] ?? "",
-    createdBy: json["created_by"] ?? "",
-    createdByName: json["created_by_name"] ?? "",
-    createdAt: json["created_at"] ?? "",
-    attachmentUrl: json["attachment_url"] == null ? [] : List<String>.from(json["attachment_url"].map((x) => x)),
+    id: json["id"]?.toString() ?? "",
+    notes: json["notes"]?.toString() ?? "",
+    reminderDate: json["reminder_date"]?.toString() ?? "",
+    createdBy: json["created_by"]?.toString() ?? "",
+    createdByName: json["created_by_name"]?.toString() ?? "",
+    createdAt: json["created_at"]?.toString() ?? "",
+    attachmentUrl: json["attachment_url"] == null ? [] : List<String>.from(json["attachment_url"].map((x) => x?.toString() ?? "")),
   );
 
   Map<String, dynamic> toJson() => {
@@ -240,7 +338,7 @@ class LeadViewLog {
     "created_at": createdAt,
     "attachment_url": List<dynamic>.from(attachmentUrl.map((x) => x)),
   };
-}
+} 
 
 class Opportunity {
   final String id;
@@ -287,7 +385,13 @@ class Opportunity {
   final String salesPersonName;
   final String createdByName;
   final String updatedByName;
-
+  
+  // New fields from JSON
+  final String companyName;
+  final String customerGstNumber;
+  final String locationCode;
+  final ContactPersonData? contactPersonData;
+  
   Opportunity({
     required this.id,
     required this.tenantId,
@@ -333,53 +437,61 @@ class Opportunity {
     required this.salesPersonName,
     required this.createdByName,
     required this.updatedByName,
+    required this.companyName,
+    required this.customerGstNumber,
+    required this.locationCode,
+    this.contactPersonData,
   });
 
   factory Opportunity.fromJson(Map<String, dynamic> json) => Opportunity(
-    id: json["id"] ?? "",
-    tenantId: json["tenant_id"] ?? "",
-    opportunityName: json["opportunity_name"] ?? "",
-    customerId: json["customer_id"] ?? "",
-    productId: json["product_id"] ?? "",
-    expectedAmount: json["expected_amount"] ?? "",
-    probability: json["probability"] ?? "",
-    email: json["email"] ?? "",
-    personName: json["person_name"] ?? "",
-    mobile1: json["mobile1"] ?? "",
-    mobile2: json["mobile2"] ?? "",
-    address: json["address"] ?? "",
+    id: json["id"]?.toString() ?? "",
+    tenantId: json["tenant_id"]?.toString() ?? "",
+    opportunityName: json["opportunity_name"]?.toString() ?? "",
+    customerId: json["customer_id"]?.toString() ?? "",
+    productId: json["product_id"]?.toString() ?? "",
+    expectedAmount: json["expected_amount"]?.toString() ?? "",
+    probability: json["probability"]?.toString() ?? "",
+    email: json["email"]?.toString() ?? "",
+    personName: json["person_name"]?.toString() ?? "",
+    mobile1: json["mobile1"]?.toString() ?? "",
+    mobile2: json["mobile2"]?.toString() ?? "",
+    address: json["address"]?.toString() ?? (json["customer_address"]?.toString() ?? ""),
     isBulkRequirement: json["is_bulk_requirement"] ?? false,
-    cityId: json["city_id"] ?? "",
-    pincodeId: json["pincode_id"] ?? "",
-    stateId: json["state_id"] ?? "",
-    sourceId: json["source_id"] ?? "",
-    labelId: json["label_id"] ?? "",
-    salesPersonId: json["sales_person_id"] ?? "",
-    expectedClosingDate: json["expected_closing_date"] ?? "",
+    cityId: json["city_id"]?.toString() ?? "",
+    pincodeId: json["pincode_id"]?.toString() ?? "",
+    stateId: json["state_id"]?.toString() ?? "",
+    sourceId: json["source_id"]?.toString() ?? "",
+    labelId: json["label_id"]?.toString() ?? "",
+    salesPersonId: json["sales_person_id"]?.toString() ?? "",
+    expectedClosingDate: json["expected_closing_date"]?.toString() ?? "",
     isAssigned: json["is_assigned"] ?? false,
-    assignedBy: json["assigned_by"] ?? "",
-    assignedAt: json["assigned_at"] ?? "",
+    assignedBy: json["assigned_by"]?.toString() ?? "",
+    assignedAt: json["assigned_at"]?.toString() ?? "",
     tags: json["tags"] ?? [],
-    remarks: json["remarks"] ?? "",
-    interest: json["interest"] ?? "",
-    sectionId: json["section_id"] ?? "",
-    sectionName: json["section_name"] ?? "",
-    createdBy: json["created_by"] ?? "",
-    updatedBy: json["updated_by"] ?? "",
-    createdAt: json["created_at"] ?? "",
-    updatedAt: json["updated_at"] ?? "",
+    remarks: json["remarks"]?.toString() ?? "",
+    interest: json["interest"]?.toString() ?? "",
+    sectionId: json["section_id"]?.toString() ?? "",
+    sectionName: json["section_name"]?.toString() ?? "",
+    createdBy: json["created_by"]?.toString() ?? "",
+    updatedBy: json["updated_by"]?.toString() ?? "",
+    createdAt: json["created_at"]?.toString() ?? "",
+    updatedAt: json["updated_at"]?.toString() ?? "",
     isDeleted: json["is_deleted"] ?? false,
-    deletedAt: json["deleted_at"] ?? "",
-    customerName: json["customer_name"] ?? "",
-    customerPriceType: json["customer_price_type"] ?? "",
-    stateName: json["state_name"] ?? "",
-    cityName: json["city_name"] ?? "",
-    pincodeName: json["pincode_name"] ?? "",
-    sourceName: json["source_name"] ?? "",
-    labelName: json["label_name"] ?? "",
-    salesPersonName: json["sales_person_name"] ?? "",
-    createdByName: json["created_by_name"] ?? "",
-    updatedByName: json["updated_by_name"] ?? "",
+    deletedAt: json["deleted_at"]?.toString() ?? "",
+    customerName: json["customer_name"]?.toString() ?? "",
+    customerPriceType: json["customer_price_type"]?.toString() ?? "",
+    stateName: json["state_name"]?.toString() ?? "",
+    cityName: json["city_name"]?.toString() ?? "",
+    pincodeName: json["pincode_name"]?.toString() ?? "",
+    sourceName: json["source_name"]?.toString() ?? "",
+    labelName: json["label_name"]?.toString() ?? "",
+    salesPersonName: json["sales_person_name"]?.toString() ?? "",
+    createdByName: json["created_by_name"]?.toString() ?? "",
+    updatedByName: json["updated_by_name"]?.toString() ?? "",
+    companyName: json["company_name"]?.toString() ?? "",
+    customerGstNumber: json["customer_gst_number"]?.toString() ?? "",
+    locationCode: json["location_code"]?.toString() ?? "",
+    contactPersonData: json["contact_person_data"] == null ? null : ContactPersonData.fromJson(json["contact_person_data"]),
   );
 
   Map<String, dynamic> toJson() => {
@@ -427,6 +539,71 @@ class Opportunity {
     "sales_person_name": salesPersonName,
     "created_by_name": createdByName,
     "updated_by_name": updatedByName,
+    "company_name": companyName,
+    "customer_gst_number": customerGstNumber,
+    "location_code": locationCode,
+    "contact_person_data": contactPersonData?.toJson(),
+  };
+}
+
+
+class ContactPersonData {
+  final String firstName;
+  final String lastName;
+  final String mobileNumber;
+  final String mobileAlt;
+  final String emailId;
+  final String designation;
+  final String address;
+  final String countryName;
+  final String stateName;
+  final String cityName;
+  final String pincodeName;
+  final String notes;
+
+  ContactPersonData({
+    required this.firstName,
+    required this.lastName,
+    required this.mobileNumber,
+    required this.mobileAlt,
+    required this.emailId,
+    required this.designation,
+    required this.address,
+    required this.countryName,
+    required this.stateName,
+    required this.cityName,
+    required this.pincodeName,
+    required this.notes,
+  });
+
+  factory ContactPersonData.fromJson(Map<String, dynamic> json) => ContactPersonData(
+    firstName: json["first_name"]?.toString() ?? "",
+    lastName: json["last_name"]?.toString() ?? "",
+    mobileNumber: json["mobile_number"]?.toString() ?? "",
+    mobileAlt: json["mobile_alt"]?.toString() ?? "",
+    emailId: json["email_id"]?.toString() ?? "",
+    designation: json["designation"]?.toString() ?? "",
+    address: json["address"]?.toString() ?? "",
+    countryName: json["country_name"]?.toString() ?? "",
+    stateName: json["state_name"]?.toString() ?? "",
+    cityName: json["city_name"]?.toString() ?? "",
+    pincodeName: json["pincode_name"]?.toString() ?? "",
+    notes: json["notes"]?.toString() ?? "",
+  );
+
+  Map<String, dynamic> toJson() => {
+    "first_name": firstName,
+    "last_name": lastName,
+    "mobile_number": mobileNumber,
+    "mobile_alt": mobileAlt,
+    "email_id": emailId,
+    "designation": designation,
+    "address": address,
+    "country_name": countryName,
+    "state_name": stateName,
+    "city_name": cityName,
+    "pincode_name": pincodeName,
+    "notes": notes,
   };
 }
 
@@ -435,7 +612,7 @@ class Summary {
   final int totalCalls;
   final int totalMeetings;
   final int totalQuotations;
-  final int totalQuotationValue;
+  final num totalQuotationValue;
   final int totalLogs;
   final int totalAssignments;
 
@@ -454,7 +631,7 @@ class Summary {
     totalCalls: json["total_calls"] ?? 0,
     totalMeetings: json["total_meetings"] ?? 0,
     totalQuotations: json["total_quotations"] ?? 0,
-    totalQuotationValue: json["total_quotation_value"] ?? 0,
+    totalQuotationValue: json["total_quotation_value"] ?? 0.0,
     totalLogs: json["total_logs"] ?? 0,
     totalAssignments: json["total_assignments"] ?? 0,
   );
