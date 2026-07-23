@@ -16,14 +16,14 @@ class ProfileController extends GetxController {
   }
 
   void getUserInfo() {
-    try {
-      String? userInfo = pref!.getString(SharedPrefKey.userInfo);
-      if (userInfo != null) {
-        Map<String, dynamic> userMap = json.decode(userInfo);
-        userData.value = LogInData.fromJson(userMap);
-      }
-    } catch (e) {
-      print("Error parsing user info: $e");
+    // try {
+    String? userInfo = pref!.getString(SharedPrefKey.userInfo);
+    if (userInfo != null) {
+      Map<String, dynamic> userMap = json.decode(userInfo);
+      userData.value = LogInData.fromJson(userMap);
     }
+    // } catch (e) {
+    //   print("Error parsing user info: $e");
+    // }
   }
 }

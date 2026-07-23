@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crm/config/app_shared_pref.dart';
 import 'package:crm/config/app_url.dart';
@@ -48,6 +49,9 @@ class AddVisitController extends GetxController {
   RxList<AssignSalesPerson> technicianList = <AssignSalesPerson>[].obs;
   RxList<Product> complaintProducts = <Product>[].obs;
 
+  RxList<File> attachments = <File>[].obs;
+  RxList<String> attachmentUrls = <String>[].obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -56,14 +60,14 @@ class AddVisitController extends GetxController {
 
   Future<void> initData() async {
     isLoading.value = true;
-    await getVisitPurposes();
-    await getTechnicians();
-    isLoading.value = false;
     if (Get.arguments != null && Get.arguments is String) {
       isEdit.value = true;
       visitId = Get.arguments;
       fetchVisitDetailForEdit(visitId!);
     }
+    await getVisitPurposes();
+    await getTechnicians();
+    isLoading.value = false;
   }
 
   Future<void> fetchVisitDetailForEdit(String id) async {
@@ -109,6 +113,11 @@ class AddVisitController extends GetxController {
 
         // Products
         complaintProducts.assignAll(visit.products);
+
+        // Attachments
+        if (visit.attachments != null) {
+          attachmentUrls.assignAll(visit.attachments!);
+        }
       }
     } catch (e) {
       debugPrint("Error fetching visit for edit: $e");
@@ -272,6 +281,16 @@ class AddVisitController extends GetxController {
 
     isLoading.value = true;
     try {
+      // 1. Upload attachments
+      for (var file in attachments) {
+        final resp = await ApiHandler.uploadFile(file, folderName: 'visit-attachments');
+        final data = resp.data;
+        if (resp.statusCode == 200 && data['success'] == true) {
+          attachmentUrls.add(data['data']['url']);
+        }
+      }
+      attachments.clear();
+
       // Helper to convert yyyy-MM-dd HH:mm to ISO8601
       String formatToIso(String dateStr) {
         if (dateStr.isEmpty) return "";
@@ -296,6 +315,7 @@ class AddVisitController extends GetxController {
         "mobile": mobileController.value.text,
         "technician_ids": selectedTechnicians.map((e) => e.id).toList(),
         "primary_technician_id": selectedPrimaryTechnician.value?.id,
+        "attachments": attachmentUrls,
       };
 
       if (isEdit.value) {

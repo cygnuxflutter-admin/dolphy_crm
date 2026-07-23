@@ -26,10 +26,12 @@ class AddExpenseScreen extends GetView<ExpenseController> {
           icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.white),
           onPressed: () => Get.back(),
         ),
-        title: Obx(() => Text(
-          controller.isEdit.value ? "Edit Expense" : "Add Expense",
-          style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.white),
-        )),
+        title: Obx(
+          () => Text(
+            controller.isEdit.value ? "Edit Expense" : "Add Expense",
+            style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.white),
+          ),
+        ),
       ),
       body: Obx(() {
         if (controller.isLoading.value) {
@@ -250,16 +252,61 @@ class AddExpenseScreen extends GetView<ExpenseController> {
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        controller.overallAttachments.isEmpty ? "No file chosen" : "${controller.overallAttachments.length} files chosen",
-                        style: AppTextStyle.regular.copyWith(fontSize: 13, color: AppColors.gray500),
-                        overflow: TextOverflow.ellipsis,
+                      child: Obx(
+                        () => Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                (controller.overallAttachments.isEmpty && controller.overallAttachmentUrls.isEmpty)
+                                    ? "No file chosen"
+                                    : "${controller.overallAttachments.length + controller.overallAttachmentUrls.length} files chosen",
+                                style: AppTextStyle.regular.copyWith(fontSize: 13, color: AppColors.gray500),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (controller.isOverallUploading.value)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 8.0),
+                                child: SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
+            Obx(() {
+              if (controller.overallAttachmentUrls.isEmpty && controller.overallAttachments.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Uploaded files (${controller.overallAttachmentUrls.length + controller.overallAttachments.length}):",
+                      style: AppTextStyle.bold.copyWith(fontSize: 12),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ...controller.overallAttachmentUrls.map(
+                          (url) => _buildFileItem(url.split('/').last, onDelete: () => controller.overallAttachmentUrls.remove(url), isUrl: true),
+                        ),
+                        ...controller.overallAttachments.map(
+                          (file) => _buildFileItem(file.path.split('/').last, onDelete: () => controller.overallAttachments.remove(file)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
         const SizedBox(height: 16),
@@ -391,11 +438,34 @@ class AddExpenseScreen extends GetView<ExpenseController> {
           Container(
             width: 180,
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: TextFormField(
-              controller: line.otherDetailController,
-              decoration: _inputDecoration("Other detail"),
-              style: const TextStyle(fontSize: 13),
-            ),
+            child: Obx(() {
+              if (line.expenseType.value == "Travel") {
+                return Column(
+                  children: [
+                    CustomDropdown<String>(
+                      hintText: "Select travel type",
+                      items: (filter, loadProps) => controller.travelTypes,
+                      itemAsString: (item) => item,
+                      selectedItem: line.travelType.value,
+                      padding: 0,
+                      onChanged: (val) => line.travelType.value = val,
+                    ),
+                    const SizedBox(height: 4),
+                    TextFormField(
+                      controller: line.kilometreController,
+                      keyboardType: TextInputType.number,
+                      decoration: _inputDecoration("Kilometre"),
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ],
+                );
+              }
+              return TextFormField(
+                controller: line.otherDetailController,
+                decoration: _inputDecoration("Other detail"),
+                style: const TextStyle(fontSize: 13),
+              );
+            }),
           ),
           Container(
             width: 120,
@@ -456,34 +526,71 @@ class AddExpenseScreen extends GetView<ExpenseController> {
           Container(
             width: 180,
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: InkWell(
-              onTap: () => _pickLineFiles(index),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                      decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(4)),
-                      child: const Text("Choose Files", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  onTap: () => _pickLineFiles(index),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.border),
+                      borderRadius: BorderRadius.circular(4),
                     ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Obx(
-                        () => Text(
-                          line.attachments.isEmpty ? "No file chosen" : "${line.attachments.length} files",
-                          style: const TextStyle(fontSize: 10, color: AppColors.gray500),
-                          overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(4)),
+                          child: const Text("Choose Files", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                         ),
-                      ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Obx(
+                            () => Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    (line.attachments.isEmpty && line.attachmentUrls.isEmpty)
+                                        ? "No file chosen"
+                                        : "${line.attachments.length + line.attachmentUrls.length} files",
+                                    style: const TextStyle(fontSize: 10, color: AppColors.gray500),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (line.isUploading.value)
+                                  const Padding(
+                                    padding: EdgeInsets.only(left: 4.0),
+                                    child: SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2)),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                Obx(() {
+                  if (line.attachmentUrls.isEmpty && line.attachments.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ...line.attachmentUrls.map(
+                          (url) => _buildFileItem(url.split('/').last, onDelete: () => line.attachmentUrls.remove(url), isUrl: true, small: true),
+                        ),
+                        ...line.attachments.map(
+                          (file) => _buildFileItem(file.path.split('/').last, onDelete: () => line.attachments.remove(file), small: true),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
             ),
           ),
           Container(
@@ -560,10 +667,15 @@ class AddExpenseScreen extends GetView<ExpenseController> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Expanded(
           child: ElevatedButton(
             onPressed: () => controller.submitExpense(isDraft: true),
@@ -573,10 +685,15 @@ class AddExpenseScreen extends GetView<ExpenseController> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            child: const Text("Save Draft", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              "Save Draft",
+              style: TextStyle(fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 8),
         Expanded(
           child: ElevatedButton(
             onPressed: () => controller.submitExpense(),
@@ -586,7 +703,12 @@ class AddExpenseScreen extends GetView<ExpenseController> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            child: const Text("Submit", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              "Submit",
+              style: TextStyle(fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ),
       ],
@@ -609,6 +731,38 @@ class AddExpenseScreen extends GetView<ExpenseController> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(4),
         borderSide: const BorderSide(color: AppColors.indigo600Main),
+      ),
+    );
+  }
+
+  Widget _buildFileItem(String name, {required VoidCallback onDelete, bool isUrl = false, bool small = false}) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: small ? 6 : 8, vertical: small ? 2 : 4),
+      decoration: BoxDecoration(
+        color: isUrl ? AppColors.indigo50 : AppColors.gray100,
+        borderRadius: BorderRadius.circular(small ? 4 : 8),
+        border: Border.all(color: isUrl ? AppColors.indigo600Main.withOpacity(0.2) : AppColors.gray300),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              name,
+              style: TextStyle(
+                fontSize: small ? 10 : 12,
+                color: isUrl ? AppColors.indigo600Main : AppColors.textPrimary,
+                decoration: isUrl ? TextDecoration.underline : TextDecoration.none,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: onDelete,
+            child: Icon(Icons.close, size: small ? 12 : 14, color: AppColors.redColor),
+          ),
+        ],
       ),
     );
   }
@@ -651,16 +805,16 @@ class AddExpenseScreen extends GetView<ExpenseController> {
   Future<void> _pickOverallFiles() async {
     final ImagePicker picker = ImagePicker();
     final List<XFile> images = await picker.pickMultiImage();
-    if (images.isNotEmpty) {
-      controller.overallAttachments.addAll(images.map((img) => File(img.path)));
+    for (var img in images) {
+      await controller.uploadOverallFile(File(img.path));
     }
   }
 
   Future<void> _pickLineFiles(int index) async {
     final ImagePicker picker = ImagePicker();
     final List<XFile> images = await picker.pickMultiImage();
-    if (images.isNotEmpty) {
-      controller.expenseLines[index].attachments.addAll(images.map((img) => File(img.path)));
+    for (var img in images) {
+      await controller.uploadLineFile(index, File(img.path));
     }
   }
 }

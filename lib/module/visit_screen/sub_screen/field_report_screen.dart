@@ -6,10 +6,12 @@ import 'package:flutter_intl_phone_field/flutter_intl_phone_field.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/app_colors.dart';
 import '../../../config/app_shared_pref.dart';
 import '../../../widget/dropdown.dart';
+import '../../../widget/toast_message.dart';
 import '../model/dispatched_serial_model.dart';
 import '../model/field_report_model.dart';
 import '../visit_controller.dart';
@@ -39,6 +41,31 @@ class FieldReportScreen extends GetView<VisitController> {
           "Field Service Report",
           style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.white),
         ),
+        actions: [
+          Obx(() {
+            final data = controller.fieldReportDetail.value;
+            if (data == null) return const SizedBox.shrink();
+            final currentUserTech = data.visitTechnicians?.firstWhereOrNull((t) => t.isCurrentUser == true);
+            final String fieldStatus = currentUserTech?.fieldStatus?.toLowerCase() ?? "";
+
+            if (fieldStatus == "completed") {
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: TextButton.icon(
+                  onPressed: controller.isLoading.value ? null : () => controller.saveFieldReport(visitId),
+                  icon: controller.isLoading.value
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.save, color: Colors.white, size: 18),
+                  label: const Text(
+                    "Save",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
+        ],
       ),
       body: Obx(() {
         if (controller.isFieldReportLoading.value) {
@@ -69,6 +96,8 @@ class FieldReportScreen extends GetView<VisitController> {
               _buildTopHeader(data, visitId),
               const SizedBox(height: 16),
               _buildVisitInfoCard(data),
+              const SizedBox(height: 24),
+              _buildSiteArrivalCard(data, visitId),
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -123,8 +152,27 @@ class FieldReportScreen extends GetView<VisitController> {
                       child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Obx(
+                      () => ElevatedButton(
+                        onPressed: controller.isLoading.value ? null : () => controller.saveFieldReport(visitId),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.indigo600Main,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                        child: controller.isLoading.value
+                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Text("Save & Draft", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ),
                 ],
               ),
+
               const SizedBox(height: 30),
             ],
           ),
@@ -137,7 +185,7 @@ class FieldReportScreen extends GetView<VisitController> {
     final currentUserTech = data.visitTechnicians?.firstWhereOrNull((t) => t.isCurrentUser == true);
     final String status = currentUserTech?.fieldStatus?.toLowerCase() ?? "";
 
-    final bool showStartButton = currentUserTech != null && status == "assigned" && currentUserTech.canStart == true;
+    final bool showStartButton = currentUserTech != null && (status == "assigned" || status == "reached") && currentUserTech.canStart == true;
     final bool showPauseStopButtons = currentUserTech != null && status == "started" && currentUserTech.canStart == false;
     final bool showRestartStopButtons = currentUserTech != null && status == "paused" && currentUserTech.canStart == false;
 
@@ -370,9 +418,12 @@ class FieldReportScreen extends GetView<VisitController> {
             _infoItem("VISIT PURPOSE", data.visitPurposeName ?? "-"),
             _infoItem(
               "VISIT START DATE & TIME",
-              data.visitStartDatetime != null ? DateFormat('dd/MM/yyyy hh:mm a').format(data.visitStartDatetime!) : "-",
+              data.visitStartDatetime != null ? DateFormat('dd/MM/yyyy hh:mm a').format(data.visitStartDatetime!.toLocal()) : "-",
             ),
-            _infoItem("VISIT END DATE & TIME", data.visitEndDatetime != null ? DateFormat('dd/MM/yyyy hh:mm a').format(data.visitEndDatetime!) : "-"),
+            _infoItem(
+              "VISIT END DATE & TIME",
+              data.visitEndDatetime != null ? DateFormat('dd/MM/yyyy hh:mm a').format(data.visitEndDatetime!.toLocal()) : "-",
+            ),
             _infoItem("TECHNICIAN", data.technicianNames ?? "-"),
           ]),
         ],
@@ -971,6 +1022,18 @@ class FieldReportScreen extends GetView<VisitController> {
     );
   }
 
+  Future<void> _pickPartFile(String productId, int partIndex) async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        controller.uploadPartAttachment(productId, partIndex, File(image.path));
+      }
+    } catch (e) {
+      debugPrint("Error picking image: $e");
+    }
+  }
+
   Future<void> _pickFile(String productId) async {
     final ImagePicker picker = ImagePicker();
     try {
@@ -1051,9 +1114,9 @@ class FieldReportScreen extends GetView<VisitController> {
                           ),
                           const SizedBox(height: 12),
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
-                                flex: 1,
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -1108,6 +1171,75 @@ class FieldReportScreen extends GetView<VisitController> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 12),
+                          _formLabel("Attachment"),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: AppColors.gray200),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      InkWell(
+                                        onTap: () => _pickPartFile(p.id ?? "", index),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                          decoration: const BoxDecoration(
+                                            color: AppColors.gray50,
+                                            borderRadius: BorderRadius.horizontal(left: Radius.circular(8)),
+                                            border: Border(right: BorderSide(color: AppColors.gray200)),
+                                          ),
+                                          child: const Text("Choose Files", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                                          child: Text(
+                                            part['attachments'] != null && part['attachments'].isNotEmpty
+                                                ? "${part['attachments'].length} files"
+                                                : "No file chosen",
+                                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (part['attachments'] != null && part['attachments'].isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            ...List.generate(part['attachments'].length, (attIndex) {
+                              final url = part['attachments'][attIndex];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        url.split('/').last,
+                                        style: const TextStyle(fontSize: 11, color: AppColors.indigo600Main),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    InkWell(
+                                      onTap: () => controller.removePartAttachment(p.id ?? "", index, attIndex),
+                                      child: const Icon(Icons.delete_outline, size: 16, color: AppColors.redColor),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
                         ],
                       ),
                     );
@@ -1181,33 +1313,6 @@ class FieldReportScreen extends GetView<VisitController> {
         ],
       ),
     );
-  }
-
-  int _calculateActiveSeconds(List<TrackingLog>? logs) {
-    if (logs == null || logs.isEmpty) return 0;
-    int totalSeconds = 0;
-    DateTime? startTime;
-
-    for (var log in logs) {
-      final action = log.action?.toLowerCase();
-      final time = log.createdAt;
-      if (time == null) continue;
-
-      if (action == 'start' || action == 'resume') {
-        startTime = time;
-      } else if (action == 'pause' || action == 'stop' || action == 'end') {
-        if (startTime != null) {
-          totalSeconds += time.difference(startTime).inSeconds;
-          startTime = null;
-        }
-      }
-    }
-
-    if (startTime != null) {
-      totalSeconds += DateTime.now().toUtc().difference(startTime).inSeconds;
-    }
-
-    return totalSeconds;
   }
 
   String _formatDuration(int seconds) {
@@ -1572,6 +1677,343 @@ class FieldReportScreen extends GetView<VisitController> {
       }
     } catch (e) {
       debugPrint("Error picking image: $e");
+    }
+  }
+
+  Widget _buildSiteArrivalCard(FieldReportData data, String visitId) {
+    final technicians = data.visitTechnicians ?? [];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.indigo600Main.withValues(alpha: 0.1)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.location_on_outlined, size: 18, color: AppColors.green500Success),
+              SizedBox(width: 8),
+              Text(
+                "Site Arrival",
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.green500Success),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            "Each technician must mark Reached at Site with location and attachment before starting the visit.",
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(height: 1, color: AppColors.gray100),
+          ),
+          Wrap(spacing: 16, runSpacing: 16, children: technicians.map((tech) => _buildTechnicianArrivalCard(tech, visitId)).toList()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTechnicianArrivalCard(VisitTechnician tech, String visitId) {
+    final bool isReached = tech.reachedAt != null;
+    final bool isCurrentUser = tech.isCurrentUser == true;
+
+    return Container(
+      width: Get.width > 600 ? (Get.width - 64 - 16) / 2 : double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isReached ? AppColors.green500Success.withValues(alpha: 0.02) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isReached ? AppColors.green500Success.withValues(alpha: 0.2) : AppColors.gray200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(tech.name ?? "-", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+              _statusBadgeSmall(isReached ? "Reached" : "Pending", isReached),
+            ],
+          ),
+          if (tech.isPrimary == true) ...[const SizedBox(height: 4), _primaryBadge()],
+          if (isReached) ...[
+            const SizedBox(height: 12),
+            _arrivalInfoItem(Icons.access_time, DateFormat('dd/MM/yyyy hh:mm a').format(tech.reachedAt!.toLocal())),
+            const SizedBox(height: 8),
+            _arrivalInfoItem(Icons.location_on_outlined, "${tech.reachedLatitude ?? '-'}, ${tech.reachedLongitude ?? '-'}"),
+            if (tech.reachedAttachments != null && tech.reachedAttachments!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: tech.reachedAttachments!.asMap().entries.map((entry) {
+                  final index = entry.key + 1;
+                  final url = entry.value;
+                  return OutlinedButton.icon(
+                    onPressed: () => _launchURL(url),
+                    icon: const Icon(Icons.open_in_new, size: 14),
+                    label: Text("View $index", style: const TextStyle(fontSize: 11)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.indigo600Main,
+                      side: const BorderSide(color: AppColors.indigo600Main),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ] else if (isCurrentUser && tech.canReachAtSite == true) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _showArrivalDialog(visitId),
+                icon: const Icon(Icons.location_on_outlined, size: 18),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.green500Success,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  elevation: 0,
+                ),
+                label: const Text("Reached at Site", style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showArrivalDialog(String visitId) {
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          width: Get.width * 0.95,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Reached at Site", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  InkWell(
+                    onTap: () => Get.back(),
+                    child: const Icon(Icons.close, color: Colors.grey),
+                  ),
+                ],
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Divider(height: 1, color: AppColors.gray200),
+              ),
+              const Text(
+                "Your current location will be recorded. Upload at least one photo or document as proof of site arrival.",
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 20),
+              const Text("Attachments *", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Obx(
+                () => Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.gray300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        flex: 2,
+                        child: InkWell(
+                          onTap: () => _pickSiteArrivalFile(),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            decoration: const BoxDecoration(
+                              border: Border(right: BorderSide(color: AppColors.gray300)),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                "Choose Files",
+                                style: TextStyle(fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Flexible(
+                        flex: 3,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            controller.siteArrivalAttachmentUrls.isNotEmpty
+                                ? "${controller.siteArrivalAttachmentUrls.length} files chosen"
+                                : "No file chosen",
+                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Obx(() {
+                if (controller.siteArrivalAttachmentUrls.isNotEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Column(
+                      children: controller.siteArrivalAttachmentUrls.asMap().entries.map((entry) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.description_outlined, size: 16, color: AppColors.indigo600Main),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  entry.value.split('/').last,
+                                  style: const TextStyle(fontSize: 12, color: AppColors.indigo600Main),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () => controller.removeSiteArrivalAttachment(entry.key),
+                                child: const Icon(Icons.close, size: 16, color: AppColors.red500),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              }),
+              const SizedBox(height: 32),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: OutlinedButton(
+                      onPressed: () => Get.back(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.textPrimary,
+                        side: const BorderSide(color: AppColors.gray300),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: Obx(
+                      () => ElevatedButton(
+                        onPressed: controller.isLoading.value
+                            ? null
+                            : () async {
+                                if (controller.siteArrivalAttachmentUrls.isEmpty) {
+                                  toastMessage(text: "Please upload at least one attachment");
+                                  return;
+                                }
+                                await controller.reachVisit(visitId);
+                                if (!controller.isLoading.value) Get.back();
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.green500Success,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                        child: controller.isLoading.value
+                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Text(
+                                "Submit & Mark Reached",
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickSiteArrivalFile() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        controller.uploadSiteArrivalAttachment(File(image.path));
+      }
+    } catch (e) {
+      debugPrint("Error picking image: $e");
+    }
+  }
+
+  Widget _arrivalInfoItem(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: AppColors.gray500),
+        const SizedBox(width: 8),
+        Text(text, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      ],
+    );
+  }
+
+  Widget _statusBadgeSmall(String text, bool isSuccess) {
+    final Color color = isSuccess ? AppColors.green500Success : AppColors.gray500;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
+      ),
+    );
+  }
+
+  Widget _primaryBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: AppColors.indigo600Main.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+      child: const Text(
+        "Primary",
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+      ),
+    );
+  }
+
+  Future<void> _launchURL(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      toastMessage(text: "Could not launch $url");
     }
   }
 }

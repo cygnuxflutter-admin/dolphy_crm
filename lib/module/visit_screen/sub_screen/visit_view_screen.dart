@@ -1058,7 +1058,7 @@ class VisitViewScreen extends GetView<VisitController> {
     final String currentUserId = Pref.getUserId();
     final bool isCreatedByMe = data?.createdBy.toString() == currentUserId.toString();
 
-    final bool showEdit = isPending || (isCancelled && isCreatedByMe);
+    final bool showEdit = isPending || (isCancelled && isCreatedByMe) || isCompleted;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1302,6 +1302,12 @@ class VisitViewScreen extends GetView<VisitController> {
                 ),
                 DataColumn(
                   label: Text(
+                    "Image",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
                     "Product",
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
@@ -1372,6 +1378,19 @@ class VisitViewScreen extends GetView<VisitController> {
                 return DataRow(
                   cells: [
                     DataCell(Text("${index + 1}", style: const TextStyle(fontSize: 12, color: AppColors.textSecondary))),
+                    DataCell(
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(4)),
+                        child: (product.productImage ?? "").isNotEmpty
+                            ? Image.network(
+                                "https://tradeapi.cygnux.in${product.productImage}",
+                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.image, size: 20, color: AppColors.gray400),
+                              )
+                            : const Icon(Icons.image, size: 20, color: AppColors.gray400),
+                      ),
+                    ),
                     DataCell(
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

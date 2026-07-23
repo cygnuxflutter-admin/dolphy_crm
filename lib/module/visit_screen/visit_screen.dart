@@ -225,7 +225,7 @@ class VisitScreen extends GetView<VisitController> {
     final String currentUserId = Pref.getUserId();
     final bool isCreatedByMe = item.createdBy?.toString() == currentUserId.toString();
 
-    final bool showEdit = isPending || (isCancelled && isCreatedByMe);
+    final bool showEdit = isPending || (isCancelled && isCreatedByMe) || isCompleted;
     final bool showCancel = isPending;
 
     return PopupMenuButton<String>(
@@ -375,27 +375,35 @@ class VisitScreen extends GetView<VisitController> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (formKey.currentState!.validate()) {
-                            Get.back();
-                            controller.cancelVisit(item.id!, remarksController.text.trim());
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.red500,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.cancel_outlined, size: 16),
-                            SizedBox(width: 8),
-                            Text("Confirm Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
-                          ],
+                      child: Obx(
+                        () => ElevatedButton(
+                          onPressed: controller.isActionLoading.value
+                              ? () {}
+                              : () {
+                                  if (formKey.currentState!.validate()) {
+                                    controller.cancelVisit(item.id!, remarksController.text.trim());
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.red500,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              controller.isActionLoading.value
+                                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.cancel_outlined, size: 16),
+                              const SizedBox(width: 8),
+                              Text(
+                                controller.isActionLoading.value ? "Cancelling..." : "Confirm Cancel",
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
