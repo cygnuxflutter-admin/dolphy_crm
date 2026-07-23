@@ -1,6 +1,8 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
 import '../../../config/app_shared_pref.dart';
 import '../../../config/app_url.dart';
 import '../../../utils/api_handler.dart';
@@ -10,6 +12,7 @@ import './model/technician_expense_view_model.dart';
 
 class TechnicianExpenseController extends GetxController {
   RxBool isLoading = false.obs;
+  RxBool isActionLoading = false.obs;
   RxList<TechnicianExpense> expenseList = <TechnicianExpense>[].obs;
   RxInt currentPage = 1.obs;
   RxInt totalRecords = 0.obs;
@@ -80,16 +83,14 @@ class TechnicianExpenseController extends GetxController {
   }
 
   Future<void> cancelExpense(String id, String remarks) async {
+    isActionLoading.value = true;
     try {
       final url = "${ApiEndPoint.baseUrl}technician-expense/status/$id";
-      final body = {
-        "status": "cancelled",
-        "cancel_remarks": remarks,
-      };
-      
+      final body = {"status": "cancelled", "cancel_remarks": remarks};
+
       final response = await ApiHandler.patchRequest(url: url, body: body);
       final data = response.data is String ? json.decode(response.data) : response.data;
-      
+
       if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
         Get.back(); // close dialog
         toastMessage(text: data['message'] ?? "Technician expense cancelled successfully", color: Colors.green);
@@ -100,19 +101,20 @@ class TechnicianExpenseController extends GetxController {
     } catch (e) {
       debugPrint("Error cancelling expense: $e");
       toastMessage(text: "Failed to cancel expense", color: Colors.red);
+    } finally {
+      isActionLoading.value = false;
     }
   }
 
   Future<void> submitExpense(String id) async {
+    isActionLoading.value = true;
     try {
       final url = "${ApiEndPoint.baseUrl}technician-expense/status/$id";
-      final body = {
-        "status": "submitted",
-      };
-      
+      final body = {"status": "submitted"};
+
       final response = await ApiHandler.patchRequest(url: url, body: body);
       final data = response.data is String ? json.decode(response.data) : response.data;
-      
+
       if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
         Get.back(); // close dialog
         toastMessage(text: data['message'] ?? "Technician expense submitted successfully", color: Colors.green);
@@ -123,6 +125,8 @@ class TechnicianExpenseController extends GetxController {
     } catch (e) {
       debugPrint("Error submitting expense: $e");
       toastMessage(text: "Failed to submit expense", color: Colors.red);
+    } finally {
+      isActionLoading.value = false;
     }
   }
 }

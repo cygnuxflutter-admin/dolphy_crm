@@ -4,10 +4,10 @@ import 'package:intl/intl.dart';
 
 import '../../../config/app_colors.dart';
 import '../../../config/app_routes.dart';
+import '../../../widget/toast_message.dart';
 import './model/technician_expense_model.dart';
 import './technician_expense_controller.dart';
 import './technician_expense_view_screen.dart';
-import '../../../widget/toast_message.dart';
 import 'expense_controller.dart';
 
 class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
@@ -219,7 +219,13 @@ class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
         List<PopupMenuEntry<String>> menuItems = [
           const PopupMenuItem(
             value: 'view',
-            child: Row(children: [Icon(Icons.visibility_outlined, size: 16, color: AppColors.gray600), SizedBox(width: 8), Text("View")]),
+            child: Row(
+              children: [
+                Icon(Icons.visibility_outlined, size: 16, color: AppColors.gray600),
+                SizedBox(width: 8),
+                Text("View"),
+              ],
+            ),
           ),
         ];
 
@@ -227,15 +233,33 @@ class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
           menuItems.addAll([
             const PopupMenuItem(
               value: 'edit',
-              child: Row(children: [Icon(Icons.edit_outlined, size: 16, color: AppColors.gray600), SizedBox(width: 8), Text("Edit")]),
+              child: Row(
+                children: [
+                  Icon(Icons.edit_outlined, size: 16, color: AppColors.gray600),
+                  SizedBox(width: 8),
+                  Text("Edit"),
+                ],
+              ),
             ),
             const PopupMenuItem(
               value: 'cancel',
-              child: Row(children: [Icon(Icons.cancel_outlined, size: 16, color: AppColors.red500), SizedBox(width: 8), Text("Cancel", style: TextStyle(color: AppColors.red500))]),
+              child: Row(
+                children: [
+                  Icon(Icons.cancel_outlined, size: 16, color: AppColors.red500),
+                  SizedBox(width: 8),
+                  Text("Cancel", style: TextStyle(color: AppColors.red500)),
+                ],
+              ),
             ),
             const PopupMenuItem(
               value: 'submit',
-              child: Row(children: [Icon(Icons.send_outlined, size: 16, color: AppColors.blue500), SizedBox(width: 8), Text("Submit", style: TextStyle(color: AppColors.blue500))]),
+              child: Row(
+                children: [
+                  Icon(Icons.send_outlined, size: 16, color: AppColors.blue500),
+                  SizedBox(width: 8),
+                  Text("Submit", style: TextStyle(color: AppColors.blue500)),
+                ],
+              ),
             ),
           ]);
         }
@@ -265,10 +289,7 @@ class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        shape: BoxShape.circle,
-                      ),
+                      decoration: BoxDecoration(color: Colors.red.shade50, shape: BoxShape.circle),
                       child: const Icon(Icons.cancel_outlined, color: Colors.red, size: 28),
                     ),
                     const SizedBox(width: 16),
@@ -281,10 +302,7 @@ class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
                             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            "Please provide a reason for cancellation",
-                            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                          ),
+                          Text("Please provide a reason for cancellation", style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
                         ],
                       ),
                     ),
@@ -300,7 +318,10 @@ class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
                     text: 'Cancellation Remarks ',
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
                     children: [
-                      TextSpan(text: '*', style: TextStyle(color: Colors.red.shade400)),
+                      TextSpan(
+                        text: '*',
+                        style: TextStyle(color: Colors.red.shade400),
+                      ),
                     ],
                   ),
                 ),
@@ -330,31 +351,49 @@ class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.grey.shade100,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.grey.shade100,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text(
+                          "Cancel",
+                          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+                        ),
                       ),
-                      child: const Text("Cancel", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(width: 12),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        if (remarksController.text.trim().isEmpty) {
-                          toastMessage(text: "Please enter cancellation remarks", color: Colors.red);
-                          return;
-                        }
-                        controller.cancelExpense(item.id, remarksController.text.trim());
-                      },
-                      icon: const Icon(Icons.cancel_outlined, size: 18, color: Colors.white),
-                      label: const Text("Confirm Cancel", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade400,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    Expanded(
+                      flex: 2,
+                      child: Obx(
+                        () => ElevatedButton.icon(
+                          onPressed: controller.isActionLoading.value
+                              ? null
+                              : () {
+                                  if (remarksController.text.trim().isEmpty) {
+                                    toastMessage(text: "Please enter cancellation remarks", color: Colors.red);
+                                    return;
+                                  }
+                                  controller.cancelExpense(item.id, remarksController.text.trim());
+                                },
+                          icon: controller.isActionLoading.value
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.cancel_outlined, size: 18, color: Colors.white),
+                          label: Text(
+                            controller.isActionLoading.value ? "Processing..." : "Confirm Cancel",
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade400,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -385,10 +424,7 @@ class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        shape: BoxShape.circle,
-                      ),
+                      decoration: BoxDecoration(color: Colors.blue.shade50, shape: BoxShape.circle),
                       child: const Icon(Icons.send_outlined, color: Colors.blue, size: 28),
                     ),
                     const SizedBox(width: 16),
@@ -419,27 +455,45 @@ class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.grey.shade100,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.grey.shade100,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text(
+                          "Cancel",
+                          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+                        ),
                       ),
-                      child: const Text("Cancel", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(width: 12),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        controller.submitExpense(item.id);
-                      },
-                      icon: const Icon(Icons.send_outlined, size: 18, color: Colors.white),
-                      label: const Text("Submit", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.blue500,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    Expanded(
+                      flex: 2,
+                      child: Obx(
+                        () => ElevatedButton.icon(
+                          onPressed: controller.isActionLoading.value
+                              ? null
+                              : () {
+                                  controller.submitExpense(item.id);
+                                },
+                          icon: controller.isActionLoading.value
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.send_outlined, size: 18, color: Colors.white),
+                          label: Text(
+                            controller.isActionLoading.value ? "Submitting..." : "Submit",
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.blue500,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -460,9 +514,12 @@ class TechnicianExpenseScreen extends GetView<TechnicianExpenseController> {
           children: [
             Icon(icon, size: 14, color: AppColors.gray400),
             const SizedBox(width: 6),
-            Text(
-              label.toUpperCase(),
-              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.gray500, letterSpacing: 0.5),
+            Flexible(
+              child: Text(
+                label.toUpperCase(),
+                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.gray500, letterSpacing: 0.5),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),

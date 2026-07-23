@@ -21,6 +21,7 @@ import 'model/visit_view_model.dart' hide Technician, VisitTechnician, TrackingL
 
 class VisitController extends GetxController {
   RxBool isLoading = false.obs;
+  RxBool isActionLoading = false.obs;
   RxBool isCountsLoading = false.obs;
   RxString error = "".obs;
 
@@ -84,6 +85,15 @@ class VisitController extends GetxController {
   RxList<File> finalAttachments = <File>[].obs;
   RxList<String> finalAttachmentUrls = <String>[].obs;
 
+  // Site Arrival
+  RxList<String> siteArrivalAttachmentUrls = <String>[].obs;
+  final siteArrivalRemarkController = TextEditingController().obs;
+  final kilometerController = TextEditingController().obs;
+  RxList<String> expenseTypes = <String>["Travel", "Food", "Accommodation", "Local Conveyance", "Other"].obs;
+  RxList<String> travelTypes = <String>["Auto", "Bike", "Bus", "Cab", "Flight", "Local Train", "Rapido", "Train"].obs;
+  Rxn<String> selectedExpenseType = Rxn<String>("Travel");
+  Rxn<String> selectedTravelType = Rxn<String>();
+
   // Validation Errors
   RxString serviceReceivedByError = "".obs;
   RxString contactNumberError = "".obs;
@@ -110,6 +120,34 @@ class VisitController extends GetxController {
       toastMessage(text: "Upload error: $e");
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> uploadSiteArrivalAttachment(File file) async {
+    isLoading.value = true;
+    try {
+      final response = await ApiHandler.uploadFile(file, folderName: 'service-visit-reached-attachments');
+      final data = response.data;
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        String? fileUrl = data['data'] != null ? data['data']['url'] : null;
+        if (fileUrl != null) {
+          siteArrivalAttachmentUrls.add(fileUrl);
+          toastMessage(text: "File uploaded successfully");
+        }
+      } else {
+        toastMessage(text: data['message'] ?? "Upload failed");
+      }
+    } catch (e) {
+      debugPrint("Error uploading file: $e");
+      toastMessage(text: "Upload error: $e");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  void removeSiteArrivalAttachment(int index) {
+    if (index < siteArrivalAttachmentUrls.length) {
+      siteArrivalAttachmentUrls.removeAt(index);
     }
   }
 
@@ -546,8 +584,52 @@ class VisitController extends GetxController {
     if (productIndex != -1) {
       final product = fieldReportDetail.value!.products![productIndex];
       product.partRequests ??= [];
-      product.partRequests!.add({"product_id": null, "product_name": null, "product_code": null, "qty": 1, "remark": ""});
+      product.partRequests!.add({"product_id": null, "product_name": null, "product_code": null, "qty": 1, "remark": "", "attachments": []});
       fieldReportDetail.refresh();
+    }
+  }
+
+  Future<void> uploadPartAttachment(String productId, int partIndex, File file) async {
+    isLoading.value = true;
+    try {
+      final response = await ApiHandler.uploadFile(file, folderName: 'service-visit-part-attachments');
+      final data = response.data;
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        String? fileUrl = data['data'] != null ? data['data']['url'] : null;
+        if (fileUrl != null) {
+          final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+          if (productIndex != -1) {
+            final product = fieldReportDetail.value!.products![productIndex];
+            if (product.partRequests != null && partIndex < product.partRequests!.length) {
+              product.partRequests![partIndex]['attachments'] ??= [];
+              product.partRequests![partIndex]['attachments'].add(fileUrl);
+              fieldReportDetail.refresh();
+              toastMessage(text: "File uploaded successfully");
+            }
+          }
+        }
+      } else {
+        toastMessage(text: data['message'] ?? "Upload failed");
+      }
+    } catch (e) {
+      debugPrint("Error uploading file: $e");
+      toastMessage(text: "Upload error: $e");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  void removePartAttachment(String productId, int partIndex, int attachmentIndex) {
+    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
+    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    if (productIndex != -1) {
+      final product = fieldReportDetail.value!.products![productIndex];
+      if (product.partRequests != null && partIndex < product.partRequests!.length) {
+        if (product.partRequests![partIndex]['attachments'] != null && attachmentIndex < product.partRequests![partIndex]['attachments'].length) {
+          product.partRequests![partIndex]['attachments'].removeAt(attachmentIndex);
+          fieldReportDetail.refresh();
+        }
+      }
     }
   }
 
@@ -586,6 +668,8 @@ class VisitController extends GetxController {
     super.onInit();
     getVisitCounts();
     fetchData();
+    getExpenseTypes();
+    getTravelTypes();
 
     // End Tracking form listeners to clear errors
     serviceReceivedByController.value.addListener(() {
@@ -715,13 +799,19 @@ class VisitController extends GetxController {
 
         // Pre-fill End Tracking Form
         if (res.data != null) {
-          serviceReceivedByController.value.text = res.data!.siteReceiverName ?? "";
-          contactNumberController.value.text = res.data!.siteReceiverMobile ?? "";
-          siteReceiverMobileCountryCode.value = res.data!.siteReceiverMobileCountryCode ?? "+91";
+          serviceReceivedByController.value.text = res.data!.contactPerson ?? res.data!.siteReceiverName ?? "";
+          contactNumberController.value.text = res.data!.mobile ?? res.data!.siteReceiverMobile ?? "";
+          siteReceiverMobileCountryCode.value = res.data!.mobileCountryCode ?? res.data!.siteReceiverMobileCountryCode ?? "+91";
           visitOutcome.value = res.data!.visitOutcome ?? "";
           overallRemarkController.value.text = res.data!.overallRemark ?? "";
-          // Note: usage_note might be available in data too, check model
+          finalUsageNoteController.value.text = res.data!.crowdNote ?? "";
           finalAttachmentUrls.assignAll(res.data!.attachments ?? []);
+
+          final currentUserTech = res.data!.visitTechnicians?.firstWhereOrNull((t) => t.isCurrentUser == true);
+          if (currentUserTech != null) {
+            siteArrivalAttachmentUrls.assignAll(currentUserTech.reachedAttachments ?? []);
+            siteArrivalRemarkController.value.text = currentUserTech.remark ?? "";
+          }
         }
 
         // Manage Timer
@@ -775,13 +865,14 @@ class VisitController extends GetxController {
   }
 
   Future<void> cancelVisit(String visitId, String remarks) async {
-    isLoading.value = true;
+    isActionLoading.value = true;
     try {
       final body = {"cancel_remarks": remarks};
       final response = await ApiHandler.postRequest(url: "${ApiEndPoint.baseUrl}service-visit/$visitId/cancel", body: body);
 
       final data = response.data;
       if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        Get.back();
         toastMessage(text: data['message'] ?? "Visit cancelled successfully");
         fetchData();
         getVisitCounts();
@@ -792,7 +883,7 @@ class VisitController extends GetxController {
       debugPrint("Error cancelling visit: $e");
       toastMessage(text: "Something went wrong");
     } finally {
-      isLoading.value = false;
+      isActionLoading.value = false;
     }
   }
 
@@ -850,6 +941,41 @@ class VisitController extends GetxController {
 
   Future<void> startVisit(String visitId) async {
     await _updateVisitStatus(visitId, "start", "Visit started successfully");
+  }
+
+  Future<void> getExpenseTypes() async {
+    try {
+      final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}commonMaster/findByGroup?type=Technician+Expense+Type");
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        if (data['data'] != null && data['data'].isNotEmpty) {
+          List<dynamic> items = data['data'][0]['items'] ?? [];
+          expenseTypes.assignAll(items.map((e) => e['name'].toString()).toList());
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching expense types: $e");
+    }
+  }
+
+  Future<void> getTravelTypes() async {
+    try {
+      final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}commonMaster/findByGroup?type=Technician+Expense+travel+Type");
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        if (data['data'] != null && data['data'].isNotEmpty) {
+          List<dynamic> items = data['data'][0]['items'] ?? [];
+          travelTypes.assignAll(items.map((e) => e['name'].toString()).toList());
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching travel types: $e");
+    }
+  }
+
+  Future<void> reachVisit(String visitId) async {
+    final extraBody = {"attachments": siteArrivalAttachmentUrls};
+    await _updateVisitStatus(visitId, "reached-at-site", "Reached at site successfully", extraBody: extraBody);
   }
 
   Future<void> pauseVisit(String visitId, {String? remark}) async {
@@ -925,7 +1051,12 @@ class VisitController extends GetxController {
                   "part_requests": (p.partRequests ?? []).map((pr) {
                     String name = pr['product_name'] ?? "";
                     String code = pr['product_code'] ?? "";
-                    return {"part_name": code.isNotEmpty ? "[$code] - $name" : name, "qty": pr['qty'] ?? 1, "remark": pr['remark'] ?? ""};
+                    return {
+                      "part_name": code.isNotEmpty ? "[$code] - $name" : name,
+                      "qty": pr['qty'] ?? 1,
+                      "remark": pr['remark'] ?? "",
+                      "attachments": pr['attachments'] ?? [],
+                    };
                   }).toList(),
                 },
               )
@@ -934,5 +1065,57 @@ class VisitController extends GetxController {
     };
 
     await _updateVisitStatus(visitId, "end", "Visit stopped successfully", extraBody: extraBody);
+  }
+
+  Future<void> saveFieldReport(String visitId) async {
+    isLoading.value = true;
+    try {
+      final body = {
+        "products":
+            fieldReportDetail.value?.products
+                ?.map(
+                  (p) => {
+                    "id": p.id,
+                    "product_id": p.productId,
+                    "tax_invoice_id": p.taxInvoiceId,
+                    "tax_invoice_no": p.taxInvoiceNo,
+                    "complaint_qty": p.complaintQty,
+                    "installed_qty": p.installedQty,
+                    "client_side_qty": p.clientSideQty,
+                    "solve_qty": p.solveQty,
+                    "issue_description": p.issueDescription,
+                    "usage_note": p.usageNote ?? "",
+                    "work_remark": p.workRemark ?? "",
+                    "attachments": p.attachments ?? [],
+                    "serial_numbers": (p.serialNumbers ?? []).where((s) => s.trim().isNotEmpty).toList(),
+                    "part_requests": (p.partRequests ?? []).map((pr) {
+                      return {
+                        "product_id": pr['product_id'],
+                        "qty": pr['qty'] ?? 1,
+                        "remark": pr['remark'] ?? "",
+                        "attachments": pr['attachments'] ?? [],
+                      };
+                    }).toList(),
+                  },
+                )
+                .toList() ??
+            [],
+      };
+
+      final response = await ApiHandler.putRequest(url: "${ApiEndPoint.baseUrl}service-visit/$visitId/field-report", body: body);
+
+      final data = response.data;
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        toastMessage(text: data['message'] ?? "Report saved successfully");
+        getFieldReport(visitId);
+      } else {
+        toastMessage(text: data['message'] ?? "Failed to save report");
+      }
+    } catch (e) {
+      debugPrint("Error saving field report: $e");
+      toastMessage(text: "Something went wrong");
+    } finally {
+      isLoading.value = false;
+    }
   }
 }

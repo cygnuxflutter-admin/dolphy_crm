@@ -14,18 +14,22 @@ import '../visit_screen/model/visit_model.dart';
 class ExpenseLine {
   String? id;
   Rxn<String> expenseType = Rxn<String>();
+  Rxn<String> travelType = Rxn<String>();
   TextEditingController otherDetailController = TextEditingController();
-  TextEditingController requestAmountController = TextEditingController(text: "0.00");
+  TextEditingController kilometreController = TextEditingController();
+  TextEditingController requestAmountController = TextEditingController(text: "");
   RxBool paidByClient = false.obs;
-  TextEditingController clientAmountController = TextEditingController(text: "0.00");
+  TextEditingController clientAmountController = TextEditingController(text: "");
   TextEditingController descriptionController = TextEditingController();
   RxList<File> attachments = <File>[].obs;
   RxList<String> attachmentUrls = <String>[].obs;
+  RxBool isUploading = false.obs;
 
   ExpenseLine();
 
   void dispose() {
     otherDetailController.dispose();
+    kilometreController.dispose();
     requestAmountController.dispose();
     clientAmountController.dispose();
     descriptionController.dispose();
@@ -41,11 +45,17 @@ class ExpenseController extends GetxController {
   TextEditingController remarksController = TextEditingController();
   RxList<File> overallAttachments = <File>[].obs;
   RxList<String> overallAttachmentUrls = <String>[].obs;
+  RxBool isOverallUploading = false.obs;
 
   RxList<ExpenseLine> expenseLines = <ExpenseLine>[ExpenseLine()].obs;
 
   RxList<String> expenseTypes = <String>["Travel", "Food", "Accommodation", "Local Conveyance", "Other"].obs;
   RxMap<String, String> expenseTypeMap = <String, String>{}.obs;
+  RxMap<String, String> expenseTypeIdToNameMap = <String, String>{}.obs;
+
+  RxList<String> travelTypes = <String>["Auto", "Bike", "Bus", "Cab", "Flight", "Local Train", "Rapido", "Train"].obs;
+  RxMap<String, String> travelTypeMap = <String, String>{}.obs;
+  RxMap<String, String> travelTypeIdToNameMap = <String, String>{}.obs;
 
   RxBool isEdit = false.obs;
   String? editId;
@@ -54,6 +64,7 @@ class ExpenseController extends GetxController {
   void onInit() {
     super.onInit();
     getExpenseTypes();
+    getTravelTypes();
     if (Get.arguments != null) {
       if (Get.arguments is Map && Get.arguments['isEdit'] == true) {
         isEdit.value = true;
@@ -74,13 +85,36 @@ class ExpenseController extends GetxController {
           List<dynamic> items = data['data'][0]['items'] ?? [];
           expenseTypes.assignAll(items.map((e) => e['name'].toString()).toList());
           expenseTypeMap.clear();
+          expenseTypeIdToNameMap.clear();
           for (var item in items) {
             expenseTypeMap[item['name'].toString()] = item['id'].toString();
+            expenseTypeIdToNameMap[item['id'].toString()] = item['name'].toString();
           }
         }
       }
     } catch (e) {
       debugPrint("Error fetching expense types: $e");
+    }
+  }
+
+  Future<void> getTravelTypes() async {
+    try {
+      final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}commonMaster/findByGroup?type=Technician+Expense+travel+Type");
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        if (data['data'] != null && data['data'].isNotEmpty) {
+          List<dynamic> items = data['data'][0]['items'] ?? [];
+          travelTypes.assignAll(items.map((e) => e['name'].toString()).toList());
+          travelTypeMap.clear();
+          travelTypeIdToNameMap.clear();
+          for (var item in items) {
+            travelTypeMap[item['name'].toString()] = item['id'].toString();
+            travelTypeIdToNameMap[item['id'].toString()] = item['name'].toString();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching travel types: $e");
     }
   }
 
@@ -122,29 +156,36 @@ class ExpenseController extends GetxController {
       final data = json.decode(response.data);
       if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
         final resData = data['data'];
-        
+
         if (resData != null) {
           // Populate fields
           expenseDate.value = DateTime.tryParse(resData['expense_date']?.toString() ?? "") ?? DateTime.now();
           remarksController.text = resData['remarks']?.toString() ?? "";
-          
-          if (resData['attachment_urls'] != null) {
-            overallAttachmentUrls.assignAll(List<String>.from(resData['attachment_urls']));
+
+          var attachments = resData['attachments'] ?? resData['attachment_urls'];
+          if (attachments != null) {
+            overallAttachmentUrls.assignAll(List<String>.from(attachments));
           }
 
           // Populate visits
           if (resData['visits'] != null) {
             List<dynamic> visitsData = resData['visits'];
-            selectedVisits.assignAll(visitsData.map((v) => VisitDatum(
-                  id: v['service_visit_id']?.toString(),
-                  visitNo: v['visit_no']?.toString(),
-                  status: v['visit_status']?.toString(),
-                  statusName: v['visit_status']?.toString(),
-                  complaintNo: v['complaint_no']?.toString(),
-                  customerName: v['customer_name']?.toString(),
-                  complaintTakerName: v['complaint_taker_name']?.toString(),
-                  complaintTakerId: v['complaint_taker_id']?.toString(),
-                )).toList());
+            selectedVisits.assignAll(
+              visitsData
+                  .map(
+                    (v) => VisitDatum(
+                      id: v['service_visit_id']?.toString() ?? v['id']?.toString(),
+                      visitNo: v['visit_no']?.toString(),
+                      status: v['visit_status']?.toString() ?? v['status']?.toString(),
+                      statusName: v['visit_status']?.toString() ?? v['status_name']?.toString() ?? v['status']?.toString(),
+                      complaintNo: v['complaint_no']?.toString(),
+                      customerName: v['customer_name']?.toString(),
+                      complaintTakerName: v['complaint_taker_name']?.toString(),
+                      complaintTakerId: v['complaint_taker_id']?.toString(),
+                    ),
+                  )
+                  .toList(),
+            );
           }
 
           // Populate lines
@@ -154,19 +195,28 @@ class ExpenseController extends GetxController {
             for (var lineData in linesData) {
               final line = ExpenseLine();
               line.id = lineData['id']?.toString();
-              line.expenseType.value = lineData['expense_type_name']?.toString();
-              line.otherDetailController.text = lineData['expense_type_other']?.toString() ?? "";
-              
+
+              // Use name if available, otherwise look up name from ID, otherwise use ID
+              String? eTypeId = lineData['expense_type_id']?.toString() ?? lineData['expense_type']?.toString();
+              line.expenseType.value = lineData['expense_type_name']?.toString() ?? expenseTypeIdToNameMap[eTypeId];
+
+              String? tTypeId = lineData['travel_type_id']?.toString() ?? lineData['travel_type']?.toString();
+              line.travelType.value = lineData['travel_type_name']?.toString() ?? travelTypeIdToNameMap[tTypeId];
+
+              line.otherDetailController.text = lineData['expense_type_other']?.toString() ?? lineData['other_detail']?.toString() ?? "";
+              line.kilometreController.text = (lineData['kilometre'] ?? "").toString();
+
               // Handle both amount (edit API) and request_amount
-              var amt = lineData['amount'] ?? lineData['request_amount'] ?? "0.00";
+              var amt = lineData['request_amount'] ?? lineData['amount'] ?? "0.00";
               line.requestAmountController.text = amt.toString();
-              
-              line.paidByClient.value = lineData['is_paid_by_client'] ?? false;
+
+              line.paidByClient.value = lineData['is_paid_by_client'] ?? lineData['paid_by_client'] ?? false;
               line.clientAmountController.text = (lineData['client_amount'] ?? "0.00").toString();
               line.descriptionController.text = lineData['description']?.toString() ?? "";
-              
-              if (lineData['attachment_urls'] != null) {
-                line.attachmentUrls.assignAll(List<String>.from(lineData['attachment_urls']));
+
+              var lineAttachments = lineData['attachments'] ?? lineData['attachment_urls'];
+              if (lineAttachments != null) {
+                line.attachmentUrls.assignAll(List<String>.from(lineAttachments));
               }
               expenseLines.add(line);
             }
@@ -197,6 +247,45 @@ class ExpenseController extends GetxController {
       isVisitLoading.value = false;
     }
     return [];
+  }
+
+  Future<void> uploadOverallFile(File file) async {
+    isOverallUploading.value = true;
+    try {
+      final resp = await ApiHandler.uploadFile(file, folderName: 'technician-expense-header');
+      final data = resp.data;
+      if (resp.statusCode == 200 && data['success'] == true) {
+        overallAttachmentUrls.add(data['data']['url']);
+      } else {
+        toastMessage(text: data['message'] ?? "Upload failed", color: Colors.red);
+      }
+    } catch (e) {
+      debugPrint("Error uploading overall file: $e");
+      toastMessage(text: "Error uploading file", color: Colors.red);
+    } finally {
+      isOverallUploading.value = false;
+    }
+  }
+
+  Future<void> uploadLineFile(int index, File file) async {
+    if (index < 0 || index >= expenseLines.length) return;
+
+    final line = expenseLines[index];
+    line.isUploading.value = true;
+    try {
+      final resp = await ApiHandler.uploadFile(file, folderName: 'technician-expense-line');
+      final data = resp.data;
+      if (resp.statusCode == 200 && data['success'] == true) {
+        line.attachmentUrls.add(data['data']['url']);
+      } else {
+        toastMessage(text: data['message'] ?? "Upload failed", color: Colors.red);
+      }
+    } catch (e) {
+      debugPrint("Error uploading line file: $e");
+      toastMessage(text: "Error uploading file", color: Colors.red);
+    } finally {
+      line.isUploading.value = false;
+    }
   }
 
   void addExpenseLine() {
@@ -263,78 +352,42 @@ class ExpenseController extends GetxController {
 
     isLoading.value = true;
     try {
-      // 1. Upload overall attachments
-      overallAttachmentUrls.clear();
-      for (var file in overallAttachments) {
-        final resp = await ApiHandler.uploadFile(file, folderName: 'expense-attachments');
-        final data = resp.data;
-        if (resp.statusCode == 200 && data['success'] == true) {
-          overallAttachmentUrls.add(data['data']['url']);
-        }
-      }
+      final body = {
+        "service_visit_ids": selectedVisits.map((v) => v.id).toList(),
+        "expense_date": DateFormat('yyyy-MM-dd').format(expenseDate.value),
+        "remarks": remarksController.text,
+        "attachment_urls": overallAttachmentUrls,
+        "submit": !isDraft,
+        "lines": expenseLines.map((line) {
+          final isTravel = line.expenseType.value == "Travel";
+          Map<String, dynamic> lineData = {
+            "expense_type_id": expenseTypeMap[line.expenseType.value] ?? line.expenseType.value,
+            "amount": double.tryParse(line.requestAmountController.text) ?? 0,
+            "is_paid_by_client": line.paidByClient.value,
+            "client_amount": double.tryParse(line.clientAmountController.text) ?? 0,
+            "description": line.descriptionController.text,
+            "attachment_urls": line.attachmentUrls.toList(),
+          };
 
-      // 2. Upload line attachments
-      for (var line in expenseLines) {
-        line.attachmentUrls.clear();
-        for (var file in line.attachments) {
-          final resp = await ApiHandler.uploadFile(file, folderName: 'expense-line-attachments');
-          final data = resp.data;
-          if (resp.statusCode == 200 && data['success'] == true) {
-            line.attachmentUrls.add(data['data']['url']);
+          if (isTravel) {
+            lineData["travel_type_id"] = travelTypeMap[line.travelType.value] ?? line.travelType.value;
+            lineData["kilometre"] = double.tryParse(line.kilometreController.text) ?? 0;
+          } else {
+            lineData["other_detail"] = line.otherDetailController.text;
           }
-        }
-      }
 
-      // 3. Submit Expense
+          if (line.id != null) lineData["id"] = line.id;
+          return lineData;
+        }).toList(),
+      };
+
       var response;
       if (isEdit.value && editId != null) {
-        final body = {
-          "service_visit_ids": selectedVisits.map((v) => v.id).toList(),
-          "expense_date": DateFormat('yyyy-MM-dd').format(expenseDate.value),
-          "remarks": remarksController.text,
-          "attachment_urls": overallAttachmentUrls,
-          "submit": !isDraft,
-          "lines": expenseLines.map((line) {
-            Map<String, dynamic> lineData = {
-              "expense_type_id": expenseTypeMap[line.expenseType.value] ?? line.expenseType.value,
-              "amount": double.tryParse(line.requestAmountController.text) ?? 0,
-              "is_paid_by_client": line.paidByClient.value,
-              "client_amount": double.tryParse(line.clientAmountController.text) ?? 0,
-              "description": line.descriptionController.text,
-              "attachment_urls": line.attachmentUrls,
-            };
-            if (line.id != null) lineData["id"] = line.id;
-            return lineData;
-          }).toList(),
-        };
         response = await ApiHandler.putRequest(url: "${ApiEndPoint.baseUrl}technician-expense/$editId", body: body);
       } else {
-        final body = {
-          "visit_ids": selectedVisits.map((v) => v.id).toList(),
-          "expense_date": DateFormat('yyyy-MM-dd').format(expenseDate.value),
-          "remarks": remarksController.text,
-          "is_draft": isDraft,
-          "lines": expenseLines
-              .map(
-                (line) => {
-                  "expense_type": line.expenseType.value,
-                  "other_detail": line.otherDetailController.text,
-                  "request_amount": double.tryParse(line.requestAmountController.text) ?? 0,
-                  "paid_by_client": line.paidByClient.value,
-                  "client_amount": double.tryParse(line.clientAmountController.text) ?? 0,
-                  "description": line.descriptionController.text,
-                  "attachments": line.attachmentUrls,
-                },
-              )
-              .toList(),
-          "attachments": overallAttachmentUrls,
-          "company_id": Pref.getCompanyId(),
-          "location_id": Pref.getLocationId(),
-          "fin_year": Pref.getFinancialYears(),
-        };
-        response = await ApiHandler.postRequest(url: "${ApiEndPoint.baseUrl}expense/create", body: body);
+        response = await ApiHandler.postRequest(url: ApiEndPoint.technicianExpenseCreate, body: body);
       }
-      
+
       final data = response.data;
 
       if (response.statusCode == 200 || response.statusCode == 201) {

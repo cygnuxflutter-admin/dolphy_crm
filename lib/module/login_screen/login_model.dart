@@ -40,7 +40,7 @@ class LogInData {
   final String dbName;
   final String orgId;
   final String subDomain;
-  final int maxQuotationDiscount;
+  final String? maxQuotationDiscount;
   final String createdAt;
   final String updatedAt;
   final bool isDeleted;
@@ -79,7 +79,7 @@ class LogInData {
     dbName: json["db_name"] ?? "",
     orgId: json["org_id"] ?? "",
     subDomain: json["sub_domain"] ?? "",
-    maxQuotationDiscount: json["max_quotation_discount"] ?? 0,
+    maxQuotationDiscount: json["max_quotation_discount"] ?? "0",
     createdAt: json["created_at"] ?? "",
     updatedAt: json["updated_at"] ?? "",
     isDeleted: json["is_deleted"] ?? false,

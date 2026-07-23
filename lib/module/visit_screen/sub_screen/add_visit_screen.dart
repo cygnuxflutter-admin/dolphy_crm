@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:crm/config/app_colors.dart';
 import 'package:crm/module/lead_screen/model/get_assign_partner.dart';
 import 'package:crm/module/lead_screen/model/lead_type.dart';
@@ -5,6 +7,7 @@ import 'package:crm/module/visit_screen/add_visit_controller.dart';
 import 'package:crm/widget/dropdown.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 
 class AddVisitScreen extends GetView<AddVisitController> {
   const AddVisitScreen({super.key});
@@ -31,10 +34,17 @@ class AddVisitScreen extends GetView<AddVisitController> {
         () => controller.isLoading.value
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom, top: 16, left: 16, right: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [_buildFormCard(), const SizedBox(height: 20), _buildProductTable(), const SizedBox(height: 30), _buildActionButtons()],
+                  children: [
+                    _buildFormCard(),
+                    const SizedBox(height: 20),
+                    _buildProductTable(),
+                    const SizedBox(height: 30),
+                    _buildActionButtons(),
+                    const SizedBox(height: 5),
+                  ],
                 ),
               ),
       ),
@@ -67,10 +77,131 @@ class AddVisitScreen extends GetView<AddVisitController> {
           Obx(() => _buildTechniciansDropdown()),
           _buildTextField("Address", controller.addressController.value, maxLines: 3, readOnly: true),
           const SizedBox(height: 16),
+          _buildAttachmentsSection(),
+          const SizedBox(height: 16),
           _buildTextField("Remark", controller.remarkController.value, maxLines: 3),
         ],
       ),
     );
+  }
+
+  Widget _buildAttachmentsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Attachments",
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.gray600),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.gray200),
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+          ),
+          child: Row(
+            children: [
+              InkWell(
+                onTap: () => _pickFiles(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: const BoxDecoration(
+                    color: AppColors.gray50,
+                    borderRadius: BorderRadius.horizontal(left: Radius.circular(8)),
+                    border: Border(right: BorderSide(color: AppColors.gray200)),
+                  ),
+                  child: const Text("Choose Files", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Obx(
+                    () => Text(
+                      (controller.attachments.isEmpty && controller.attachmentUrls.isEmpty)
+                          ? "No file chosen"
+                          : "${controller.attachments.length + controller.attachmentUrls.length} files chosen",
+                      style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Obx(() {
+          if (controller.attachmentUrls.isEmpty && controller.attachments.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          return Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Uploaded files (${controller.attachmentUrls.length + controller.attachments.length}):",
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ...controller.attachmentUrls.map(
+                      (url) => _buildFileItem(url.split('/').last, onDelete: () => controller.attachmentUrls.remove(url), isUrl: true),
+                    ),
+                    ...controller.attachments.map(
+                      (file) => _buildFileItem(file.path.split('/').last, onDelete: () => controller.attachments.remove(file)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildFileItem(String name, {required VoidCallback onDelete, bool isUrl = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isUrl ? AppColors.indigo50 : AppColors.gray100,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: isUrl ? AppColors.indigo600Main.withOpacity(0.2) : AppColors.gray300),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              name,
+              style: TextStyle(
+                fontSize: 12,
+                color: isUrl ? AppColors.indigo600Main : AppColors.textPrimary,
+                decoration: isUrl ? TextDecoration.underline : TextDecoration.none,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: onDelete,
+            child: const Icon(Icons.close, size: 14, color: AppColors.red500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickFiles() async {
+    final List<XFile> images = await ImagePicker().pickMultiImage();
+    if (images.isNotEmpty) {
+      controller.attachments.addAll(images.map((img) => File(img.path)));
+    }
   }
 
   Widget _buildComplaintDropdown() {
@@ -293,6 +424,9 @@ class AddVisitScreen extends GetView<AddVisitController> {
                   label: Text("Tax Invoice No", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
                 DataColumn(
+                  label: Text("Tax Invoice Date", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+                DataColumn(
                   label: Text("Warranty Type", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
                 DataColumn(
@@ -349,6 +483,7 @@ class AddVisitScreen extends GetView<AddVisitController> {
                       ),
                     ),
                     DataCell(Text(p.taxInvoiceNo.isEmpty ? "-" : p.taxInvoiceNo)),
+                    DataCell(Text(p.taxInvoiceDate == null || p.taxInvoiceDate!.isEmpty ? "-" : p.taxInvoiceDate!)),
                     DataCell(Text(p.warrantyTypeName)),
                     DataCell(Text(p.repeatServiceStatus?.replaceAll('_', ' ').capitalizeFirst ?? "-")),
                     DataCell(Text("${p.complaintQty}")),
@@ -376,29 +511,37 @@ class AddVisitScreen extends GetView<AddVisitController> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
-        OutlinedButton(
-          onPressed: () => Get.back(),
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: AppColors.red500),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          ),
-          child: const Text(
-            "Cancel",
-            style: TextStyle(color: AppColors.red500, fontWeight: FontWeight.bold),
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () => Get.back(),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.red500),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: AppColors.red500, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ),
         const SizedBox(width: 16),
-        ElevatedButton(
-          onPressed: () => controller.submitVisit(),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.indigo600Main,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-          ),
-          child: const Text(
-            "Save",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        Expanded(
+          child: ElevatedButton(
+            onPressed: () => controller.submitVisit(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.indigo600Main,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+            ),
+            child: const Text(
+              "Save",
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ),
       ],
