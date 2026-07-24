@@ -85,4 +85,7 @@ class ApiEndPoint {
   static String technicianExpenseList = "${baseUrl}technician-expense/find";
   static String technicianExpenseCreate = "${baseUrl}technician-expense/create";
   static String dispatchedSerialSuggestions = "${baseUrl}service-visit/{visit_id}/dispatched-serial-suggestions";
+
+  // Notification Endpoints
+  static String notifications = "${baseUrl}notifications/my";
 }

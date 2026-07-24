@@ -128,13 +128,7 @@ class VisitScreen extends GetView<VisitController> {
                 Row(
                   children: [
                     Expanded(child: _infoCell(Icons.receipt_long_outlined, "Complaint No", item.complaintNo ?? "-")),
-                    Expanded(
-                      child: _infoCell(
-                        Icons.calendar_today_outlined,
-                        "Visit Date",
-                        item.visitDate != null ? DateFormat('dd/MM/yyyy').format(item.visitDate!) : "-",
-                      ),
-                    ),
+                    Expanded(child: _infoCell(Icons.history, "Created At", _formatDateTime(item.createdAt))),
                   ],
                 ),
                 const Padding(
@@ -154,6 +148,13 @@ class VisitScreen extends GetView<VisitController> {
                   children: [
                     Expanded(child: _infoCell(Icons.engineering_outlined, "Technician", item.technicianNames ?? "-")),
                     Expanded(child: _infoCell(Icons.person_add_alt_1_outlined, "Created By", item.createdByName ?? "-")),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _infoCell(Icons.play_circle_outline, "Visit Start", _formatDateTime(item.visitStartDatetime))),
+                    Expanded(child: _infoCell(Icons.stop_circle_outlined, "Visit End", _formatDateTime(item.visitEndDatetime))),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -440,6 +441,11 @@ class VisitScreen extends GetView<VisitController> {
         ),
       ],
     );
+  }
+
+  String _formatDateTime(DateTime? dateTime) {
+    if (dateTime == null) return "-";
+    return DateFormat('dd/MM/yyyy hh:mm a').format(dateTime.toLocal()).toLowerCase();
   }
 
   Widget _buildPagination() {
