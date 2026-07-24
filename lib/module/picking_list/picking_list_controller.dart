@@ -300,7 +300,7 @@ class PickingListController extends GetxController {
         "fin_year": Pref.getFinYear(),
       };
 
-      final response = await ApiHandler.postRequest(url: "${ApiEndPoint.pickingReject}$pickingId", body: body);
+      final response = await ApiHandler.patchRequest(url: "${ApiEndPoint.pickingReject}$pickingId", body: body);
       final data = response.data;
 
       if (response.statusCode == 200 && data['status'] == 200) {
