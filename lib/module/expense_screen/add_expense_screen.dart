@@ -1,12 +1,10 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../config/app_colors.dart';
 import '../../../config/app_text_style.dart';
+import 'package:crm/utils/image_picker_utils.dart';
 import '../../../widget/dropdown.dart';
 import '../visit_screen/model/visit_model.dart';
 import 'expense_controller.dart';
@@ -109,7 +107,7 @@ class AddExpenseScreen extends GetView<ExpenseController> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.indigo600Main.withOpacity(0.1)),
+        border: Border.all(color: AppColors.indigo600Main.withValues(alpha: 0.1)),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(
@@ -803,18 +801,30 @@ class AddExpenseScreen extends GetView<ExpenseController> {
   }
 
   Future<void> _pickOverallFiles() async {
-    final ImagePicker picker = ImagePicker();
-    final List<XFile> images = await picker.pickMultiImage();
-    for (var img in images) {
-      await controller.uploadOverallFile(File(img.path));
-    }
+    ImagePickerUtils.showOptions(
+      multiImage: true,
+      onImageSelected: (file) async {
+        await controller.uploadOverallFile(file);
+      },
+      onMultiImageSelected: (files) async {
+        for (var file in files) {
+          await controller.uploadOverallFile(file);
+        }
+      },
+    );
   }
 
   Future<void> _pickLineFiles(int index) async {
-    final ImagePicker picker = ImagePicker();
-    final List<XFile> images = await picker.pickMultiImage();
-    for (var img in images) {
-      await controller.uploadLineFile(index, File(img.path));
-    }
+    ImagePickerUtils.showOptions(
+      multiImage: true,
+      onImageSelected: (file) async {
+        await controller.uploadLineFile(index, file);
+      },
+      onMultiImageSelected: (files) async {
+        for (var file in files) {
+          await controller.uploadLineFile(index, file);
+        }
+      },
+    );
   }
 }

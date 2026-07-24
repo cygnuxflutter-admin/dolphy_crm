@@ -14,6 +14,8 @@ import '../module/lead_screen/lead_binding.dart';
 import '../module/lead_screen/lead_screen.dart';
 import '../module/lead_screen/sub_screen/add_lead_screen.dart';
 import '../module/lead_screen/sub_screen/lead_detail_screen.dart';
+import '../module/notification_screen/notification_binding.dart';
+import '../module/notification_screen/notification_screen.dart';
 import '../module/packing_screen/packing_binding.dart';
 import '../module/packing_screen/packing_screen.dart';
 import '../module/packing_screen/sub_screen/packing_detail_screen.dart';
@@ -51,4 +53,5 @@ List<GetPage> getPages = [
   GetPage(name: AppRoutes.addVisitScreen, page: () => const AddVisitScreen(), binding: VisitBinding()),
   GetPage(name: AppRoutes.addExpenseScreen, page: () => const AddExpenseScreen(), binding: ExpenseBinding()),
   GetPage(name: AppRoutes.technicianExpenseScreen, page: () => const TechnicianExpenseScreen(), binding: TechnicianExpenseBinding()),
+  GetPage(name: AppRoutes.notificationScreen, page: () => const NotificationScreen(), binding: NotificationBinding()),
 ];

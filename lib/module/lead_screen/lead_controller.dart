@@ -16,10 +16,10 @@ import 'package:crm/utils/api_handler.dart';
 import 'package:crm/widget/toast_message.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:multi_dropdown/multi_dropdown.dart';
 
+import 'package:crm/utils/image_picker_utils.dart';
 import '../inquiry_screen/model/city_model.dart';
 import '../inquiry_screen/model/country_model.dart';
 import '../inquiry_screen/model/pincode_model.dart';
@@ -244,25 +244,6 @@ class LeadController extends GetxController {
   RxString selectedSearchCategory = "".obs;
 
   // Rx<File?> selectedImage = Rx<File?>(null);
-  final ImagePicker _picker = ImagePicker();
-
-  Future<File?> pickFromCamera() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.camera, imageQuality: 70);
-
-    if (image != null) {
-      return File(image.path);
-    }
-    return null;
-  }
-
-  Future<File?> pickFromGallery() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-
-    if (image != null) {
-      return File(image.path);
-    }
-    return null;
-  }
 
   String formatDateTime(String input) {
     try {
@@ -312,51 +293,17 @@ class LeadController extends GetxController {
   }
 
   void openImagePickerSheet() {
-    Get.bottomSheet(
-      SafeArea(
-        child: Container(
-          color: AppColors.white,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('Camera'),
-                onTap: () async {
-                  File? img = await pickFromCamera();
-
-                  var response = await ApiHandler.uploadFile(img!);
-                  var data = response.data;
-                  if (response.statusCode == 200 && (data['success'] == true || data['status'] == 200)) {
-                    uploadedImageLink.add(data['data']['url']);
-                  } else {
-                    toastMessage(text: "Image Upload Failed", color: AppColors.redColor);
-                  }
-                  uploadedImageLink.refresh();
-                  Get.back();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('Gallery'),
-                onTap: () async {
-                  final img = await pickFromGallery();
-
-                  var response = await ApiHandler.uploadFile(img!);
-                  var data = response.data;
-                  if (response.statusCode == 200 && (data['success'] == true || data['status'] == 200)) {
-                    uploadedImageLink.add(data['data']['url']);
-                  } else {
-                    toastMessage(text: "Image Upload Failed", color: AppColors.redColor);
-                  }
-                  uploadedImageLink.refresh();
-                  Get.back();
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
+    ImagePickerUtils.showOptions(
+      onImageSelected: (File img) async {
+        var response = await ApiHandler.uploadFile(img);
+        var data = response.data;
+        if (response.statusCode == 200 && (data['success'] == true || data['status'] == 200)) {
+          uploadedImageLink.add(data['data']['url']);
+        } else {
+          toastMessage(text: "Image Upload Failed", color: AppColors.redColor);
+        }
+        uploadedImageLink.refresh();
+      },
     );
   }
 

@@ -1,17 +1,15 @@
-import 'dart:io';
-
+import 'package:crm/config/app_colors.dart';
+import 'package:crm/config/app_shared_pref.dart';
+import 'package:crm/utils/image_picker_utils.dart';
+import 'package:crm/widget/dropdown.dart';
+import 'package:crm/widget/toast_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_intl_phone_field/flutter_intl_phone_field.dart';
 import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../config/app_colors.dart';
-import '../../../config/app_shared_pref.dart';
-import '../../../widget/dropdown.dart';
-import '../../../widget/toast_message.dart';
 import '../model/dispatched_serial_model.dart';
 import '../model/field_report_model.dart';
 import '../visit_controller.dart';
@@ -1023,27 +1021,19 @@ class FieldReportScreen extends GetView<VisitController> {
   }
 
   Future<void> _pickPartFile(String productId, int partIndex) async {
-    final ImagePicker picker = ImagePicker();
-    try {
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        controller.uploadPartAttachment(productId, partIndex, File(image.path));
-      }
-    } catch (e) {
-      debugPrint("Error picking image: $e");
-    }
+    ImagePickerUtils.showOptions(
+      onImageSelected: (file) {
+        controller.uploadPartAttachment(productId, partIndex, file);
+      },
+    );
   }
 
   Future<void> _pickFile(String productId) async {
-    final ImagePicker picker = ImagePicker();
-    try {
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        controller.uploadProductAttachment(productId, File(image.path));
-      }
-    } catch (e) {
-      debugPrint("Error picking image: $e");
-    }
+    ImagePickerUtils.showOptions(
+      onImageSelected: (file) {
+        controller.uploadProductAttachment(productId, file);
+      },
+    );
   }
 
   Widget _buildPartsRequiredSection(Product p) {
@@ -1669,15 +1659,11 @@ class FieldReportScreen extends GetView<VisitController> {
   }
 
   Future<void> _pickFinalFile() async {
-    final ImagePicker picker = ImagePicker();
-    try {
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        controller.uploadFinalAttachment(File(image.path));
-      }
-    } catch (e) {
-      debugPrint("Error picking image: $e");
-    }
+    ImagePickerUtils.showOptions(
+      onImageSelected: (file) {
+        controller.uploadFinalAttachment(file);
+      },
+    );
   }
 
   Widget _buildSiteArrivalCard(FieldReportData data, String visitId) {
@@ -1966,15 +1952,11 @@ class FieldReportScreen extends GetView<VisitController> {
   }
 
   Future<void> _pickSiteArrivalFile() async {
-    final ImagePicker picker = ImagePicker();
-    try {
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        controller.uploadSiteArrivalAttachment(File(image.path));
-      }
-    } catch (e) {
-      debugPrint("Error picking image: $e");
-    }
+    ImagePickerUtils.showOptions(
+      onImageSelected: (file) {
+        controller.uploadSiteArrivalAttachment(file);
+      },
+    );
   }
 
   Widget _arrivalInfoItem(IconData icon, String text) {
