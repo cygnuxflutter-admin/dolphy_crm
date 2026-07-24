@@ -13,20 +13,19 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../config/app_colors.dart';
 import '../../../config/app_shared_pref.dart';
 import '../../../config/app_url.dart';
 import '../../../utils/api_handler.dart';
 import '../../../widget/toast_message.dart';
-import '../../config/app_routes.dart';
+import '../../config/app_colors.dart';
 import 'model/box_config_model.dart';
+import 'model/box_suggestion_response_model.dart';
 import 'model/packing_counts_response_model.dart';
 import 'model/packing_detail_responce_model.dart';
 import 'model/packing_list_detail_response_model.dart';
 import 'model/packing_list_response_model.dart';
 import 'model/physical_box_status_model.dart';
 import 'model/shipping_label_model.dart';
-import 'model/box_suggestion_response_model.dart';
 
 class PackingController extends GetxController {
   RxBool isLoading = false.obs;
@@ -58,10 +57,17 @@ class PackingController extends GetxController {
   RxBool isListDetailLoading = false.obs;
   RxString listDetailError = "".obs;
   Rx<PackingListDetailData?> packingListDetail = Rx<PackingListDetailData?>(null);
+  RxList<ProductSummary> productSummary = <ProductSummary>[].obs;
 
   var isInvoiceExpanded = false.obs;
 
   RxInt selectedAttachmentTab = 0.obs;
+
+  // Log Note state
+  RxBool isLogNoteOpen = false.obs;
+  final logNoteController = TextEditingController();
+  Rx<DateTime?> reminderDate = Rx<DateTime?>(null);
+  RxList<File> selectedLogFiles = <File>[].obs;
 
   // Box configurations reactive state
   RxList<BoxConfiguration> boxConfigs = <BoxConfiguration>[].obs;
@@ -312,7 +318,8 @@ class PackingController extends GetxController {
   }
 
   String formatStatus(String str) {
-    return str.toLowerCase()
+    return str
+        .toLowerCase()
         .replaceAll('_', ' ')
         .replaceAll('-', ' ')
         .split(' ')
@@ -335,7 +342,13 @@ class PackingController extends GetxController {
         PackingListDetailResponse res = PackingListDetailResponse.fromJson(data);
         packingListDetail.value = res.data;
         if (res.data != null) {
-          autoFillWithAI(res.data!);
+          // First try to fetch actual saved physical boxes
+          await fetchPhysicalBoxStatus(id);
+
+          // If no physical boxes saved, then show AI suggestions
+          if (boxConfigs.isEmpty) {
+            await autoFillWithAI(res.data!);
+          }
         }
       } else {
         listDetailError.value = data['message'] ?? "Failed to load details";
@@ -346,6 +359,53 @@ class PackingController extends GetxController {
     } finally {
       isListDetailLoading.value = false;
     }
+  }
+
+  Future<void> fetchPhysicalBoxStatus(String packingId) async {
+    try {
+      final response = await ApiHandler.getRequest(
+        "${ApiEndPoint.packingPhysicalBoxStatus}?packing_id=$packingId&location_id=${Pref.getLocationId()}&company_id=${Pref.getCompanyId()}",
+      );
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && data['status'] == 200) {
+        final physicalBoxData = PhysicalBoxStatusResponse.fromJson(data).data;
+        if (physicalBoxData != null) {
+          if (physicalBoxData.configs != null) {
+            boxConfigs.value = physicalBoxData.configs!.map((config) => _mapConfigToBoxConfig(config)).toList();
+          }
+          if (physicalBoxData.productSummary != null) {
+            productSummary.value = physicalBoxData.productSummary!;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching physical box status: $e");
+    }
+  }
+
+  BoxConfiguration _mapConfigToBoxConfig(Config config) {
+    return BoxConfiguration(
+      id: config.id ?? "",
+      boxName: "Box ${config.boxRangeStart}${config.boxRangeStart != config.boxRangeEnd ? "-${config.boxRangeEnd}" : ""}",
+      weight: double.tryParse(config.grossWeight ?? "0") ?? 0.0,
+      fromBox: config.boxRangeStart ?? 0,
+      toBox: config.boxRangeEnd ?? 0,
+      length: config.length ?? 0.0,
+      width: config.width ?? 0.0,
+      height: config.height ?? 0.0,
+      dimUom: config.dimensionUom ?? "cm",
+      netWeight: double.tryParse(config.netWeight ?? "0") ?? 0.0,
+      grossWeight: double.tryParse(config.grossWeight ?? "0") ?? 0.0,
+      weightUom: config.weightUom ?? "kg",
+      remarks: config.remarks ?? "",
+      items: (config.items ?? []).map((item) {
+        return BoxConfigItem(
+          productId: item.productId ?? "",
+          productName: item.productName ?? "Product",
+          qty: item.qtyPerBox ?? item.quantityPerBox ?? 0,
+        );
+      }).toList(),
+    );
   }
 
   Future<void> createPackingFromPicking({required String pickingId, required bool isShrinkWrapped, String? remarks}) async {
@@ -517,6 +577,73 @@ class PackingController extends GetxController {
     }
   }
 
+  Future<void> postLogNote() async {
+    if (logNoteController.text.trim().isEmpty) {
+      toastMessage(text: "Please enter log details");
+      return;
+    }
+
+    final detail = packingDetail.value;
+    if (detail == null) return;
+
+    isLoading.value = true;
+    try {
+      List<String> attachmentUrls = [];
+
+      // 1. Upload files if any
+      for (var file in selectedLogFiles) {
+        final response = await ApiHandler.uploadFile(file, folderName: 'logs');
+        if (response.statusCode == 200) {
+          final data = response.data;
+          if (data['status'] == 200 && data['data'] != null) {
+            attachmentUrls.add(data['data']);
+          }
+        }
+      }
+
+      // 2. Create Log
+      final body = {
+        "entity_type": "PackingList",
+        "entity_id": detail.id,
+        "parent_type": "PickingList",
+        "parent_id": detail.pickingId,
+        "root_type": "Quotation",
+        "root_id": detail.picking?.pickRequestId ?? detail.pickRequestId,
+        "notes": logNoteController.text.trim(),
+        "log_type": "user",
+        "metadata": reminderDate.value != null ? {"reminder_date": reminderDate.value!.toIso8601String()} : {},
+        "attachment_url": attachmentUrls,
+      };
+
+      if (detail.invoice?.quotationId != null) {
+        body["root_type"] = "Quotation";
+        body["root_id"] = detail.invoice!.quotationId;
+      } else if (detail.invoice?.opportunityId != null) {
+        body["root_type"] = "Opportunity";
+        body["root_id"] = detail.invoice!.opportunityId;
+      }
+
+      final response = await ApiHandler.postRequest(url: ApiEndPoint.addLog, body: body);
+      final data = response.data;
+
+      if (response.statusCode == 200 && data['status'] == 200) {
+        toastMessage(text: "Log posted successfully", color: AppColors.green500Success);
+        isLogNoteOpen.value = false;
+        logNoteController.clear();
+        reminderDate.value = null;
+        selectedLogFiles.clear();
+        getPackingDetail(detail.id!); // Refresh timeline
+      } else {
+        toastMessage(text: data['message'] ?? "Failed to post log", color: AppColors.red500);
+      }
+    } catch (e) {
+      debugPrint("Error posting log: $e");
+      toastMessage(text: "Something went wrong", color: AppColors.red500);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<void> requestForEWayBill(String id) async {
     isLoading.value = true;
     try {
@@ -593,12 +720,12 @@ class PackingController extends GetxController {
     }
   }
 
-  Future<void> viewBoxWisePackingList(String id) async {
+  Future<void> viewBoxWisePackingList(String packingId) async {
     try {
       isLoading.value = true;
       Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
       final response = await ApiHandler.getRequest(
-        "${ApiEndPoint.packingPhysicalBoxStatus}?packing_id=$id&location_id=${Pref.getLocationId()}&company_id=${Pref.getCompanyId()}",
+        "${ApiEndPoint.packingPhysicalBoxStatus}?packing_id=$packingId&location_id=${Pref.getLocationId()}&company_id=${Pref.getCompanyId()}",
       );
       final data = json.decode(response.data);
       if (response.statusCode == 200 && data['status'] == 200) {
@@ -1038,13 +1165,7 @@ class PackingController extends GetxController {
                   id: item.boxSuggestionItemId ?? "${DateTime.now().millisecondsSinceEpoch}_$boxIndex",
                   boxName: "Box $boxIndex",
                   weight: 0.0,
-                  items: [
-                    BoxConfigItem(
-                      productId: item.productId ?? "",
-                      productName: item.productName ?? "Product",
-                      qty: qtyForThisBox,
-                    )
-                  ],
+                  items: [BoxConfigItem(productId: item.productId ?? "", productName: item.productName ?? "Product", qty: qtyForThisBox)],
                 ),
               );
               remainingQty -= qtyForThisBox;
@@ -1052,28 +1173,16 @@ class PackingController extends GetxController {
             }
           }
           boxConfigs.addAll(tempConfigs);
-          toastMessage(
-            text: "Box configurations generated successfully!",
-            color: AppColors.green500Success,
-          );
+          toastMessage(text: "Box configurations generated successfully!", color: AppColors.green500Success);
         } else {
-          toastMessage(
-            text: responseData['message'] ?? "Failed to get AI suggestion",
-            color: AppColors.redColor,
-          );
+          toastMessage(text: responseData['message'] ?? "Failed to get AI suggestion", color: AppColors.redColor);
         }
       } else {
-        toastMessage(
-          text: responseData['message'] ?? "Failed to connect to AI server",
-          color: AppColors.redColor,
-        );
+        toastMessage(text: responseData['message'] ?? "Failed to connect to AI server", color: AppColors.redColor);
       }
     } catch (e) {
       debugPrint("Error fetching AI suggestions: $e");
-      toastMessage(
-        text: "Something went wrong",
-        color: AppColors.redColor,
-      );
+      toastMessage(text: "Something went wrong", color: AppColors.redColor);
     } finally {
       isLoading.value = false;
     }
@@ -1111,37 +1220,23 @@ class PackingController extends GetxController {
         "gross_weight": config.grossWeight,
         "weight_uom": config.weightUom,
         "remarks": config.remarks.isEmpty ? "Auto filled with AI" : config.remarks,
-        "items": config.items.map((item) => {
-          "product_id": item.productId,
-          "quantity_per_box": item.qty,
-        }).toList(),
+        "items": config.items.map((item) => {"product_id": item.productId, "quantity_per_box": item.qty}).toList(),
       };
 
-      final response = await ApiHandler.patchRequest(
-        url: "${ApiEndPoint.updateBoxConfig}${config.id}",
-        body: body,
-      );
+      final response = await ApiHandler.patchRequest(url: "${ApiEndPoint.updateBoxConfig}${config.id}", body: body);
 
       final data = response.data;
       if (response.statusCode == 200 && data['status'] == 200) {
-        toastMessage(
-          text: data['message'] ?? "Box Configuration Updated",
-          color: AppColors.greenColor,
-        );
+        toastMessage(text: data['message'] ?? "Box Configuration Updated", color: AppColors.greenColor);
+        await fetchPhysicalBoxStatus(packingId);
         return true;
       } else {
-        toastMessage(
-          text: data['message'] ?? "Failed to update Box Configuration",
-          color: AppColors.redColor,
-        );
+        toastMessage(text: data['message'] ?? "Failed to update Box Configuration", color: AppColors.redColor);
         return false;
       }
     } catch (e) {
       debugPrint("Error updating box config: $e");
-      toastMessage(
-        text: "Something went wrong while updating Box Configuration",
-        color: AppColors.redColor,
-      );
+      toastMessage(text: "Something went wrong while updating Box Configuration", color: AppColors.redColor);
       return false;
     } finally {
       isLoading.value = false;
@@ -1178,10 +1273,7 @@ class PackingController extends GetxController {
   Future<void> saveBoxConfigs() async {
     final detail = packingListDetail.value;
     if (detail == null) {
-      toastMessage(
-        text: "No packing details found to save.",
-        color: AppColors.redColor,
-      );
+      toastMessage(text: "No packing details found to save.", color: AppColors.redColor);
       return;
     }
 
@@ -1203,30 +1295,16 @@ class PackingController extends GetxController {
       final body = {
         "packing_no": detail.packingNo ?? "",
         "packing_id": detail.id ?? "",
-        "company_id": detail.companyId ?? Pref.getCompanyId() ?? "",
-        "fin_year": detail.finYear ?? Pref.getFinancialYears() ?? "",
+        "company_id": detail.companyId ?? Pref.getCompanyId(),
+        "fin_year": detail.finYear ?? Pref.getFinancialYears(),
         "items": itemsList,
       };
 
-      final response = await ApiHandler.patchRequest(
-        url: ApiEndPoint.updateBoxSuggestion,
-        body: body,
-      );
-
-      if (response == null) {
-        toastMessage(
-          text: "Failed to receive response from server.",
-          color: AppColors.redColor,
-        );
-        return;
-      }
+      final response = await ApiHandler.patchRequest(url: ApiEndPoint.updateBoxSuggestion, body: body);
 
       final responseData = response.data;
       if (responseData == null) {
-        toastMessage(
-          text: "Server returned empty data.",
-          color: AppColors.redColor,
-        );
+        toastMessage(text: "Server returned empty data.", color: AppColors.redColor);
         return;
       }
 
@@ -1236,10 +1314,7 @@ class PackingController extends GetxController {
       } else if (responseData is Map) {
         dataMap = Map<String, dynamic>.from(responseData);
       } else {
-        toastMessage(
-          text: "Invalid response format from server.",
-          color: AppColors.redColor,
-        );
+        toastMessage(text: "Invalid response format from server.", color: AppColors.redColor);
         return;
       }
 
@@ -1249,25 +1324,35 @@ class PackingController extends GetxController {
 
       if (isSuccess || status == 200) {
         Get.back();
-        toastMessage(
-          text: message,
-          color: AppColors.greenColor,
-        );
+        toastMessage(text: message, color: AppColors.greenColor);
         if (detail.id != null) {
           getPackingListDetail(detail.id!);
         }
       } else {
-        toastMessage(
-          text: message,
-          color: AppColors.redColor,
-        );
+        toastMessage(text: message, color: AppColors.redColor);
       }
     } catch (e) {
       debugPrint("Error saving box configurations: $e");
-      toastMessage(
-        text: "Something went wrong while saving: $e",
-        color: AppColors.redColor,
-      );
+      toastMessage(text: "Something went wrong while saving: $e", color: AppColors.redColor);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> requestForInvoiceFromDetail(String id) async {
+    isLoading.value = true;
+    try {
+      final response = await ApiHandler.postRequest(url: ApiEndPoint.requestInvoice, body: {"packing_id": id, "flow_type": "regular"});
+      final data = response.data;
+      if (response.statusCode == 200 && data['status'] == 200) {
+        Get.snackbar("Success", data['message'] ?? "Invoice requested successfully", backgroundColor: Colors.green, colorText: Colors.white);
+        getPackingDetail(id);
+      } else {
+        Get.snackbar("Error", data['message'] ?? "Failed to request invoice", backgroundColor: Colors.red, colorText: Colors.white);
+      }
+    } catch (e) {
+      debugPrint("Error requesting invoice: $e");
+      Get.snackbar("Error", "Something went wrong", backgroundColor: Colors.red, colorText: Colors.white);
     } finally {
       isLoading.value = false;
     }

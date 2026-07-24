@@ -111,6 +111,7 @@ class PickingDetailScreen extends GetView<PickingListController> {
                         ),
                         const SizedBox(height: 20),
                         _buildLogsSection(data),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -1025,63 +1026,153 @@ class PickingDetailScreen extends GetView<PickingListController> {
     final logs = detail.logs ?? [];
     if (logs.isEmpty) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "History",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 12),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: logs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final log = logs[index];
-            String logDate = "-";
-            if (log.createdAt != null) {
-              logDate = DateFormat("dd MMM yyyy, hh:mm a").format(log.createdAt!);
-            }
-            return Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.gray200, width: 0.8),
+    // Group logs by date
+    Map<String, List<Log>> groupedLogs = {};
+    for (var log in logs) {
+      if (log.createdAt != null) {
+        String dateKey = DateFormat('dd MMM yyyy').format(log.createdAt!.toLocal()).toUpperCase();
+        if (!groupedLogs.containsKey(dateKey)) {
+          groupedLogs[dateKey] = [];
+        }
+        groupedLogs[dateKey]!.add(log);
+      }
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gray200, width: 0.8),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 6))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.history_outlined, color: AppColors.gray600, size: 20),
+              SizedBox(width: 8),
+              Text(
+                "Activity Timeline",
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.gray600),
               ),
-              child: Column(
+            ],
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () {
+              // TODO: Log Note action
+            },
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text("Log Note", style: TextStyle(fontWeight: FontWeight.bold)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textPrimary,
+              side: const BorderSide(color: AppColors.gray200),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ListView.builder(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: groupedLogs.length,
+            itemBuilder: (context, index) {
+              String dateKey = groupedLogs.keys.elementAt(index);
+              List<Log> dayLogs = groupedLogs[dateKey]!;
+              return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        log.logType?.replaceAll("_", " ") ?? "Action",
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.indigo600Main, fontSize: 13),
-                      ),
-                      Text(logDate, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                    ],
+                  Text(
+                    dateKey,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.gray500, letterSpacing: 0.5),
                   ),
-                  if (log.notes != null && log.notes!.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(log.notes!, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
-                  ],
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.person_outline, size: 14, color: AppColors.textSecondary),
-                      const SizedBox(width: 4),
-                      Text(log.createdByName ?? "Unknown", style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                    ],
-                  ),
+                  const SizedBox(height: 16),
+                  ...dayLogs.map((log) {
+                    bool isLast = dayLogs.indexOf(log) == dayLogs.length - 1 && index == groupedLogs.length - 1;
+                    return _buildTimelineItem(log, isLast);
+                  }),
+                  if (index != groupedLogs.length - 1) const SizedBox(height: 16),
                 ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineItem(Log log, bool isLast) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.indigo600Main.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.indigo600Main.withValues(alpha: 0.2)),
+                ),
+                child: Center(
+                  child: Text(
+                    log.createdByName?.isNotEmpty == true ? log.createdByName![0].toUpperCase() : "A",
+                    style: const TextStyle(color: AppColors.indigo600Main, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
-            );
-          },
-        ),
-      ],
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 1,
+                    color: AppColors.gray200,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      log.createdByName ?? "Unknown User",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                    ),
+                    Text(
+                      log.createdAt != null ? DateFormat('dd/MM/yyyy hh:mm a').format(log.createdAt!.toLocal()) : "-",
+                      style: const TextStyle(fontSize: 11, color: AppColors.gray500, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.gray200, width: 0.8),
+                  ),
+                  child: Text(
+                    log.notes ?? "-",
+                    style: const TextStyle(fontSize: 13, color: AppColors.textPrimary, height: 1.4),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

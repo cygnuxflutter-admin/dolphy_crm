@@ -600,7 +600,7 @@ class PackingListScreen extends GetView<PackingController> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                 Obx(() {
+                Obx(() {
                   bool allItemsCompleted = (data.items ?? []).every((item) {
                     final double pqDouble = double.tryParse(item.packedQty ?? "0") ?? 0;
                     final int packedQty = pqDouble.toInt();
@@ -613,18 +613,10 @@ class PackingListScreen extends GetView<PackingController> {
                     children: [
                       ElevatedButton.icon(
                         onPressed: allItemsCompleted ? null : () => controller.autoFillWithAI(data),
-                        icon: Icon(
-                          Icons.psychology,
-                          color: allItemsCompleted ? AppColors.gray600 : Colors.white,
-                          size: 16,
-                        ),
+                        icon: Icon(Icons.psychology, color: allItemsCompleted ? AppColors.gray600 : Colors.white, size: 16),
                         label: Text(
                           "Auto-Fill With AI",
-                          style: TextStyle(
-                            color: allItemsCompleted ? AppColors.gray600 : Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(color: allItemsCompleted ? AppColors.gray600 : Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.indigo600Light,
@@ -636,18 +628,10 @@ class PackingListScreen extends GetView<PackingController> {
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed: allItemsCompleted ? null : () => _showBoxConfigBottomSheet(context, data),
-                        icon: Icon(
-                          Icons.add,
-                          color: allItemsCompleted ? AppColors.gray600 : Colors.white,
-                          size: 16,
-                        ),
+                        icon: Icon(Icons.add, color: allItemsCompleted ? AppColors.gray600 : Colors.white, size: 16),
                         label: Text(
                           "Create Box Config",
-                          style: TextStyle(
-                            color: allItemsCompleted ? AppColors.gray600 : Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(color: allItemsCompleted ? AppColors.gray600 : Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.indigo600Main,
@@ -669,19 +653,40 @@ class PackingListScreen extends GetView<PackingController> {
                 Obx(() {
                   // Register boxConfigs dependency
                   controller.boxConfigs.length;
+                  final summary = controller.productSummary;
                   final items = data.items ?? [];
+
                   return ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: items.length,
+                    itemCount: summary.isNotEmpty ? summary.length : items.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
-                      final item = items[index];
-                      final double pqDouble = double.tryParse(item.packedQty ?? "0") ?? 0;
-                      final int packedQty = pqDouble.toInt();
-                      final int physicallyPacked = controller.getPhysicallyPackedQty(item.product?.id ?? "");
-                      final double progress = packedQty > 0 ? (physicallyPacked / packedQty).clamp(0.0, 1.0) : 0.0;
-                      final bool isDone = physicallyPacked >= packedQty;
+                      String productName = "-";
+                      String imageUrl = "";
+                      int packedQty = 0;
+                      int totalOrdered = 0;
+                      bool isDone = false;
+
+                      if (summary.isNotEmpty) {
+                        final s = summary[index];
+                        productName = s.productName ?? "-";
+                        packedQty = s.totalQtyPacked ?? 0;
+                        totalOrdered = s.totalQtyOrdered ?? 0;
+                        isDone = s.status == "COMPLETED";
+                        // Find matching item for image
+                        final matchingItem = items.firstWhereOrNull((i) => i.product?.id == s.productId);
+                        imageUrl = matchingItem?.product?.imageUrl ?? "";
+                      } else {
+                        final item = items[index];
+                        productName = item.product?.productName ?? "-";
+                        imageUrl = item.product?.imageUrl ?? "";
+                        totalOrdered = (double.tryParse(item.packedQty ?? "0") ?? 0).toInt();
+                        packedQty = controller.getPhysicallyPackedQty(item.product?.id ?? "");
+                        isDone = packedQty >= totalOrdered;
+                      }
+
+                      final double progress = totalOrdered > 0 ? (packedQty / totalOrdered).clamp(0.0, 1.0) : 0.0;
 
                       return Container(
                         padding: const EdgeInsets.all(12),
@@ -698,9 +703,9 @@ class PackingListScreen extends GetView<PackingController> {
                                 width: 36,
                                 height: 36,
                                 color: AppColors.gray200,
-                                child: item.product?.imageUrl != null && item.product!.imageUrl!.isNotEmpty
+                                child: imageUrl.isNotEmpty
                                     ? Image.network(
-                                        item.product!.imageUrl!,
+                                        imageUrl,
                                         fit: BoxFit.cover,
                                         loadingBuilder: (context, child, loadingProgress) {
                                           if (loadingProgress == null) return child;
@@ -721,7 +726,7 @@ class PackingListScreen extends GetView<PackingController> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    item.product?.productName ?? "-",
+                                    productName,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
@@ -742,7 +747,7 @@ class PackingListScreen extends GetView<PackingController> {
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
-                                        "$physicallyPacked/$packedQty",
+                                        "$packedQty/$totalOrdered",
                                         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
                                       ),
                                     ],
@@ -933,22 +938,18 @@ class _BoxConfigBottomSheetState extends State<BoxConfigBottomSheet> {
   void initState() {
     super.initState();
     final bool isEdit = widget.config != null;
-    final String defaultBoxVal = widget.index != null
-        ? (widget.index! + 1).toString()
-        : (isEdit ? widget.config!.fromBox.toString() : "1");
-    final String defaultToBoxVal = widget.index != null
-        ? (widget.index! + 1).toString()
-        : (isEdit ? widget.config!.toBox.toString() : "1");
+    final String defaultBoxVal = isEdit ? widget.config!.fromBox.toString() : (widget.index != null ? (widget.index! + 1).toString() : "1");
+    final String defaultToBoxVal = isEdit ? widget.config!.toBox.toString() : (widget.index != null ? (widget.index! + 1).toString() : "1");
     fromBoxController = TextEditingController(text: defaultBoxVal);
     toBoxController = TextEditingController(text: defaultToBoxVal);
-    lengthController = TextEditingController(text: isEdit ? widget.config!.length.toString() : "100");
-    widthController = TextEditingController(text: isEdit ? widget.config!.width.toString() : "100");
-    heightController = TextEditingController(text: isEdit ? widget.config!.height.toString() : "100");
-    netWeightController = TextEditingController(text: isEdit ? widget.config!.netWeight.toString() : "500.000");
-    grossWeightController = TextEditingController(text: isEdit ? widget.config!.grossWeight.toString() : "500.000");
+    lengthController = TextEditingController(text: isEdit ? widget.config!.length.toString() : "0");
+    widthController = TextEditingController(text: isEdit ? widget.config!.width.toString() : "0");
+    heightController = TextEditingController(text: isEdit ? widget.config!.height.toString() : "0");
+    netWeightController = TextEditingController(text: isEdit ? widget.config!.netWeight.toStringAsFixed(3) : "0.000");
+    grossWeightController = TextEditingController(text: isEdit ? widget.config!.grossWeight.toStringAsFixed(3) : "0.000");
     remarksController = TextEditingController(text: isEdit ? widget.config!.remarks : "");
     dimUom = isEdit ? widget.config!.dimUom : "cm";
-    weightUom = isEdit ? widget.config!.weightUom : "g";
+    weightUom = isEdit ? widget.config!.weightUom : "kg";
 
     if (isEdit) {
       for (var item in widget.config!.items) {
@@ -1408,12 +1409,11 @@ class _BoxConfigBottomSheetState extends State<BoxConfigBottomSheet> {
                   );
 
                   if (isEdit) {
-                    Get.find<PackingController>().updatePhysicalBoxConfig(
-                      packingId: widget.detailData.id ?? "",
-                      config: updatedConfig,
-                    ).then((success) {
+                    Get.find<PackingController>().updatePhysicalBoxConfig(packingId: widget.detailData.id ?? "", config: updatedConfig).then((
+                      success,
+                    ) {
                       if (success) {
-                        Get.find<PackingController>().editBoxConfig(widget.config!.id, updatedConfig);
+                        Navigator.pop(context);
                       }
                     });
                   } else {

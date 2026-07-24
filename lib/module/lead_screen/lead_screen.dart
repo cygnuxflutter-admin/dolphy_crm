@@ -106,7 +106,7 @@ class _LeadScreenState extends State<LeadScreen> {
                   ? IconButton(
                       icon: const Icon(Icons.add_circle_outline, color: Colors.white),
                       onPressed: () {
-                        Get.toNamed(AppRoutes.AddLeadScreen);
+                        Get.toNamed(AppRoutes.addLeadScreen);
                       },
                     )
                   : const SizedBox(),

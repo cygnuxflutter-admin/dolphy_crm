@@ -80,11 +80,11 @@ class Config {
   final int? rangeEnd;
   final int? boxCount;
   final String? weightPerBox;
-  final int? length;
-  final int? width;
-  final int? height;
+  final double? length;
+  final double? width;
+  final double? height;
   final String? dimensionUom;
-  final int? totalVolume;
+  final double? totalVolume;
   final String? netWeight;
   final String? grossWeight;
   final String? weightUom;
@@ -121,11 +121,11 @@ class Config {
     rangeEnd: json["range_end"],
     boxCount: json["box_count"],
     weightPerBox: json["weight_per_box"],
-    length: json["length"],
-    width: json["width"],
-    height: json["height"],
+    length: (json["length"] as num?)?.toDouble(),
+    width: (json["width"] as num?)?.toDouble(),
+    height: (json["height"] as num?)?.toDouble(),
     dimensionUom: json["dimension_uom"],
-    totalVolume: json["total_volume"],
+    totalVolume: (json["total_volume"] as num?)?.toDouble(),
     netWeight: json["net_weight"],
     grossWeight: json["gross_weight"],
     weightUom: json["weight_uom"],
