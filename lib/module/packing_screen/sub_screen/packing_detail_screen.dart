@@ -1,10 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../config/app_colors.dart';
-import '../../picking_list/model/picking_detail_response.dart';
 import '../model/packing_detail_responce_model.dart';
 import '../packing_controller.dart';
 
@@ -105,6 +107,9 @@ class PackingDetailScreen extends GetView<PackingController> {
                             return _buildItemCard(data, item);
                           },
                         ),
+                        const SizedBox(height: 20),
+                        _buildLogsSection(context, data),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -713,48 +718,6 @@ class PackingDetailScreen extends GetView<PackingController> {
     );
   }
 
-  Widget _attachmentLink(String url) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: InkWell(
-        onTap: () async {
-          final uri = Uri.parse(url);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          } else {
-            Get.snackbar("Error", "Could not open attachment link");
-          }
-        },
-        child: Row(
-          children: [
-            const Icon(Icons.open_in_new, size: 14, color: AppColors.indigo600Main),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                url.split('/').last,
-                style: const TextStyle(fontSize: 13, color: AppColors.indigo600Main, decoration: TextDecoration.underline),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInvoiceSectionHeader(String title) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(color: AppColors.indigo600Main, fontWeight: FontWeight.bold, fontSize: 13),
-        ),
-        const SizedBox(height: 4),
-        Container(height: 2, width: 30, color: AppColors.indigo600Main),
-      ],
-    );
-  }
-
   Widget _buildAttachmentTile(String url) {
     bool isPdf = url.toLowerCase().endsWith('.pdf');
     bool isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].any((ext) => url.toLowerCase().endsWith(ext));
@@ -896,24 +859,6 @@ class PackingDetailScreen extends GetView<PackingController> {
     );
   }
 
-  String _getStatusText({required String status}) {
-    if (status == "PACKED" || status == "PENDING") return "IN PACKING";
-    if (status == "PICKED") return "PICKED";
-    if (status == "INVOICED" || status == "INVOICE_PROCESS") return "INVOICED";
-    if (status == "READY_FOR_DISPATCH") return "READY FOR DISPATCH";
-    if (status == "REJECTED") return "REJECTED";
-    return status ?? "-";
-  }
-
-  Color _getStatusColor({required String status}) {
-    if (status == "PACKED" || status == "PENDING") return AppColors.orangeColor;
-    if (status == "PICKED") return AppColors.gray500;
-    if (status == "INVOICED" || status == "INVOICE_PROCESS") return AppColors.gray600;
-    if (status == "READY_FOR_DISPATCH") return AppColors.blue500;
-    if (status == "REJECTED") return AppColors.red500;
-    return AppColors.textPrimary;
-  }
-
   Widget _infoCell(IconData icon, String label, String value, {bool isFullWidth = false, Color? valueColor}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -936,58 +881,6 @@ class PackingDetailScreen extends GetView<PackingController> {
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: valueColor ?? AppColors.textPrimary),
         ),
       ],
-    );
-  }
-
-  Widget _statusBadge(PickingDetailData data) {
-    String displayStatus = data.status ?? "-";
-    Color color = AppColors.gray500;
-
-    if (data.status == "PACKED") {
-      displayStatus = "In packing";
-      color = AppColors.orangeColor;
-    } else if (data.status == "INVOICED") {
-      if (data.invoice?.isStockApproved == true) {
-        displayStatus = "Ready For Dispatch";
-        color = AppColors.blue500;
-      } else {
-        displayStatus = "Invoiced";
-        color = AppColors.gray600;
-      }
-    } else if (data.status == "PICKED") {
-      displayStatus = "Picked";
-      color = AppColors.gray500;
-    }
-
-    return _badge(displayStatus, color);
-  }
-
-  Widget _approveBadge(PickingDetailData data) {
-    if (data.invoice?.isStockApproved == null) {
-      return const Text(
-        "-",
-        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.gray400),
-      );
-    }
-
-    String label = data.invoice!.isStockApproved! ? "Approved" : "Pending";
-    Color color = data.invoice!.isStockApproved! ? AppColors.green500Normal : AppColors.orangeColor;
-
-    return _badge(label, color);
-  }
-
-  Widget _badge(String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color),
-      ),
     );
   }
 
@@ -1058,49 +951,317 @@ class PackingDetailScreen extends GetView<PackingController> {
     );
   }
 
-  void _showPackedQtyDialog(BuildContext context, String pickingId, DataItem item) {
-    final TextEditingController qtyController = TextEditingController(text: item.packedQty ?? "0");
-    Get.dialog(
-      AlertDialog(
-        title: const Text("Enter Packed Quantity"),
-        content: TextField(
-          controller: qtyController,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            hintText: "Picked: ${item.pickedQty ?? "0"}",
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  Widget _buildLogsSection(BuildContext context, PackingDetailData detail) {
+    final logs = detail.logs ?? [];
+    if (logs.isEmpty && !controller.isLogNoteOpen.value) return const SizedBox.shrink();
+
+    // Group logs by date
+    Map<String, List<Log>> groupedLogs = {};
+    for (var log in logs) {
+      if (log.createdAt != null) {
+        String dateKey = DateFormat('dd MMM yyyy').format(log.createdAt!.toLocal()).toUpperCase();
+        if (!groupedLogs.containsKey(dateKey)) {
+          groupedLogs[dateKey] = [];
+        }
+        groupedLogs[dateKey]!.add(log);
+      }
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gray200, width: 0.8),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 6))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.history_outlined, color: AppColors.gray600, size: 20),
+              SizedBox(width: 8),
+              Text(
+                "Activity Timeline",
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.gray600),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text("CANCEL")),
-          ElevatedButton(
-            onPressed: () {
-              final double picked = double.tryParse(item.pickedQty ?? "0") ?? 0;
-              final double entered = double.tryParse(qtyController.text) ?? 0;
-
-              if (qtyController.text.isEmpty) {
-                Get.snackbar("Invalid Quantity", "Please enter a quantity", backgroundColor: Colors.red, colorText: Colors.white);
-                return;
-              }
-
-              if (entered < 0) {
-                Get.snackbar("Invalid Quantity", "Quantity cannot be negative", backgroundColor: Colors.red, colorText: Colors.white);
-                return;
-              }
-
-              if (entered > picked) {
-                Get.snackbar(
-                  "Invalid Quantity",
-                  "Packed quantity cannot exceed picked quantity",
-                  backgroundColor: Colors.red,
-                  colorText: Colors.white,
-                );
-              } else {
-                Navigator.of(context).pop();
-                controller.updatePackedQty(pickingId, item.id!, entered.toString());
-              }
+          const SizedBox(height: 16),
+          Obx(
+            () => ElevatedButton.icon(
+              onPressed: () => controller.isLogNoteOpen.toggle(),
+              icon: Icon(controller.isLogNoteOpen.value ? Icons.close : Icons.add, size: 18),
+              label: Text(controller.isLogNoteOpen.value ? "Log Note" : "Log Note", style: const TextStyle(fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.indigo600Main,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
+          Obx(() {
+            if (!controller.isLogNoteOpen.value) return const SizedBox.shrink();
+            return _buildLogNoteForm(context);
+          }),
+          const SizedBox(height: 24),
+          ListView.builder(
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: groupedLogs.length,
+            itemBuilder: (context, index) {
+              String dateKey = groupedLogs.keys.elementAt(index);
+              List<Log> dayLogs = groupedLogs[dateKey]!;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dateKey,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.gray500, letterSpacing: 0.5),
+                  ),
+                  const SizedBox(height: 16),
+                  ...dayLogs.map((log) {
+                    bool isLast = dayLogs.indexOf(log) == dayLogs.length - 1 && index == groupedLogs.length - 1;
+                    return _buildTimelineItem(log, isLast);
+                  }),
+                  if (index != groupedLogs.length - 1) const SizedBox(height: 16),
+                ],
+              );
             },
-            child: const Text("UPDATE"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogNoteForm(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Form Header
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                const Icon(Icons.edit_note, size: 20, color: AppColors.gray600),
+                const SizedBox(width: 8),
+                const Text(
+                  "New Log",
+                  style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+                const Spacer(),
+                InkWell(
+                  onTap: () => _selectReminderDate(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.gray100,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.gray200),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.calendar_today, size: 14, color: AppColors.indigo600Main),
+                        const SizedBox(width: 6),
+                        Obx(
+                          () => Text(
+                            controller.reminderDate.value != null ? DateFormat('dd MMM yyyy').format(controller.reminderDate.value!) : "Reminder?",
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.gray600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Text Input
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextField(
+              controller: controller.logNoteController,
+              maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: "Type your log details here...",
+                hintStyle: TextStyle(color: AppColors.gray400, fontSize: 14),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          // File Picker Section
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.gray300),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                children: [
+                  InkWell(
+                    onTap: () => _pickFiles(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: const BoxDecoration(
+                        color: AppColors.gray100,
+                        border: Border(right: BorderSide(color: AppColors.gray300)),
+                      ),
+                      child: const Text("Choose Files", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Obx(
+                      () => Text(
+                        controller.selectedLogFiles.isEmpty ? "No file chosen" : "${controller.selectedLogFiles.length} file(s) selected",
+                        style: const TextStyle(fontSize: 13, color: AppColors.gray600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Divider(height: 1),
+          // Form Footer
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    controller.isLogNoteOpen.value = false;
+                    controller.logNoteController.clear();
+                    controller.reminderDate.value = null;
+                    controller.selectedLogFiles.clear();
+                  },
+                  child: const Text(
+                    "Cancel",
+                    style: TextStyle(color: AppColors.gray600, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () => controller.postLogNote(),
+                  icon: const Icon(Icons.send, size: 16),
+                  label: const Text("Post", style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.indigo600Main,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _selectReminderDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(primary: AppColors.indigo600Main, onPrimary: Colors.white, onSurface: AppColors.textPrimary),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      controller.reminderDate.value = picked;
+    }
+  }
+
+  Future<void> _pickFiles() async {
+    final ImagePicker picker = ImagePicker();
+    final List<XFile> images = await picker.pickMultiImage();
+    if (images.isNotEmpty) {
+      controller.selectedLogFiles.addAll(images.map((image) => File(image.path)));
+    }
+  }
+
+  Widget _buildTimelineItem(Log log, bool isLast) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.indigo600Main.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.indigo600Main.withValues(alpha: 0.2)),
+                ),
+                child: Center(
+                  child: Text(
+                    log.createdByName?.isNotEmpty == true ? log.createdByName![0].toUpperCase() : "A",
+                    style: const TextStyle(color: AppColors.indigo600Main, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              if (!isLast) Expanded(child: Container(width: 1, color: AppColors.gray200)),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      log.createdByName ?? "Unknown User",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                    ),
+                    Text(
+                      log.createdAt != null ? DateFormat('dd/MM/yyyy hh:mm a').format(log.createdAt!.toLocal()) : "-",
+                      style: const TextStyle(fontSize: 11, color: AppColors.gray500, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.gray200, width: 0.8),
+                  ),
+                  child: Text(log.notes ?? "-", style: const TextStyle(fontSize: 13, color: AppColors.textPrimary, height: 1.4)),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ],
       ),
@@ -1283,6 +1444,8 @@ class PackingDetailScreen extends GetView<PackingController> {
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close, size: 20, color: AppColors.gray400),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                 ],
               ),
@@ -1309,7 +1472,7 @@ class PackingDetailScreen extends GetView<PackingController> {
                     () => Switch(
                       value: isShrinkWrapped.value,
                       onChanged: (value) => isShrinkWrapped.value = value,
-                      activeColor: AppColors.indigo600Main,
+                      activeThumbColor: AppColors.indigo600Main,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1406,6 +1569,8 @@ class PackingDetailScreen extends GetView<PackingController> {
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close, size: 20, color: AppColors.gray400),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                 ],
               ),
