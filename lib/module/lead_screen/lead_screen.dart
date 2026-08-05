@@ -16,6 +16,7 @@ import 'package:intl/intl.dart';
 
 import '../../config/app_images.dart';
 import '../../widget/textfield.dart';
+import '../notification_screen/controller/notification_controller.dart';
 import 'model/get_assign_partner.dart';
 import 'model/opportunity_summary_model.dart';
 
@@ -30,6 +31,7 @@ class _LeadScreenState extends State<LeadScreen> {
   LeadController leadController = Get.find<LeadController>();
   PermissionHandler permissionHandler = Get.find<PermissionHandler>();
   HomeScreenController homeScreenController = Get.find<HomeScreenController>();
+  NotificationController notificationController = Get.find<NotificationController>();
 
   final ScrollController scrollController = ScrollController();
   final ScrollController summaryScrollController = ScrollController();
@@ -102,14 +104,32 @@ class _LeadScreenState extends State<LeadScreen> {
           ),
           actions: [
             Obx(
-              () => permissionHandler.isLeadCreateAllowed
-                  ? IconButton(
-                      icon: const Icon(Icons.add_circle_outline, color: Colors.white),
-                      onPressed: () {
-                        Get.toNamed(AppRoutes.addLeadScreen);
-                      },
-                    )
-                  : const SizedBox(),
+              () => Stack(
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      notificationController.markAllNotificationsAsRead();
+                      Get.toNamed(AppRoutes.notificationScreen);
+                    },
+                    icon: const Icon(Icons.notifications_none_outlined, size: 26, color: Colors.white),
+                  ),
+                  if (notificationController.unreadCount.value > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          '${notificationController.unreadCount.value}',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ],
           bottom: const TabBar(
@@ -123,6 +143,17 @@ class _LeadScreenState extends State<LeadScreen> {
           ),
         ),
         body: SafeArea(child: TabBarView(children: [_buildLeadList(), _buildActivityList()])),
+        floatingActionButton: Obx(
+          () => permissionHandler.isLeadCreateAllowed
+              ? FloatingActionButton(
+                  onPressed: () {
+                    Get.toNamed(AppRoutes.addLeadScreen);
+                  },
+                  backgroundColor: AppColors.indigo600Main,
+                  child: const Icon(Icons.add, color: Colors.white),
+                )
+              : const SizedBox.shrink(),
+        ),
       ),
     );
   }

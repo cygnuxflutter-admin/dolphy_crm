@@ -108,12 +108,15 @@ class _PickingListScreenState extends State<PickingListScreen> with TickerProvid
           const SizedBox(width: 8),
         ],
       ),
-      body: Column(
-        children: [
-          _buildCountCards(),
-          _searchBar(),
-          Expanded(child: _buildList()),
-        ],
+      body: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+        child: Column(
+          children: [
+            _searchBar(),
+            _buildCountCards(),
+            Expanded(child: _buildList()),
+          ],
+        ),
       ),
     );
   }
@@ -128,7 +131,7 @@ class _PickingListScreenState extends State<PickingListScreen> with TickerProvid
       }
 
       final items = [
-        {'label': 'All PICKINGS', 'count': counts?.all ?? 0, 'index': 0, 'color': AppColors.indigo600Main},
+        {'label': 'NEW ORDER', 'count': counts?.all ?? 0, 'index': 0, 'color': AppColors.indigo600Main},
         {'label': 'PENDING', 'count': counts?.draft ?? 0, 'index': 1, 'color': AppColors.yellow500},
         {'label': 'PARTIAL', 'count': counts?.picking ?? 0, 'index': 2, 'color': AppColors.orangeColor},
         {'label': 'PICKED', 'count': counts?.picked ?? 0, 'index': 3, 'color': AppColors.green500Success},
@@ -137,7 +140,7 @@ class _PickingListScreenState extends State<PickingListScreen> with TickerProvid
       ];
 
       return Container(
-        height: 100,
+        height: 80,
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
@@ -231,7 +234,7 @@ class _PickingListScreenState extends State<PickingListScreen> with TickerProvid
 
       return ListView.separated(
         controller: scrollController,
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.only(bottom: 14, left: 14, right: 14),
         itemCount: list.length + (list.length < totalCount ? 1 : 0),
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
@@ -243,7 +246,7 @@ class _PickingListScreenState extends State<PickingListScreen> with TickerProvid
           }
 
           final data = list[index];
-          return _pickingCard(data);
+          return _pickingCard(data, index);
         },
       );
     });
@@ -251,7 +254,7 @@ class _PickingListScreenState extends State<PickingListScreen> with TickerProvid
 
   Widget _searchBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.only(bottom: 0, left: 14, right: 14, top: 8),
       child: TextField(
         controller: controller.searchController.value,
         onChanged: (value) => value.isEmpty
@@ -271,7 +274,7 @@ class _PickingListScreenState extends State<PickingListScreen> with TickerProvid
     );
   }
 
-  Widget _pickingCard(PickingListDatum data) {
+  Widget _pickingCard(PickingListDatum data, int index) {
     String pickingDate = "-";
     bool isPicking = data.status?.toUpperCase() == 'PICKING';
 
@@ -286,79 +289,107 @@ class _PickingListScreenState extends State<PickingListScreen> with TickerProvid
       }
     }
 
-    return GestureDetector(
-      onTap: () => Get.to(() => PickingDetailScreen(pickingId: data.id!)),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200, width: 0.8),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.gray200, width: 0.8),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.indigo600Main.withOpacity(0.05),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.receipt_long_outlined, size: 16, color: AppColors.indigo600Main),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          onTap: () => Get.to(() => PickingDetailScreen(pickingId: data.id!)),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.indigo600Main.withOpacity(0.05),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      height: 28,
+                      width: 28,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(color: AppColors.indigo600Main, shape: BoxShape.circle),
+                      child: Text(
+                        "${index + 1}",
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            data.invoiceNo ?? "-",
+                            style: const TextStyle(fontSize: 16, color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            // data.pickingNo ?? "-",
+                            data.transport_mode ?? "-",
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: AppColors.indigo600Main),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
                       children: [
-                        Text(
-                          data.pickingNo ?? "-",
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.indigo600Main),
-                        ),
-                        Text(
-                          data.invoiceNo ?? "-",
-                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                        if (data.priority != null && data.priority!.isNotEmpty) ...[
+                          _compactBadge(data.priority!, _getPriorityColor(data.priority)),
+                          const SizedBox(height: 05),
+                        ],
+                        _compactBadge(data.status ?? data.orderType ?? "-", _getStatusColor(data.status)),
+                      ],
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.remove_red_eye, size: 16, color: AppColors.gray400),
+                  ],
+                ),
+              ),
+
+              /*Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: _compactInfoCell(Icons.person_outline, "Customer", data.customerName ?? "-")),
+                        Expanded(
+                          child: _compactInfoCell(
+                            Icons.calendar_today_outlined,
+                            "Date",
+                            pickingDate,
+                            valueColor: isPicking ? AppColors.red500 : null,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  if (data.priority != null && data.priority!.isNotEmpty) ...[
-                    _compactBadge(data.priority!, _getPriorityColor(data.priority)),
-                    const SizedBox(width: 6),
-                  ],
-                  _compactBadge(data.status ?? data.orderType ?? "-", _getStatusColor(data.status)),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: _compactInfoCell(Icons.person_outline, "Customer", data.customerName ?? "-")),
-                      Expanded(
-                        child: _compactInfoCell(Icons.calendar_today_outlined, "Date", pickingDate, valueColor: isPicking ? AppColors.red500 : null),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(child: _compactInfoCell(Icons.person_pin_outlined, "Sales Person", data.salesPerson ?? "-")),
-                      Expanded(
-                        child: _compactInfoCell(
-                          Icons.comment_outlined,
-                          "SP Remarks",
-                          (data.piRemarks == null || data.piRemarks!.isEmpty) ? "-" : data.piRemarks!,
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: _compactInfoCell(Icons.person_pin_outlined, "Sales Person", data.salesPerson ?? "-")),
+                        Expanded(
+                          child: _compactInfoCell(
+                            Icons.comment_outlined,
+                            "SP Remarks",
+                            (data.piRemarks == null || data.piRemarks!.isEmpty) ? "-" : data.piRemarks!,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),*/
+            ],
+          ),
         ),
       ),
     );
@@ -397,6 +428,8 @@ class _PickingListScreenState extends State<PickingListScreen> with TickerProvid
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color, width: 1),
       ),
+      width: 70,
+      alignment: Alignment.center,
       child: Text(
         label.isNotEmpty ? label[0].toUpperCase() + label.substring(1).toLowerCase() : "-",
         style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:crm/config/app_colors.dart';
 import 'package:crm/module/lead_screen/model/get_assign_partner.dart';
 import 'package:crm/module/lead_screen/model/lead_type.dart';
@@ -7,7 +5,6 @@ import 'package:crm/module/visit_screen/add_visit_controller.dart';
 import 'package:crm/widget/dropdown.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
 
 class AddVisitScreen extends GetView<AddVisitController> {
   const AddVisitScreen({super.key});
@@ -42,7 +39,7 @@ class AddVisitScreen extends GetView<AddVisitController> {
                     const SizedBox(height: 20),
                     _buildProductTable(),
                     const SizedBox(height: 30),
-                    _buildActionButtons(),
+                    Obx(() => _buildActionButtons()),
                     const SizedBox(height: 5),
                   ],
                 ),
@@ -61,25 +58,46 @@ class AddVisitScreen extends GetView<AddVisitController> {
       ),
       child: Column(
         children: [
-          Obx(() => _buildComplaintDropdown()),
+          _buildComplaintDropdown(),
           _buildTextField("Customer Name", controller.customerNameController.value, readOnly: true),
-          const SizedBox(height: 16),
-          _buildDateTimePicker("Visit Start Date & Time *", controller.startDateController.value),
-          const SizedBox(height: 16),
-          _buildDateTimePicker("Visit End Date & Time *", controller.endDateController.value),
-          const SizedBox(height: 16),
-          Obx(() => _buildPurposeDropdown()),
-          _buildTextField("Customer Mobile *", controller.mobileController.value, readOnly: true),
-          const SizedBox(height: 16),
-          _buildTextField("Contact Person", controller.contactPersonController.value, readOnly: true),
-          const SizedBox(height: 16),
-          Obx(() => _buildPrimaryTechnicianDropdown()),
-          Obx(() => _buildTechniciansDropdown()),
+          if (controller.isEdit.value) _buildStatusDropdown(),
+          _buildPurposeDropdown(),
+          _buildPrimaryTechnicianDropdown(),
+          _buildTechniciansDropdown(),
           _buildTextField("Address", controller.addressController.value, maxLines: 3, readOnly: true),
-          const SizedBox(height: 16),
+
+          _buildDateTimePicker("Visit Start Date & Time *", controller.startDateController.value),
+
+          _buildDateTimePicker("Visit End Date & Time *", controller.endDateController.value),
+
+          _buildTextField("Customer Mobile *", controller.mobileController.value, readOnly: true),
+          _buildTextField("Contact Person", controller.contactPersonController.value, readOnly: true),
+
           _buildTextField("Remark", controller.remarkController.value, maxLines: 3),
         ],
       ),
+    );
+  }
+
+  Widget _buildStatusDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Status",
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.gray600),
+        ),
+        const SizedBox(height: 8),
+        CustomDropdown<dynamic>(
+          hintText: "Select status...",
+          items: (filter, props) async => controller.statusOptionsList,
+          itemAsString: (dynamic item) => item['label'] ?? "",
+          onChanged: (val) => controller.selectedStatus.value = val,
+          selectedItem: controller.selectedStatus.value,
+          compareFn: (item, selectedItem) => item?['value'] == selectedItem?['value'],
+          showSearchBox: false,
+        ),
+      ],
     );
   }
 
@@ -152,7 +170,7 @@ class AddVisitScreen extends GetView<AddVisitController> {
             await controller.getTechnicians(search: filter);
             return controller.technicianList;
           },
-          itemAsString: (item) => "${item.firstName} ${item.lastName}",
+          itemAsString: (item) => "${item.firstName ?? ""} ${item.lastName ?? ""}".trim(),
           onChanged: (val) => controller.onPrimaryTechnicianSelected(val),
           selectedItem: controller.selectedPrimaryTechnician.value,
           compareFn: (item, selectedItem) => item?.id == selectedItem?.id,
@@ -177,7 +195,7 @@ class AddVisitScreen extends GetView<AddVisitController> {
             await controller.getTechnicians(search: filter);
             return controller.technicianList;
           },
-          itemAsString: (item) => "${item.firstName} ${item.lastName}",
+          itemAsString: (item) => "${item.firstName ?? ""} ${item.lastName ?? ""}".trim(),
           selectedItems: controller.selectedTechnicians.toList(),
           onChanged: (List<AssignSalesPerson> selected) {
             controller.selectedTechnicians.assignAll(selected);
@@ -392,7 +410,7 @@ class AddVisitScreen extends GetView<AddVisitController> {
       children: [
         Expanded(
           child: OutlinedButton(
-            onPressed: () => Get.back(),
+            onPressed: controller.isSubmitLoading.value ? null : () => Get.back(),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: AppColors.red500),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -409,18 +427,20 @@ class AddVisitScreen extends GetView<AddVisitController> {
         const SizedBox(width: 16),
         Expanded(
           child: ElevatedButton(
-            onPressed: () => controller.submitVisit(),
+            onPressed: controller.isSubmitLoading.value ? null : () => controller.submitVisit(),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.indigo600Main,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
             ),
-            child: const Text(
-              "Save",
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: controller.isSubmitLoading.value
+                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text(
+                    "Save",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
           ),
         ),
       ],

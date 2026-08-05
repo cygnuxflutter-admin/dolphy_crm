@@ -192,18 +192,8 @@ class _BarcodeScannerWidgetState extends State<BarcodeScannerWidget> {
                     await Future.delayed(const Duration(seconds: 2));
                   } else {
                     await _playErrorSound();
-                    if (mounted) {
-                      // Stop camera immediately on error to show dialog
-                      await cameraController.stop();
-
-                      // Show dialog and wait for it to be dismissed
-                      await _showWrongBarcodeDialog(code);
-
-                      // Restart camera after dialog is closed
-                      if (mounted) {
-                        await cameraController.start();
-                      }
-                    }
+                    // Just a small delay on error too, to prevent rapid-fire errors
+                    await Future.delayed(const Duration(seconds: 1));
                   }
                 } catch (e) {
                   debugPrint('Error in onDetect: $e');

@@ -7,7 +7,7 @@ void toastMessage({text, color, isTop = false}) {
     Fluttertoast.showToast(
       gravity: isTop ? ToastGravity.TOP : ToastGravity.BOTTOM,
       msg: text,
-      backgroundColor: AppColors.indigo600Main,
+      backgroundColor: color ?? AppColors.indigo600Main,
       fontSize: 14,
       textColor: AppColors.white,
     );

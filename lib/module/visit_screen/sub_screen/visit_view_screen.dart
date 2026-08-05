@@ -741,178 +741,297 @@ class VisitViewScreen extends GetView<VisitController> {
   Widget _buildFieldTrackingTab(VisitViewData data) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.gray200, width: 0.8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(Icons.person_pin_circle_outlined, size: 20, color: AppColors.red500),
-                  SizedBox(width: 10),
-                  Text(
-                    "Field Tracking",
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.red500),
-                  ),
-                ],
-              ),
+      child: Column(
+        children: [
+          _buildSiteArrivalCard(data),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.gray200, width: 0.8),
             ),
-            const Divider(height: 1, color: AppColors.gray200),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Column(
-                children: [
-                  // Table Header
-                  Container(
-                    color: AppColors.gray50,
-                    height: 40,
-                    child: Row(
-                      children: [
-                        _tableHeaderItem("#", 40),
-                        _tableHeaderItem("Technician", 180),
-                        _tableHeaderItem("Status", 120),
-                        _tableHeaderItem("Start Time", 180),
-                        _tableHeaderItem("Start Location (Lat, Long)", 200),
-                        _tableHeaderItem("Elapsed Time", 120),
-                        _tableHeaderItem("Stop Remark", 150),
-                      ],
-                    ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_pin_circle_outlined, size: 20, color: AppColors.red500),
+                      SizedBox(width: 10),
+                      Text(
+                        "Field Tracking",
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.red500),
+                      ),
+                    ],
                   ),
-                  // Table Rows
-                  ...List.generate(data.visitTechnicians.length, (index) {
-                    final tech = data.visitTechnicians![index];
-                    return Obx(() {
-                      final bool isExpanded = controller.expandedTechLogs[tech.id ?? ""] ?? false;
-                      return Column(
-                        children: [
-                          Container(
-                            height: 80,
-                            decoration: const BoxDecoration(
-                              border: Border(bottom: BorderSide(color: AppColors.gray100, width: 1)),
-                            ),
-                            child: Row(
-                              children: [
-                                _tableCellItem(Text("${index + 1}", style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)), 40),
-                                _tableCellItem(
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        tech.name ?? "-",
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
+                ),
+                const Divider(height: 1, color: AppColors.gray200),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Column(
+                    children: [
+                      // Table Header
+                      Container(
+                        color: AppColors.gray50,
+                        height: 40,
+                        child: Row(
+                          children: [
+                            _tableHeaderItem("#", 40),
+                            _tableHeaderItem("Technician", 180),
+                            _tableHeaderItem("Status", 120),
+                            _tableHeaderItem("Start Time", 180),
+                            _tableHeaderItem("Start Location (Lat, Long)", 200),
+                            _tableHeaderItem("Elapsed Time", 120),
+                            _tableHeaderItem("Stop Remark", 150),
+                          ],
+                        ),
+                      ),
+                      // Table Rows
+                      ...List.generate(data.visitTechnicians.length, (index) {
+                        final tech = data.visitTechnicians![index];
+                        return Obx(() {
+                          final bool isExpanded = controller.expandedTechLogs[tech.id ?? ""] ?? false;
+                          return Column(
+                            children: [
+                              Container(
+                                height: 80,
+                                decoration: const BoxDecoration(
+                                  border: Border(bottom: BorderSide(color: AppColors.gray100, width: 1)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    _tableCellItem(Text("${index + 1}", style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)), 40),
+                                    _tableCellItem(
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
-                                          if (tech.isPrimary == true) ...[
-                                            _techBadge("Primary", AppColors.indigo600Main.withValues(alpha: 0.1), AppColors.indigo600Main),
-                                            const SizedBox(width: 4),
-                                          ],
-                                          if (tech.isCurrentUser == true) ...[
-                                            _techBadge("You", AppColors.blueColor.withValues(alpha: 0.1), AppColors.blueColor),
-                                          ],
+                                          Text(
+                                            tech.name ?? "-",
+                                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              if (tech.isPrimary == true) ...[
+                                                _techBadge("Primary", AppColors.indigo600Main.withValues(alpha: 0.1), AppColors.indigo600Main),
+                                                const SizedBox(width: 4),
+                                              ],
+                                              if (tech.isCurrentUser == true) ...[
+                                                _techBadge("You", AppColors.blueColor.withValues(alpha: 0.1), AppColors.blueColor),
+                                              ],
+                                            ],
+                                          ),
                                         ],
                                       ),
-                                    ],
-                                  ),
-                                  180,
-                                ),
-                                _tableCellItem(_techStatusBadge(tech.fieldStatus ?? "-"), 120),
-                                _tableCellItem(
-                                  Text(_formatDateTime(tech.startedAt), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                                  180,
-                                ),
-                                _tableCellItem(
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
+                                      180,
+                                    ),
+                                    _tableCellItem(_techStatusBadge(tech.fieldStatus ?? "-"), 120),
+                                    _tableCellItem(
+                                      Text(_formatDateTime(tech.startedAt), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                                      180,
+                                    ),
+                                    _tableCellItem(
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            "${tech.startLatitude ?? ''} ${tech.startLongitude ?? ''}".trim().isEmpty
+                                                ? "-"
+                                                : "${tech.startLatitude}, ${tech.startLongitude}",
+                                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                          ),
+                                          if ("${tech.startLatitude ?? ''} ${tech.startLongitude ?? ''}".trim().isNotEmpty)
+                                            InkWell(
+                                              onTap: () => _openMap(tech.startLatitude, tech.startLongitude),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.location_on_outlined, size: 12, color: AppColors.indigo600Main),
+                                                  Text(
+                                                    " View on map",
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: AppColors.indigo600Main,
+                                                      decoration: TextDecoration.underline,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      200,
+                                    ),
+                                    _tableCellItem(
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            tech.activeDurationSeconds != 0 ? _formatDuration(tech.activeDurationSeconds ?? 0) : "-",
+                                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.green500Success),
+                                          ),
+                                          if (tech.activeDurationSeconds != 0)
+                                            InkWell(
+                                              onTap: () => controller.toggleTechLogExpansion(tech.id ?? ""),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                                    size: 12,
+                                                    color: AppColors.indigo600Main,
+                                                  ),
+                                                  Text(
+                                                    isExpanded ? " Hide Log" : " View Log",
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      color: AppColors.indigo600Main,
+                                                      decoration: TextDecoration.underline,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      120,
+                                    ),
+                                    _tableCellItem(
                                       Text(
-                                        "${tech.startLatitude ?? ''} ${tech.startLongitude ?? ''}".trim().isEmpty
-                                            ? "-"
-                                            : "${tech.startLatitude}, ${tech.startLongitude}",
+                                        tech.remark == "" ? "-" : tech.remark!,
                                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                       ),
-                                      if ("${tech.startLatitude ?? ''} ${tech.startLongitude ?? ''}".trim().isNotEmpty)
-                                        InkWell(
-                                          onTap: () => _openMap(tech.startLatitude, tech.startLongitude),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.location_on_outlined, size: 12, color: AppColors.indigo600Main),
-
-                                              Text(
-                                                " View on map",
-                                                style: TextStyle(fontSize: 11, color: AppColors.indigo600Main, decoration: TextDecoration.underline),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  200,
+                                      150,
+                                    ),
+                                  ],
                                 ),
-
-                                _tableCellItem(
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        tech.activeDurationSeconds != 0 ? _formatDuration(tech.activeDurationSeconds ?? 0) : "-",
-                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.green500Success),
-                                      ),
-                                      if (tech.activeDurationSeconds != 0)
-                                        InkWell(
-                                          onTap: () => controller.toggleTechLogExpansion(tech.id ?? ""),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                                size: 12,
-                                                color: AppColors.indigo600Main,
-                                              ),
-                                              Text(
-                                                isExpanded ? " Hide Log" : " View Log",
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: AppColors.indigo600Main,
-                                                  decoration: TextDecoration.underline,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  120,
-                                ),
-                                _tableCellItem(
-                                  Text(tech.remark == "" ? "-" : tech.remark!, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                                  150,
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (isExpanded) _buildTrackingHistory(tech),
-                        ],
-                      );
-                    });
-                  }),
-                ],
-              ),
+                              ),
+                              if (isExpanded) _buildTrackingHistory(tech),
+                            ],
+                          );
+                        });
+                      }),
+                    ],
+                  ),
+                ),
+              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSiteArrivalCard(VisitViewData data) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200, width: 0.8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.location_on_outlined, size: 20, color: AppColors.green500Success),
+                SizedBox(width: 10),
+                Text(
+                  "Site Arrival",
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.green500Success),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.gray200),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Wrap(spacing: 16, runSpacing: 16, children: data.visitTechnicians.map((tech) => _buildTechnicianArrivalCard(tech)).toList()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTechnicianArrivalCard(VisitTechnician tech) {
+    final bool isReached = tech.reachedAt != null;
+
+    return Container(
+      width: Get.width > 600 ? (Get.width - 64 - 16) / 2 : double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isReached ? AppColors.green500Success.withValues(alpha: 0.02) : AppColors.gray50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isReached ? AppColors.green500Success.withValues(alpha: 0.2) : AppColors.gray200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  tech.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                ),
+              ),
+              _statusBadgeSmall(isReached ? "Reached" : "Pending", isReached ? AppColors.green500Success : AppColors.gray500),
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (tech.isPrimary == true) _techBadge("Primary", AppColors.indigo600Main.withValues(alpha: 0.1), AppColors.indigo600Main),
+          const SizedBox(height: 12),
+          if (isReached) ...[
+            Row(
+              children: [
+                const Icon(Icons.access_time, size: 14, color: AppColors.gray500),
+                const SizedBox(width: 6),
+                Text(_formatDateTime(tech.reachedAt), style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
+            if (tech.reachedAttachments.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 32,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: tech.reachedAttachments.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    return OutlinedButton.icon(
+                      onPressed: () => _openFile(tech.reachedAttachments[index]),
+                      icon: const Icon(Icons.open_in_new, size: 12),
+                      label: const Text("View File", style: TextStyle(fontSize: 11)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.indigo600Main,
+                        side: const BorderSide(color: AppColors.indigo600Main),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ] else ...[
+            const Text(
+              "Not marked yet",
+              style: TextStyle(fontSize: 12, color: AppColors.gray500, fontStyle: FontStyle.italic),
+            ),
+            const SizedBox(height: 4),
+            const Text("No attachments", style: TextStyle(fontSize: 12, color: AppColors.gray500)),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -1058,7 +1177,7 @@ class VisitViewScreen extends GetView<VisitController> {
     final String currentUserId = Pref.getUserId();
     final bool isCreatedByMe = data?.createdBy.toString() == currentUserId.toString();
 
-    final bool showEdit = isPending || (isCancelled && isCreatedByMe) || isCompleted;
+    final bool showEdit = isCreatedByMe;
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,

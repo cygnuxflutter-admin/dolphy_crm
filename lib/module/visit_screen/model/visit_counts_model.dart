@@ -29,15 +29,9 @@ class VisitCounts {
   final int? completed;
   final int? cancelled;
   final int? rejected;
+  final int? todayTask;
 
-  VisitCounts({
-    this.all,
-    this.pending,
-    this.inProgress,
-    this.completed,
-    this.cancelled,
-    this.rejected,
-  });
+  VisitCounts({this.all, this.pending, this.inProgress, this.completed, this.cancelled, this.rejected, this.todayTask});
 
   factory VisitCounts.fromJson(Map<String, dynamic> json) => VisitCounts(
     all: int.tryParse((json["all"] ?? json["ALL"] ?? "0").toString()),
@@ -46,6 +40,7 @@ class VisitCounts {
     completed: int.tryParse((json["COMPLETED"] ?? json["completed"] ?? "0").toString()),
     cancelled: int.tryParse((json["CANCELLED"] ?? json["cancelled"] ?? "0").toString()),
     rejected: int.tryParse((json["REJECTED"] ?? json["rejected"] ?? "0").toString()),
+    todayTask: int.tryParse((json["today_task"] ?? json["today_task"] ?? "0").toString()),
   );
 
   Map<String, dynamic> toJson() => {
@@ -55,5 +50,6 @@ class VisitCounts {
     "COMPLETED": completed,
     "CANCELLED": cancelled,
     "REJECTED": rejected,
+    "TODAY_TASK": todayTask,
   };
 }

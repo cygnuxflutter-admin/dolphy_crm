@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crm/config/app_routes.dart';
 import 'package:crm/module/packing_screen/model/transport_mode_responce_model.dart';
 import 'package:crm/module/packing_screen/model/vendor_responce_model.dart';
 import 'package:flutter/material.dart';
@@ -40,9 +42,11 @@ class PackingController extends GetxController {
   // Pagination
   RxInt currentPage = 1.obs;
   RxInt totalRecords = 0.obs;
-  RxInt limit = 50.obs;
+  RxInt limit = 100.obs;
 
   int get totalPages => (totalRecords.value / limit.value).ceil();
+
+  Timer? _searchDebounce;
 
   // Detail State
   RxBool isDetailLoading = false.obs;
@@ -57,6 +61,7 @@ class PackingController extends GetxController {
   RxBool isListDetailLoading = false.obs;
   RxString listDetailError = "".obs;
   Rx<PackingListDetailData?> packingListDetail = Rx<PackingListDetailData?>(null);
+  Rx<BoxSuggestionData?> boxSuggestionData = Rx<BoxSuggestionData?>(null);
   RxList<ProductSummary> productSummary = <ProductSummary>[].obs;
 
   var isInvoiceExpanded = false.obs;
@@ -110,107 +115,71 @@ class PackingController extends GetxController {
   }
 
   Future<void> fetchData({bool isRefresh = true}) async {
+    isLoading.value = true;
     if (isRefresh) {
       currentPage.value = 1;
     }
     packingList.clear();
-    isLoading.value = true;
     error.value = "";
 
     try {
-      if (selectedTabIndex.value == 0) {
-        // "ALL" tab: Combined data from both APIs
-        await fetchAllData();
-      } else if (selectedTabIndex.value == 1) {
-        // "NEW ORDER" tab: picking-list with status=PICKED
-        await fetchNewOrders();
+      String status = getStatusFromTabIndex(selectedTabIndex.value);
+      String baseUrl = ApiEndPoint.packingList;
+      String readyForPacking = "";
+
+      if (status == "NEW") {
+        baseUrl = ApiEndPoint.pickingList;
+        status = "PICKED";
+        readyForPacking = "&ready_for_packing=true";
+      }
+
+      String url =
+          "$baseUrl?page=${currentPage.value}&limit=${limit.value}&status=$status&company_id=${Pref.getCompanyId()}$readyForPacking&search=${Uri.encodeComponent(searchController.value.text)}";
+
+      final response = await ApiHandler.getRequest(url);
+      final data = json.decode(response.data);
+
+      if (response.statusCode == 200 && data['status'] == 200) {
+        final res = PickingListResponseModel.fromJson(data);
+        packingList.assignAll(res.data ?? []);
+        totalRecords.value = res.pagination?.totalRecords ?? 0;
       } else {
-        // Other tabs: Use packing-list API with status
-        await fetchStatusData();
+        error.value = data['message'] ?? "Failed to fetch data";
       }
     } catch (e) {
-      debugPrint("Error fetching packing data: $e");
-      error.value = "Failed to load data";
+      error.value = e.toString();
     } finally {
       isLoading.value = false;
     }
   }
 
   Future<void> fetchAllData() async {
-    final pickingUrl =
-        "${ApiEndPoint.pickingList}?page=${currentPage.value}&limit=50&search=${searchController.value.text}&status=PICKED&company_id=${Pref.getCompanyId()}";
-    final packingUrl =
-        "${ApiEndPoint.packingList}?page=${currentPage.value}&limit=50&search=${searchController.value.text}&status=&company_id=${Pref.getCompanyId()}";
-
-    final responses = await Future.wait([ApiHandler.getRequest(pickingUrl), ApiHandler.getRequest(packingUrl)]);
-
-    List<PackingList> combinedData = [];
-    int total = 0;
-
-    for (var response in responses) {
-      final data = json.decode(response.data);
-      if (response.statusCode == 200 && data['status'] == 200) {
-        PickingListResponseModel res = PickingListResponseModel.fromJson(data);
-        if (res.data != null) {
-          combinedData.addAll(res.data!);
-        }
-        total += res.pagination?.totalRecords ?? 0;
-      }
-    }
-
-    // Sort by date or something? For now just add
-    packingList.addAll(combinedData);
-    totalRecords.value = total;
-  }
-
-  Future<void> fetchNewOrders() async {
-    final url =
-        "${ApiEndPoint.pickingList}?page=${currentPage.value}&limit=100&search=${searchController.value.text}&status=PICKED&company_id=${Pref.getCompanyId()}";
-    final response = await ApiHandler.getRequest(url);
-    final data = json.decode(response.data);
-
-    if (response.statusCode == 200 && data['status'] == 200) {
-      PickingListResponseModel res = PickingListResponseModel.fromJson(data);
-      if (res.data != null) {
-        packingList.addAll(res.data!);
-      }
-      totalRecords.value = res.pagination?.totalRecords ?? 0;
-    }
-  }
-
-  Future<void> fetchStatusData() async {
-    String status = getStatusFromTabIndex(selectedTabIndex.value);
-    final url =
-        "${ApiEndPoint.packingList}?page=${currentPage.value}&limit=100&search=${searchController.value.text}&status=$status&company_id=${Pref.getCompanyId()}";
-
-    final response = await ApiHandler.getRequest(url);
-    final data = json.decode(response.data);
-
-    if (response.statusCode == 200 && data['status'] == 200) {
-      PickingListResponseModel res = PickingListResponseModel.fromJson(data);
-      if (res.data != null) {
-        packingList.addAll(res.data!);
-      }
-      totalRecords.value = res.pagination?.totalRecords ?? 0;
-    } else {
-      error.value = data['message'] ?? "Something went wrong";
+    isLoading.value = true;
+    try {
+      await Future.wait([getPackingCounts(), fetchData()]);
+    } catch (e) {
+      debugPrint("Error fetching all data: $e");
+    } finally {
+      isLoading.value = false;
     }
   }
 
   String getStatusFromTabIndex(int index) {
     switch (index) {
+      case 0:
+        return "ALL";
       case 1:
-        return "PICKED"; // NEW ORDER
+        return "NEW";
       case 2:
-        return "PENDING"; // IN PROGRESS
+        return "IN_PACKING";
       case 3:
-        return "INVOICE_PROCESS"; // INVOICED
+        return "INVOICE_PROCESS";
       case 4:
-        return "READY_FOR_DISPATCH"; // DISPATCH
+        return "READY_FOR_DISPATCH";
       case 5:
-        return "REJECTED"; // REJECTED
+        return "REJECTED";
       default:
-        return "";
+        return "ALL";
     }
   }
 
@@ -220,11 +189,17 @@ class PackingController extends GetxController {
   }
 
   void onSearch(String query) {
-    fetchData();
+    if (_searchDebounce?.isActive ?? false) _searchDebounce?.cancel();
+
+    if (query.isEmpty || query.length % 3 == 0) {
+      _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+        fetchData();
+      });
+    }
   }
 
   void onPageChanged(int page) {
-    if (page >= 1 && page <= totalPages) {
+    if (page > 0 && page <= totalPages) {
       currentPage.value = page;
       fetchData(isRefresh: false);
     }
@@ -233,83 +208,92 @@ class PackingController extends GetxController {
   Future<void> getPackingDetail(String id) async {
     isDetailLoading.value = true;
     detailError.value = "";
-    packingDetail.value = null;
-    updateDetailStatus();
-
     try {
       final response = await ApiHandler.getRequest("${ApiEndPoint.packingDetail}$id");
       final data = json.decode(response.data);
-
       if (response.statusCode == 200 && data['status'] == 200) {
-        PackingDetailResponseModel res = PackingDetailResponseModel.fromJson(data);
-        packingDetail.value = res.data;
+        packingDetail.value = PackingDetailData.fromJson(data['data']);
         updateDetailStatus();
       } else {
         detailError.value = data['message'] ?? "Failed to load details";
       }
     } catch (e) {
-      debugPrint("Error fetching packing detail: $e");
-      detailError.value = "Something went wrong";
+      detailError.value = e.toString();
     } finally {
       isDetailLoading.value = false;
     }
   }
 
   void updateDetailStatus() {
-    final item = packingDetail.value;
-    if (item == null) {
-      detailStatusLabel.value = "-";
-      detailStatusColor.value = AppColors.gray500;
-      return;
+    if (packingDetail.value != null) {
+      detailStatusLabel.value = getStatusLabel(packingDetail.value!.status);
+      detailStatusColor.value = getBadgeColor(packingDetail.value!.status, detailStatusLabel.value);
     }
-    detailStatusLabel.value = getStatusLabel(item);
-    detailStatusColor.value = getBadgeColor(item, detailStatusLabel.value);
   }
 
   String getStatusLabel(dynamic item) {
-    final status = (item.status ?? "").trim().toUpperCase();
-
-    // Check dispatch_status first
-    if (item.dispatchStatus != null && item.dispatchStatus.toString().toUpperCase() != "DRAFT") {
-      return formatStatus(item.dispatchStatus.toString());
+    if (item is PackingList) {
+      if (item.status?.toUpperCase() == "DRAFT") {
+        return "Start Packing";
+      }
+      return getStatusLabel(item.status);
+    }
+    String status = "";
+    if (item is String) {
+      status = item;
+    } else if (item != null) {
+      status = item.toString();
     }
 
-    if (status == "INVOICED") {
-      return (item.isRegularInvoiceApproved == true) ? "Ready For Dispatch" : "Invoiced";
+    switch (status.toUpperCase()) {
+      case "NEW":
+        return "New Order";
+      case "PACKING":
+      case "PACKED":
+      case "IN_PACKING":
+        return "In Packing";
+      case "INVOICED":
+        return "Invoiced";
+      case "REJECTED":
+        return "Rejected";
+      case "COMPLETED":
+        return "Completed";
+      case "PENDING":
+        return "Pending";
+      case "CANCELLED":
+        return "Cancelled";
+      case "DRAFT":
+        return "Start Packing";
+      default:
+        return status.isNotEmpty ? status : "-";
     }
-
-    if (status == "PACKED") {
-      final hasLrNo = item.lrNo != null && item.lrNo.toString().trim().isNotEmpty;
-      final hasTransportMode = item.transportMode != null && item.transportMode.toString().trim().isNotEmpty;
-      return (hasLrNo && hasTransportMode) ? "Packed" : "In packing";
-    }
-
-    return status.isNotEmpty ? formatStatus(status) : "-";
   }
 
   Color getBadgeColor(dynamic item, String label) {
-    if (label == "In packing" || label == "Ready For Dispatch") {
-      return AppColors.orangeColor;
+    if (item is PackingList) {
+      return getBadgeColor(item.status, label);
     }
-    if (label.startsWith("Ready")) {
-      return AppColors.blue500;
-    }
-    if (label.startsWith("Dispatched") || label.startsWith("Delivered")) {
-      return AppColors.green500Normal;
+    String status = "";
+    if (item is String) {
+      status = item;
+    } else if (item != null) {
+      status = item.toString();
     }
 
-    final status = (item.status ?? "").trim().toUpperCase();
-    switch (status) {
-      case "DRAFT":
-        return AppColors.gray500;
-      case "PACKING":
-        return AppColors.orangeColor;
-      case "PACKED":
-        return AppColors.green500Normal;
-      case "REJECTED":
-        return AppColors.red500;
-      case "INVOICED":
+    switch (status.toUpperCase()) {
+      case "NEW":
         return AppColors.indigo600Main;
+      case "PACKING":
+      case "PACKED":
+      case "IN PACKING":
+      case "IN_PACKING":
+      case "DRAFT":
+        return AppColors.orangeColor;
+      case "COMPLETED":
+        return AppColors.green500Success;
+      case "INVOICED":
+        return AppColors.blue500;
+      case "REJECTED":
       case "CANCELLED":
         return AppColors.red500;
       default:
@@ -318,14 +302,14 @@ class PackingController extends GetxController {
   }
 
   String formatStatus(String str) {
+    if (str.isEmpty) return "-";
     return str
-        .toLowerCase()
-        .replaceAll('_', ' ')
-        .replaceAll('-', ' ')
-        .split(' ')
-        .map((word) => word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1)}' : '')
-        .join(' ')
-        .trim();
+        .split('_')
+        .map((word) {
+          if (word.isEmpty) return "";
+          return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        })
+        .join(' ');
   }
 
   Future<void> getPackingListDetail(String id) async {
@@ -346,9 +330,9 @@ class PackingController extends GetxController {
           await fetchPhysicalBoxStatus(id);
 
           // If no physical boxes saved, then show AI suggestions
-          if (boxConfigs.isEmpty) {
-            await autoFillWithAI(res.data!);
-          }
+          // if (boxConfigs.isEmpty) {
+          await autoFillWithAI(res.data!);
+          // }
         }
       } else {
         listDetailError.value = data['message'] ?? "Failed to load details";
@@ -371,7 +355,8 @@ class PackingController extends GetxController {
         final physicalBoxData = PhysicalBoxStatusResponse.fromJson(data).data;
         if (physicalBoxData != null) {
           if (physicalBoxData.configs != null) {
-            boxConfigs.value = physicalBoxData.configs!.map((config) => _mapConfigToBoxConfig(config)).toList();
+            final rawConfigs = physicalBoxData.configs!.map((config) => _mapConfigToBoxConfig(config)).toList();
+            boxConfigs.value = _groupConfigs(rawConfigs);
           }
           if (physicalBoxData.productSummary != null) {
             productSummary.value = physicalBoxData.productSummary!;
@@ -384,12 +369,20 @@ class PackingController extends GetxController {
   }
 
   BoxConfiguration _mapConfigToBoxConfig(Config config) {
+    int from = config.boxRangeStart ?? config.rangeStart ?? 0;
+    int to = config.boxRangeEnd ?? config.rangeEnd ?? 0;
+
+    // If to is 0 but boxCount is set, try to calculate to
+    if (to == 0 && from != 0 && config.boxCount != null && config.boxCount! > 0) {
+      to = from + config.boxCount! - 1;
+    }
+
     return BoxConfiguration(
       id: config.id ?? "",
-      boxName: "Box ${config.boxRangeStart}${config.boxRangeStart != config.boxRangeEnd ? "-${config.boxRangeEnd}" : ""}",
+      boxName: "Box $from${from != to ? "-$to" : ""}",
       weight: double.tryParse(config.grossWeight ?? "0") ?? 0.0,
-      fromBox: config.boxRangeStart ?? 0,
-      toBox: config.boxRangeEnd ?? 0,
+      fromBox: from,
+      toBox: to,
       length: config.length ?? 0.0,
       width: config.width ?? 0.0,
       height: config.height ?? 0.0,
@@ -402,60 +395,69 @@ class PackingController extends GetxController {
         return BoxConfigItem(
           productId: item.productId ?? "",
           productName: item.productName ?? "Product",
-          qty: item.qtyPerBox ?? item.quantityPerBox ?? 0,
+          qty: item.quantityPerBox ?? item.qtyPerBox ?? 0,
         );
       }).toList(),
     );
   }
 
-  Future<void> createPackingFromPicking({required String pickingId, required bool isShrinkWrapped, String? remarks}) async {
+  Future<void> createPackingFromPicking({
+    required String pickingId,
+    required bool isShrinkWrapped,
+    String? remarks,
+    String? transportMode,
+    String? vendorId,
+    String? transporterName,
+  }) async {
     isLoading.value = true;
     try {
       final body = {
         "picking_id": pickingId,
         "is_shrink_wrapped": isShrinkWrapped,
         "remarks": remarks ?? "",
-        "location_id": Pref.getLocationId(),
+        "transport_mode": transportMode ?? "",
+        "transporter_id": vendorId ?? "",
+        "transporter_name": transporterName ?? "",
         "company_id": Pref.getCompanyId(),
         "fin_year": Pref.getFinancialYears(),
+        "location_id": Pref.getLocationId(),
       };
 
       final response = await ApiHandler.postRequest(url: ApiEndPoint.createFromPicking, body: body);
-
       final data = response.data;
-      if (response.statusCode == 200 && data['status'] == 200) {
-        Get.snackbar("Success", "Packing created successfully", backgroundColor: Colors.green, colorText: Colors.white);
-        fetchData(); // Refresh list
-        getPackingCounts(); // Refresh counts
+      if (response.statusCode == 201 && data['status'] == 201) {
+        toastMessage(text: data['message'] ?? "Packing created successfully", color: Colors.green);
+        Get.back();
+        fetchData();
       } else {
-        Get.snackbar("Error", data['message'] ?? "Failed to create packing", backgroundColor: Colors.red, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "Failed to create packing", color: Colors.red);
       }
     } catch (e) {
       debugPrint("Error creating packing: $e");
-      Get.snackbar("Error", "Something went wrong", backgroundColor: Colors.red, colorText: Colors.white);
+      toastMessage(text: "Something went wrong", color: Colors.red);
     } finally {
       isLoading.value = false;
     }
   }
 
-  Future<void> startPacking(String id, {String? remarks}) async {
+  Future<bool> startPacking(String id) async {
     isLoading.value = true;
     try {
-      final response = await ApiHandler.postRequest(
-        url: ApiEndPoint.startPacking,
-        body: {"picking_id": id, if (remarks != null && remarks.isNotEmpty) "remarks": remarks},
-      );
+      final body = {"picking_id": id, "company_id": Pref.getCompanyId(), "fin_year": Pref.getFinancialYears(), "location_id": Pref.getLocationId()};
+      final response = await ApiHandler.postRequest(url: ApiEndPoint.startPacking, body: body);
       final data = response.data;
-      if (response.statusCode == 200 && data['status'] == 200) {
-        Get.snackbar("Success", "Packing started successfully", backgroundColor: Colors.green, colorText: Colors.white);
-        getPackingDetail(id); // Refresh detail
-        getPackingCounts(); // Refresh counts
+      if (response.statusCode == 201 && data['status'] == 201) {
+        toastMessage(text: data['message'] ?? "Packing started", color: Colors.green);
+        fetchData();
+        return true;
       } else {
-        Get.snackbar("Error", data['message'] ?? "Failed to start packing", backgroundColor: Colors.red, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "Failed to start packing", color: Colors.red);
+        return false;
       }
     } catch (e) {
       debugPrint("Error starting packing: $e");
-      Get.snackbar("Error", "Something went wrong", backgroundColor: Colors.red, colorText: Colors.white);
+      toastMessage(text: "Something went wrong", color: Colors.red);
+      return false;
     } finally {
       isLoading.value = false;
     }
@@ -464,70 +466,81 @@ class PackingController extends GetxController {
   Future<void> updatePackedQty(String pickingId, String itemId, String packedQty) async {
     isLoading.value = true;
     try {
-      final response = await ApiHandler.postRequest(
-        url: ApiEndPoint.updatePackedQty,
-        body: {
-          "picking_id": pickingId,
-          "items": [
-            {"picking_item_id": itemId, "packed_qty": packedQty},
-          ],
-        },
-      );
+      final body = {
+        "packing_id": pickingId,
+        "item_id": itemId,
+        "packed_qty": packedQty,
+        "company_id": Pref.getCompanyId(),
+        "fin_year": Pref.getFinancialYears(),
+        "location_id": Pref.getLocationId(),
+      };
+      final response = await ApiHandler.patchRequest(url: ApiEndPoint.updatePackedQty, body: body);
       final data = response.data;
       if (response.statusCode == 200 && data['status'] == 200) {
         getPackingDetail(pickingId);
       } else {
-        Get.snackbar("Error", data['message'] ?? "Failed to update quantity", backgroundColor: Colors.red, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "Failed to update quantity", color: Colors.red);
       }
     } catch (e) {
-      debugPrint("Error updating packed quantity: $e");
+      debugPrint("Error updating quantity: $e");
+      toastMessage(text: "Something went wrong", color: Colors.red);
     } finally {
       isLoading.value = false;
     }
   }
 
   Future<void> completePacking(String id) async {
-    // Check for partial packing
-    if (packingDetail.value != null) {
-      bool isPartiallyPacked = false;
-      for (var item in packingDetail.value!.items ?? []) {
-        double picked = double.tryParse(item.pickedQty ?? "0") ?? 0;
+    // Check if everything is packed
+    bool isPartial = false;
+    if (packingDetail.value != null && packingDetail.value!.items != null) {
+      for (var item in packingDetail.value!.items!) {
+        double ordered = double.tryParse(item.pickedQty ?? "0") ?? 0;
         double packed = double.tryParse(item.packedQty ?? "0") ?? 0;
-        if (packed < picked) {
-          isPartiallyPacked = true;
+        if (packed < ordered) {
+          isPartial = true;
           break;
         }
       }
-
-      if (isPartiallyPacked) {
-        bool? confirm = await Get.dialog<bool>(
-          AlertDialog(
-            title: const Text("Partial Packing"),
-            content: const Text("Some items are not fully packed. Do you want to complete packing anyway?"),
-            actions: [
-              TextButton(onPressed: () => Get.back(result: false), child: const Text("CANCEL")),
-              TextButton(onPressed: () => Get.back(result: true), child: const Text("COMPLETE")),
-            ],
-          ),
-        );
-        if (confirm != true) return;
-      }
     }
 
+    if (isPartial) {
+      Get.dialog(
+        AlertDialog(
+          title: const Text("Partial Packing"),
+          content: const Text("Some items are not fully packed. Do you want to complete packing anyway?"),
+          actions: [
+            TextButton(onPressed: () => Get.back(), child: const Text("CANCEL")),
+            TextButton(
+              onPressed: () {
+                Get.back();
+                _executeCompletePacking(id);
+              },
+              child: const Text("COMPLETE"),
+            ),
+          ],
+        ),
+      );
+    } else {
+      _executeCompletePacking(id);
+    }
+  }
+
+  Future<void> _executeCompletePacking(String id) async {
     isLoading.value = true;
     try {
-      final response = await ApiHandler.postRequest(url: ApiEndPoint.completePacking, body: {"picking_id": id});
+      final body = {"packing_id": id, "company_id": Pref.getCompanyId(), "fin_year": Pref.getFinancialYears(), "location_id": Pref.getLocationId()};
+      final response = await ApiHandler.patchRequest(url: ApiEndPoint.completePacking, body: body);
       final data = response.data;
       if (response.statusCode == 200 && data['status'] == 200) {
-        Get.snackbar("Success", "Packing completed successfully", backgroundColor: Colors.green, colorText: Colors.white);
-        Navigator.of(Get.context!).pop();
+        toastMessage(text: data['message'] ?? "Packing completed successfully", color: Colors.green);
+        Get.back();
         fetchData();
-        getPackingCounts();
       } else {
-        Get.snackbar("Error", data['message'] ?? "Failed to complete packing", backgroundColor: Colors.red, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "Failed to complete packing", color: Colors.red);
       }
     } catch (e) {
       debugPrint("Error completing packing: $e");
+      toastMessage(text: "Something went wrong", color: Colors.red);
     } finally {
       isLoading.value = false;
     }
@@ -536,22 +549,46 @@ class PackingController extends GetxController {
   Future<void> rejectPacking(String id, {String? reason}) async {
     isLoading.value = true;
     try {
-      final response = await ApiHandler.postRequest(
-        url: "${ApiEndPoint.packingReject}$id",
-        body: {if (reason != null && reason.isNotEmpty) "rejection_reason": reason},
-      );
+      final body = {
+        "rejection_reason": reason ?? "Rejected from mobile app",
+        "company_id": Pref.getCompanyId(),
+        "fin_year": Pref.getFinancialYears(),
+        "location_id": Pref.getLocationId(),
+      };
+      final response = await ApiHandler.patchRequest(url: "${ApiEndPoint.packingReject}$id", body: body);
       final data = response.data;
-
       if (response.statusCode == 200 && data['status'] == 200) {
-        Get.snackbar("Success", "Packing rejected successfully", backgroundColor: Colors.green, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "Packing rejected", color: Colors.green);
+        Get.back();
         fetchData();
-        getPackingCounts();
       } else {
-        Get.snackbar("Error", data['message'] ?? "Failed to reject packing", backgroundColor: Colors.red, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "Failed to reject packing", color: Colors.red);
       }
     } catch (e) {
       debugPrint("Error rejecting packing: $e");
-      Get.snackbar("Error", "Something went wrong", backgroundColor: Colors.red, colorText: Colors.white);
+      toastMessage(text: "Something went wrong", color: Colors.red);
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> deletePacking(String id) async {
+    isLoading.value = true;
+    try {
+      final response = await ApiHandler.deleteRequest("${ApiEndPoint.deletePacking}$id");
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && data['status'] == 200) {
+        toastMessage(text: data['message'] ?? "Packing deleted", color: Colors.green);
+        if (Get.currentRoute == AppRoutes.packingDetailScreen) {
+          Get.back();
+        }
+        fetchData();
+      } else {
+        toastMessage(text: data['message'] ?? "Failed to delete packing", color: Colors.red);
+      }
+    } catch (e) {
+      debugPrint("Error deleting packing: $e");
+      toastMessage(text: "Something went wrong", color: Colors.red);
     } finally {
       isLoading.value = false;
     }
@@ -562,142 +599,113 @@ class PackingController extends GetxController {
     try {
       final response = await ApiHandler.postRequest(url: ApiEndPoint.requestInvoice, body: {"packing_id": id, "flow_type": "regular"});
       final data = response.data;
-      if (response.statusCode == 200 && data['status'] == 200) {
-        Get.snackbar("Success", data['message'] ?? "Invoice requested successfully", backgroundColor: Colors.green, colorText: Colors.white);
+      if (response.statusCode == 201 && data['status'] == 201) {
+        toastMessage(text: data['message'] ?? "Invoice requested successfully", color: Colors.green);
         fetchData();
-        Navigator.of(Get.context!).pop(); // Close detail screen if open
       } else {
-        Get.snackbar("Error", data['message'] ?? "Failed to request invoice", backgroundColor: Colors.red, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "Failed to request invoice", color: Colors.red);
       }
     } catch (e) {
       debugPrint("Error requesting invoice: $e");
-      Get.snackbar("Error", "Something went wrong", backgroundColor: Colors.red, colorText: Colors.white);
+      toastMessage(text: "Something went wrong", color: Colors.red);
     } finally {
       isLoading.value = false;
     }
   }
 
   Future<void> postLogNote() async {
-    if (logNoteController.text.trim().isEmpty) {
-      toastMessage(text: "Please enter log details");
+    if (logNoteController.text.isEmpty) {
+      toastMessage(text: "Please enter some notes", color: Colors.red);
       return;
     }
 
-    final detail = packingDetail.value;
-    if (detail == null) return;
-
     isLoading.value = true;
     try {
-      List<String> attachmentUrls = [];
-
-      // 1. Upload files if any
-      for (var file in selectedLogFiles) {
-        final response = await ApiHandler.uploadFile(file, folderName: 'logs');
-        if (response.statusCode == 200) {
-          final data = response.data;
-          if (data['status'] == 200 && data['data'] != null) {
-            attachmentUrls.add(data['data']);
-          }
-        }
-      }
-
-      // 2. Create Log
       final body = {
-        "entity_type": "PackingList",
-        "entity_id": detail.id,
-        "parent_type": "PickingList",
-        "parent_id": detail.pickingId,
-        "root_type": "Quotation",
-        "root_id": detail.picking?.pickRequestId ?? detail.pickRequestId,
-        "notes": logNoteController.text.trim(),
-        "log_type": "user",
-        "metadata": reminderDate.value != null ? {"reminder_date": reminderDate.value!.toIso8601String()} : {},
-        "attachment_url": attachmentUrls,
+        "notes": logNoteController.text,
+        "entity_id": packingDetail.value?.id,
+        "entity_type": "packing_list",
+        "reminder_date": reminderDate.value?.toIso8601String(),
+        "company_id": Pref.getCompanyId(),
+        "fin_year": Pref.getFinancialYears(),
+        "location_id": Pref.getLocationId(),
       };
-
-      if (detail.invoice?.quotationId != null) {
-        body["root_type"] = "Quotation";
-        body["root_id"] = detail.invoice!.quotationId;
-      } else if (detail.invoice?.opportunityId != null) {
-        body["root_type"] = "Opportunity";
-        body["root_id"] = detail.invoice!.opportunityId;
-      }
 
       final response = await ApiHandler.postRequest(url: ApiEndPoint.addLog, body: body);
       final data = response.data;
-
       if (response.statusCode == 200 && data['status'] == 200) {
-        toastMessage(text: "Log posted successfully", color: AppColors.green500Success);
-        isLogNoteOpen.value = false;
+        toastMessage(text: "Log note added successfully", color: Colors.green);
         logNoteController.clear();
         reminderDate.value = null;
-        selectedLogFiles.clear();
-        getPackingDetail(detail.id!); // Refresh timeline
+        isLogNoteOpen.value = false;
+        getPackingDetail(packingDetail.value!.id!);
       } else {
-        toastMessage(text: data['message'] ?? "Failed to post log", color: AppColors.red500);
+        toastMessage(text: data['message'] ?? "Failed to add log note", color: Colors.red);
       }
     } catch (e) {
-      debugPrint("Error posting log: $e");
-      toastMessage(text: "Something went wrong", color: AppColors.red500);
+      debugPrint("Error adding log note: $e");
+      toastMessage(text: "Something went wrong", color: Colors.red);
     } finally {
       isLoading.value = false;
     }
   }
 
   Future<void> requestForEWayBill(String id) async {
+    if (selectedTransportMode.value == null) {
+      toastMessage(text: "Please select transport mode", color: Colors.red);
+      return;
+    }
+
     isLoading.value = true;
     try {
       final body = {
-        "picking_id": id,
-        "transport_mode": selectedTransportMode.value?.id,
-        "vendor_id": selectedVendorId.value?.id,
+        "packing_id": id,
+        "is_required_ewaybill": true,
+        "transporter_id": selectedVendorId.value?.id,
         "transporter_gstin": transporterGstinController.text,
         "vehicle_no": vehicleNoController.text,
-        "lr_awb_no": lrAwbController.text,
-        "eway_bill_no": eWayBillNoController.text,
+        "transport_mode": selectedTransportMode.value?.name,
+        "transporter_name": selectedVendorId.value?.name,
         "driver_name": driverNameController.text,
         "driver_contact": driverContactController.text,
+        "lr_no": lrAwbController.text,
+        "eway_bill_no": eWayBillNoController.text,
         "remarks": remarksController.text,
       };
-      final response = await ApiHandler.postRequest(url: ApiEndPoint.requestEWayBill, body: body);
+
+      final response = await ApiHandler.patchRequest(url: ApiEndPoint.updateEWayBill, body: body);
       final data = response.data;
       if (response.statusCode == 200 && data['status'] == 200) {
-        Get.snackbar("Success", "E-Way Bill requested successfully", backgroundColor: Colors.green, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "E-Way Bill details updated successfully", color: Colors.green);
+        Get.back();
+        getPackingDetail(id);
         fetchData();
-        Navigator.of(Get.context!).pop(); // Close bottom sheet
       } else {
-        Get.snackbar("Error", data['message'] ?? "Failed to request E-Way Bill", backgroundColor: Colors.red, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "Failed to update E-Way Bill details", color: Colors.red);
       }
     } catch (e) {
-      debugPrint("Error requesting E-Way Bill: $e");
-      Get.snackbar("Error", "Something went wrong", backgroundColor: Colors.red, colorText: Colors.white);
+      debugPrint("Error updating E-Way Bill: $e");
+      toastMessage(text: "Something went wrong", color: Colors.red);
     } finally {
       isLoading.value = false;
     }
   }
 
   Future<void> fetchEWayBillRequiredData() async {
-    if (transportModes.isNotEmpty && vendors.isNotEmpty) return;
-
     try {
-      final transportModesFuture = ApiHandler.getRequest(ApiEndPoint.transportMode);
-      final vendorsFuture = ApiHandler.getRequest(ApiEndPoint.transporters);
+      final responses = await Future.wait([ApiHandler.getRequest(ApiEndPoint.transportMode), ApiHandler.getRequest(ApiEndPoint.transporters)]);
 
-      final responses = await Future.wait([transportModesFuture, vendorsFuture]);
-
-      if (responses[0].statusCode == 200) {
-        TransportModeResponseModel transportModeResponseModel = transportModeResponseModelFromJson(responses[0].data);
-        if (transportModeResponseModel.status == 200 && (transportModeResponseModel.data?.isNotEmpty ?? false)) {
-          transportModes.value = transportModeResponseModel.data!.first.items ?? [];
-        }
+      final modeData = json.decode(responses[0].data);
+      if (responses[0].statusCode == 200 && modeData['status'] == 200) {
+        transportModes.assignAll(TransportModeResponseModel.fromJson(modeData).data?.expand((m) => m.items ?? <Item>[]).toList() ?? <Item>[]);
       }
 
-      if (responses[1].statusCode == 200) {
-        VendorResponce vendorResponse = vendorResponceFromJson(responses[1].data);
-        vendors.value = vendorResponse.data ?? [];
+      final vendorData = json.decode(responses[1].data);
+      if (responses[1].statusCode == 200 && vendorData['status'] == 200) {
+        vendors.assignAll(VendorResponce.fromJson(vendorData).data ?? <Vendor>[]);
       }
     } catch (e) {
-      debugPrint("Error fetching E-Way Bill data: $e");
+      debugPrint("Error fetching E-Way Bill required data: $e");
     }
   }
 
@@ -714,35 +722,35 @@ class PackingController extends GetxController {
   }
 
   Future<void> viewPackingList(String id) async {
-    final url = Uri.parse("${ApiEndPoint.viewPackingList}$id");
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      Get.snackbar("Error", "Could not launch PDF viewer", backgroundColor: Colors.red, colorText: Colors.white);
+    final url = "${ApiEndPoint.viewPackingList}$id?company_id=${Pref.getCompanyId()}&location_id=${Pref.getLocationId()}";
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } else {
+      toastMessage(text: "Could not launch packing list", color: Colors.red);
     }
   }
 
   Future<void> viewBoxWisePackingList(String packingId) async {
+    isLoading.value = true;
     try {
-      isLoading.value = true;
-      Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
       final response = await ApiHandler.getRequest(
         "${ApiEndPoint.packingPhysicalBoxStatus}?packing_id=$packingId&location_id=${Pref.getLocationId()}&company_id=${Pref.getCompanyId()}",
       );
+
       final data = json.decode(response.data);
       if (response.statusCode == 200 && data['status'] == 200) {
         final physicalBoxData = PhysicalBoxStatusResponse.fromJson(data).data;
         if (physicalBoxData != null) {
           await _generateAndSaveBoxWisePdf(physicalBoxData);
         } else {
-          if (Get.isDialogOpen ?? false) Navigator.of(Get.context!).pop();
+          toastMessage(text: "No box data found", color: Colors.red);
         }
       } else {
-        if (Get.isDialogOpen ?? false) Navigator.of(Get.context!).pop();
-        Get.snackbar("Error", data['message'] ?? "Failed to fetch physical box status", backgroundColor: Colors.red, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "Failed to fetch box details", color: Colors.red);
       }
     } catch (e) {
-      if (Get.isDialogOpen ?? false) Navigator.of(Get.context!).pop();
-      debugPrint("Error fetching physical box status: $e");
-      Get.snackbar("Error", "Something went wrong", backgroundColor: Colors.red, colorText: Colors.white);
+      debugPrint("Error fetching box details: $e");
+      toastMessage(text: "Something went wrong", color: Colors.red);
     } finally {
       isLoading.value = false;
     }
@@ -750,9 +758,6 @@ class PackingController extends GetxController {
 
   Future<void> _generateAndSaveBoxWisePdf(PhysicalBoxData data) async {
     final pdf = pw.Document();
-    final ByteData logoData = await rootBundle.load('assets/icon/dolphy_logo.png');
-    final Uint8List logoBytes = logoData.buffer.asUint8List();
-    final pw.MemoryImage logoImage = pw.MemoryImage(logoBytes);
 
     pdf.addPage(
       pw.MultiPage(
@@ -760,131 +765,70 @@ class PackingController extends GetxController {
         margin: const pw.EdgeInsets.all(32),
         build: (pw.Context context) {
           return [
-            pw.Container(
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.black, width: 1)),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
+            pw.Header(
+              level: 0,
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  // Header
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.all(8),
-                    child: pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      children: [
-                        pw.Image(logoImage, width: 100),
-                        pw.Expanded(
-                          child: pw.Center(
-                            child: pw.Text("PACKING LIST (BOX WISE)", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-                          ),
-                        ),
-                        pw.SizedBox(width: 100), // To balance the logo
-                      ],
-                    ),
-                  ),
-                  pw.Divider(height: 1, color: PdfColors.black),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      children: [
-                        pw.Text(
-                          "DATE: ${DateFormat('dd/MM/yyyy').format(DateTime.now())}",
-                          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
-                        ),
-                        pw.Text("Packing No : ${data.packingNo ?? '-'}", style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                  pw.Divider(height: 1, color: PdfColors.black),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: pw.Text("PI Number : ${data.piNumber ?? '-'}", style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                  ),
-                  pw.Divider(height: 1, color: PdfColors.black),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: pw.Text(
-                      "Client Name : ${data.customerName?.toUpperCase() ?? '-'}",
-                      style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
-                    ),
-                  ),
-                  pw.Divider(height: 1, color: PdfColors.black),
-                  // Table
-                  pw.Table(
-                    border: const pw.TableBorder(
-                      verticalInside: pw.BorderSide(color: PdfColors.black, width: 1),
-                      horizontalInside: pw.BorderSide(color: PdfColors.black, width: 1),
-                      bottom: pw.BorderSide(color: PdfColors.black, width: 1),
-                    ),
-                    columnWidths: {
-                      0: const pw.FixedColumnWidth(60),
-                      1: const pw.FixedColumnWidth(80),
-                      2: const pw.FlexColumnWidth(),
-                      3: const pw.FixedColumnWidth(60),
-                      4: const pw.FixedColumnWidth(60),
-                      5: const pw.FixedColumnWidth(60),
-                    },
-                    children: [
-                      // Table Header
-                      pw.TableRow(
-                        decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-                        children: [
-                          _buildTableCell("BOX NO", isHeader: true),
-                          _buildTableCell("ITEM CODE", isHeader: true),
-                          _buildTableCell("PRODUCT", isHeader: true),
-                          _buildTableCell("QTY/BOX", isHeader: true),
-                          _buildTableCell("TOTAL QTY", isHeader: true),
-                          _buildTableCell("BOXES", isHeader: true),
-                        ],
-                      ),
-                      // Table Data
-                      ..._buildTableRows(data),
-                      // Total Row
-                      pw.TableRow(
-                        children: [
-                          pw.SizedBox(),
-                          pw.SizedBox(),
-                          pw.Container(
-                            alignment: pw.Alignment.center,
-                            padding: const pw.EdgeInsets.all(4),
-                            child: pw.Text("TOTAL", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-                          ),
-                          _buildTableCell("-", isHeader: true),
-                          _buildTableCell("${_calculateTotalQty(data)}", isHeader: true),
-                          _buildTableCell("${_calculateTotalBoxes(data)}", isHeader: true),
-                        ],
-                      ),
-                    ],
-                  ),
-                  pw.SizedBox(height: 40),
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.only(left: 16, bottom: 16),
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Container(
-                          width: 120,
-                          decoration: pw.BoxDecoration(
-                            border: const pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 1)),
-                          ),
-                        ),
-                        pw.SizedBox(height: 4),
-                        pw.Text("CHECK BY", style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                      ],
-                    ),
-                  ),
+                  pw.Text("BOX WISE PACKING LIST", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18)),
+                  pw.Text("Date: ${DateFormat('dd-MM-yyyy').format(DateTime.now())}"),
                 ],
               ),
+            ),
+            pw.SizedBox(height: 20),
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text("Packing No: ${data.packingNo ?? "-"}", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text("Customer: ${data.customerName ?? "-"}"),
+                      pw.Text("PI No: ${data.piNumber ?? "-"}"),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 20),
+            pw.Table(
+              border: pw.TableBorder.all(),
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                  children: [
+                    _buildTableCell("Box No", isHeader: true),
+                    _buildTableCell("Dimensions (L x W x H)", isHeader: true),
+                    _buildTableCell("Gross Wt", isHeader: true),
+                    _buildTableCell("Product Details", isHeader: true),
+                    _buildTableCell("Qty", isHeader: true),
+                  ],
+                ),
+                ..._buildTableRows(data),
+              ],
+            ),
+            pw.SizedBox(height: 30),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.end,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text("Total Qty: ${_calculateTotalQty(data)}", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    pw.Text("Total Boxes: ${_calculateTotalBoxes(data)}", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  ],
+                ),
+              ],
             ),
           ];
         },
       ),
     );
 
-    // Save and View PDF
     try {
       final Uint8List bytes = await pdf.save();
-      String fileName = "PackingList_BoxWise_${data.packingNo?.replaceAll('/', '_')}.pdf";
+      String fileName = "BoxWisePackingList_${data.packingNo?.replaceAll('/', '_')}.pdf";
 
       Directory? directory;
       if (Platform.isAndroid) {
@@ -902,53 +846,49 @@ class PackingController extends GetxController {
       final File file = File("$dolphyPath/$fileName");
       await file.writeAsBytes(bytes);
 
-      if (Get.isDialogOpen ?? false) Navigator.of(Get.context!).pop();
-
       await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => bytes);
 
-      Get.snackbar("Success", "PDF saved in Dolphy folder", backgroundColor: Colors.green, colorText: Colors.white);
+      toastMessage(text: "PDF saved in Dolphy folder", color: Colors.green);
     } catch (e) {
       debugPrint("Error saving PDF: $e");
-      Get.snackbar("Error", "Could not save PDF", backgroundColor: Colors.red, colorText: Colors.white);
+      toastMessage(text: "Could not save PDF", color: Colors.red);
     }
   }
 
   pw.Widget _buildTableCell(String text, {bool isHeader = false}) {
-    return pw.Container(
-      alignment: pw.Alignment.center,
-      padding: const pw.EdgeInsets.all(4),
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(5),
       child: pw.Text(
         text,
+        style: pw.TextStyle(fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal, fontSize: 10),
         textAlign: pw.TextAlign.center,
-        style: pw.TextStyle(fontSize: 9, fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal),
       ),
     );
   }
 
   List<pw.TableRow> _buildTableRows(PhysicalBoxData data) {
     List<pw.TableRow> rows = [];
-    if (data.configs == null) return rows;
+    if (data.configs != null) {
+      for (var config in data.configs!) {
+        final boxRange = config.boxRangeStart != config.boxRangeEnd ? "${config.boxRangeStart} - ${config.boxRangeEnd}" : "${config.boxRangeStart}";
 
-    for (var config in data.configs!) {
-      if (config.items == null) continue;
+        final dims = "${config.length} x ${config.width} x ${config.height} ${config.dimensionUom}";
 
-      String boxRange = config.boxRangeStart == config.boxRangeEnd ? "${config.boxRangeStart}" : "${config.boxRangeStart}-${config.boxRangeEnd}";
+        String productDetails = "";
+        String qtyDetails = "";
+        if (config.items != null) {
+          productDetails = config.items!.map((i) => "${i.productCode}\n${i.productName}").join("\n\n");
+          qtyDetails = config.items!.map((i) => "${i.quantityPerBox ?? i.qtyPerBox}").join("\n\n");
+        }
 
-      for (int i = 0; i < config.items!.length; i++) {
-        var item = config.items![i];
         rows.add(
           pw.TableRow(
             children: [
-              i == 0 ? _buildTableCell(boxRange) : pw.SizedBox(),
-              _buildTableCell(item.productCode ?? "-"),
-              pw.Container(
-                alignment: pw.Alignment.centerLeft,
-                padding: const pw.EdgeInsets.all(4),
-                child: pw.Text(item.productName ?? "-", style: const pw.TextStyle(fontSize: 9)),
-              ),
-              _buildTableCell("${item.qtyPerBox ?? 0}"),
-              _buildTableCell("${item.totalQty ?? 0}"),
-              i == 0 ? _buildTableCell("${config.boxCount ?? 0}") : pw.SizedBox(),
+              _buildTableCell(boxRange),
+              _buildTableCell(dims),
+              _buildTableCell("${config.grossWeight} ${config.weightUom}"),
+              _buildTableCell(productDetails),
+              _buildTableCell(qtyDetails),
             ],
           ),
         );
@@ -961,9 +901,10 @@ class PackingController extends GetxController {
     int total = 0;
     if (data.configs != null) {
       for (var config in data.configs!) {
+        int boxes = (config.boxRangeEnd ?? 0) - (config.boxRangeStart ?? 0) + 1;
         if (config.items != null) {
           for (var item in config.items!) {
-            total += (item.totalQty ?? 0);
+            total += (item.quantityPerBox ?? item.qtyPerBox ?? 0) * boxes;
           }
         }
       }
@@ -972,38 +913,26 @@ class PackingController extends GetxController {
   }
 
   int _calculateTotalBoxes(PhysicalBoxData data) {
-    int total = 0;
-    if (data.configs != null) {
-      for (var config in data.configs!) {
-        total += (config.boxCount ?? 0);
-      }
-    }
-    return total;
+    if (data.configs == null || data.configs!.isEmpty) return 0;
+    return data.configs!.last.boxRangeEnd ?? 0;
   }
 
   Future<void> printShippingLabel(String id) async {
+    isLoading.value = true;
     try {
-      isLoading.value = true;
-      Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
-      final response = await ApiHandler.getRequest(
-        "${ApiEndPoint.shippingLabel}?packing_id=$id&location_id=${Pref.getLocationId()}&company_id=${Pref.getCompanyId()}",
-      );
+      final response = await ApiHandler.getRequest("${ApiEndPoint.shippingLabel}?packing_id=$id");
       final data = json.decode(response.data);
       if (response.statusCode == 200 && data['status'] == 200) {
-        final labelData = ShippingLabelResponse.fromJson(data).data;
-        if (labelData != null) {
-          await _generateAndSaveShippingLabels(labelData);
-        } else {
-          if (Get.isDialogOpen ?? false) Navigator.of(Get.context!).pop();
+        final shippingLabelData = ShippingLabelResponse.fromJson(data).data;
+        if (shippingLabelData != null) {
+          await _generateAndSaveShippingLabels(shippingLabelData);
         }
       } else {
-        if (Get.isDialogOpen ?? false) Navigator.of(Get.context!).pop();
-        Get.snackbar("Error", data['message'] ?? "Failed to fetch shipping label data", backgroundColor: Colors.red, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "Failed to fetch label data", color: Colors.red);
       }
     } catch (e) {
-      if (Get.isDialogOpen ?? false) Navigator.of(Get.context!).pop();
-      debugPrint("Error fetching shipping label: $e");
-      Get.snackbar("Error", "Something went wrong", backgroundColor: Colors.red, colorText: Colors.white);
+      debugPrint("Error printing label: $e");
+      toastMessage(text: "Something went wrong", color: Colors.red);
     } finally {
       isLoading.value = false;
     }
@@ -1011,70 +940,46 @@ class PackingController extends GetxController {
 
   Future<void> _generateAndSaveShippingLabels(ShippingLabelData data) async {
     final pdf = pw.Document();
-
-    int totalBoxes = data.totalBoxes ?? 1;
+    final int totalBoxes = data.totalBoxes ?? 1;
 
     for (int i = 1; i <= totalBoxes; i++) {
       pdf.addPage(
         pw.Page(
-          pageFormat: PdfPageFormat.a5,
-          orientation: pw.PageOrientation.portrait,
-          margin: const pw.EdgeInsets.all(32),
+          pageFormat: PdfPageFormat.a6,
           build: (pw.Context context) {
             return pw.Container(
-              padding: const pw.EdgeInsets.all(20),
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.black, width: 1)),
+              padding: const pw.EdgeInsets.all(10),
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black)),
+              ),
               child: pw.Stack(
                 children: [
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text("To:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
-                      pw.SizedBox(height: 8),
-                      pw.Text(data.to?.companyName?.toUpperCase() ?? "", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18)),
-                      pw.Text("${data.to?.address ?? ''} - ${data.to?.pincode ?? ''}", style: const pw.TextStyle(fontSize: 16)),
-                      pw.Text(data.to?.city?.toUpperCase() ?? "", style: const pw.TextStyle(fontSize: 16)),
-                      pw.Text("Contact no - ${data.to?.contact ?? ''}", style: const pw.TextStyle(fontSize: 16)),
-                      pw.SizedBox(height: 40),
-                      pw.Text("FROM:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
-                      pw.SizedBox(height: 8),
-                      pw.Text(data.from?.companyName?.toUpperCase() ?? "", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 18)),
-                      if (data.from?.addressLines != null)
-                        ...data.from!.addressLines!.map((line) => pw.Text(line.toUpperCase(), style: const pw.TextStyle(fontSize: 16))),
-                      pw.Text(data.from?.cityCode?.toUpperCase() ?? "", style: const pw.TextStyle(fontSize: 16)),
-                      pw.Text("Mob: ${data.from?.mobile ?? ''}", style: const pw.TextStyle(fontSize: 16)),
-                      pw.SizedBox(height: 40),
-                      pw.Container(
-                        width: double.infinity,
-                        height: 1,
-                        decoration: const pw.BoxDecoration(
-                          border: pw.Border(
-                            bottom: pw.BorderSide(color: PdfColors.black, width: 1, style: pw.BorderStyle.dashed),
-                          ),
-                        ),
+                      pw.Center(
+                        child: pw.Text("SHIPPING LABEL", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
                       ),
+                      pw.Divider(),
+                      pw.Text("FROM:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                      pw.Text(data.from?.companyName ?? "-", style: const pw.TextStyle(fontSize: 12)),
+                      pw.Text(data.from?.addressLines?.join(", ") ?? "-", style: const pw.TextStyle(fontSize: 10)),
                       pw.SizedBox(height: 10),
-                      pw.Text(data.packingNo ?? "", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+                      pw.Text("TO:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                      pw.Text(
+                        data.to?.companyName ?? data.to?.receiverName ?? "-",
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
+                      ),
+                      pw.Text(data.to?.address ?? "-", style: const pw.TextStyle(fontSize: 12)),
                       pw.SizedBox(height: 10),
                       pw.RichText(
                         text: pw.TextSpan(
                           children: [
                             pw.TextSpan(
-                              text: "Transporter: ",
+                              text: "Packing No: ",
                               style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
                             ),
-                            pw.TextSpan(text: data.to?.transporterName ?? "-", style: const pw.TextStyle(fontSize: 14)),
-                          ],
-                        ),
-                      ),
-                      pw.RichText(
-                        text: pw.TextSpan(
-                          children: [
-                            pw.TextSpan(
-                              text: "Receiver Name: ",
-                              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14),
-                            ),
-                            pw.TextSpan(text: data.to?.receiverName ?? "-", style: const pw.TextStyle(fontSize: 14)),
+                            pw.TextSpan(text: data.packingNo ?? "-", style: const pw.TextStyle(fontSize: 14)),
                           ],
                         ),
                       ),
@@ -1125,10 +1030,10 @@ class PackingController extends GetxController {
 
       await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => bytes);
 
-      Get.snackbar("Success", "Labels saved in Dolphy folder", backgroundColor: Colors.green, colorText: Colors.white);
+      toastMessage(text: "Labels saved in Dolphy folder", color: Colors.green);
     } catch (e) {
       debugPrint("Error saving Shipping Labels: $e");
-      Get.snackbar("Error", "Could not save Shipping Labels", backgroundColor: Colors.red, colorText: Colors.white);
+      toastMessage(text: "Could not save Shipping Labels", color: Colors.red);
     }
   }
 
@@ -1144,6 +1049,7 @@ class PackingController extends GetxController {
       if (response.statusCode == 200 && responseData['status'] == 200) {
         final boxSuggestionResponseModel = BoxSuggestionResponseModel.fromJson(responseData);
         if (boxSuggestionResponseModel.success == true && boxSuggestionResponseModel.data != null) {
+          boxSuggestionData.value = boxSuggestionResponseModel.data;
           boxConfigs.clear();
           final items = boxSuggestionResponseModel.data!.items ?? [];
           List<BoxConfiguration> tempConfigs = [];
@@ -1157,18 +1063,35 @@ class PackingController extends GetxController {
             final int basePerBox = perBoxCount > 0 ? perBoxCount : 1;
 
             int remainingQty = packedQty;
-            while (remainingQty > 0) {
-              int qtyForThisBox = remainingQty > basePerBox ? basePerBox : remainingQty;
 
+            // Full boxes
+            int fullBoxesCount = remainingQty ~/ basePerBox;
+            if (fullBoxesCount > 0) {
               tempConfigs.add(
                 BoxConfiguration(
-                  id: item.boxSuggestionItemId ?? "${DateTime.now().millisecondsSinceEpoch}_$boxIndex",
-                  boxName: "Box $boxIndex",
+                  id: "${DateTime.now().millisecondsSinceEpoch}_${boxIndex}_full",
+                  boxName: fullBoxesCount > 1 ? "Boxes $boxIndex - ${boxIndex + fullBoxesCount - 1}" : "Box $boxIndex",
                   weight: 0.0,
-                  items: [BoxConfigItem(productId: item.productId ?? "", productName: item.productName ?? "Product", qty: qtyForThisBox)],
+                  fromBox: boxIndex,
+                  toBox: boxIndex + fullBoxesCount - 1,
+                  items: [BoxConfigItem(productId: item.productId ?? "", productName: item.productName ?? "Product", qty: basePerBox)],
                 ),
               );
-              remainingQty -= qtyForThisBox;
+              boxIndex += fullBoxesCount;
+              remainingQty %= basePerBox;
+            }
+
+            if (remainingQty > 0) {
+              tempConfigs.add(
+                BoxConfiguration(
+                  id: "${DateTime.now().millisecondsSinceEpoch}_${boxIndex}_rem",
+                  boxName: "Box $boxIndex",
+                  weight: 0.0,
+                  fromBox: boxIndex,
+                  toBox: boxIndex,
+                  items: [BoxConfigItem(productId: item.productId ?? "", productName: item.productName ?? "Product", qty: remainingQty)],
+                ),
+              );
               boxIndex++;
             }
           }
@@ -1246,9 +1169,10 @@ class PackingController extends GetxController {
   int getPhysicallyPackedQty(String productId) {
     int sum = 0;
     for (var config in boxConfigs) {
+      final int numBoxes = (config.toBox - config.fromBox + 1).clamp(1, 99999);
       for (var item in config.items) {
         if (item.productId == productId) {
-          sum += item.qty;
+          sum += (item.qty * numBoxes);
         }
       }
     }
@@ -1258,6 +1182,7 @@ class PackingController extends GetxController {
   int getActualBoxesForProduct(String productId) {
     int count = 0;
     for (var config in boxConfigs) {
+      final int numBoxes = (config.toBox - config.fromBox + 1).clamp(1, 99999);
       bool contains = false;
       for (var item in config.items) {
         if (item.productId == productId && item.qty > 0) {
@@ -1265,7 +1190,7 @@ class PackingController extends GetxController {
           break;
         }
       }
-      if (contains) count++;
+      if (contains) count += numBoxes;
     }
     return count;
   }
@@ -1297,6 +1222,7 @@ class PackingController extends GetxController {
         "packing_id": detail.id ?? "",
         "company_id": detail.companyId ?? Pref.getCompanyId(),
         "fin_year": detail.finYear ?? Pref.getFinancialYears(),
+        "location_id": detail.locationId ?? Pref.getLocationId(),
         "items": itemsList,
       };
 
@@ -1345,16 +1271,68 @@ class PackingController extends GetxController {
       final response = await ApiHandler.postRequest(url: ApiEndPoint.requestInvoice, body: {"packing_id": id, "flow_type": "regular"});
       final data = response.data;
       if (response.statusCode == 200 && data['status'] == 200) {
-        Get.snackbar("Success", data['message'] ?? "Invoice requested successfully", backgroundColor: Colors.green, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "Invoice requested successfully", color: Colors.green);
         getPackingDetail(id);
       } else {
-        Get.snackbar("Error", data['message'] ?? "Failed to request invoice", backgroundColor: Colors.red, colorText: Colors.white);
+        toastMessage(text: data['message'] ?? "Failed to request invoice", color: Colors.red);
       }
     } catch (e) {
       debugPrint("Error requesting invoice: $e");
-      Get.snackbar("Error", "Something went wrong", backgroundColor: Colors.red, colorText: Colors.white);
+      toastMessage(text: "Something went wrong", color: Colors.red);
     } finally {
       isLoading.value = false;
     }
+  }
+
+  List<BoxConfiguration> _groupConfigs(List<BoxConfiguration> configs) {
+    if (configs.isEmpty) return [];
+
+    // Sort by fromBox to ensure consecutive checking
+    configs.sort((a, b) => a.fromBox.compareTo(b.fromBox));
+
+    List<BoxConfiguration> grouped = [];
+    BoxConfiguration? current;
+
+    for (var config in configs) {
+      if (current == null) {
+        current = config;
+      } else if (_areConfigsGroupable(current, config)) {
+        current = current.copyWith(toBox: config.toBox, boxName: "Boxes ${current.fromBox} - ${config.toBox}");
+      } else {
+        grouped.add(current);
+        current = config;
+      }
+    }
+    if (current != null) grouped.add(current);
+    return grouped;
+  }
+
+  bool _areConfigsGroupable(BoxConfiguration a, BoxConfiguration b) {
+    // If box numbers are not set or not consecutive, we can't group them into a single range card
+    if (a.fromBox == 0 || b.fromBox == 0) return false;
+    if (a.toBox + 1 != b.fromBox) return false;
+
+    // Compare dimensions
+    if ((a.length - b.length).abs() > 0.01 || (a.width - b.width).abs() > 0.01 || (a.height - b.height).abs() > 0.01 || a.dimUom != b.dimUom) {
+      return false;
+    }
+
+    // Compare weights
+    if ((a.netWeight - b.netWeight).abs() > 0.001 || (a.grossWeight - b.grossWeight).abs() > 0.001 || a.weightUom != b.weightUom) {
+      return false;
+    }
+
+    // Compare items
+    if (a.items.length != b.items.length) return false;
+
+    // Sort items by productId to ensure order-independent comparison
+    var itemsA = List<BoxConfigItem>.from(a.items)..sort((x, y) => x.productId.compareTo(y.productId));
+    var itemsB = List<BoxConfigItem>.from(b.items)..sort((x, y) => x.productId.compareTo(y.productId));
+
+    for (int i = 0; i < itemsA.length; i++) {
+      if (itemsA[i].productId != itemsB[i].productId || itemsA[i].qty != itemsB[i].qty) return false;
+    }
+
+    return true;
   }
 }

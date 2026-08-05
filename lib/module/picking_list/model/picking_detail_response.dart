@@ -1,7 +1,3 @@
-// To parse this JSON data, do
-//
-//     final pickingDetailResponse = pickingDetailResponseFromJson(jsonString);
-
 import 'dart:convert';
 
 PickingDetailResponse pickingDetailResponseFromJson(String str) => PickingDetailResponse.fromJson(json.decode(str));
@@ -9,11 +5,11 @@ PickingDetailResponse pickingDetailResponseFromJson(String str) => PickingDetail
 String pickingDetailResponseToJson(PickingDetailResponse data) => json.encode(data.toJson());
 
 class PickingDetailResponse {
-  final bool? success;
-  final String? message;
-  final PickingDetailData? data;
-  final int? status;
-  final dynamic error;
+  bool? success;
+  String? message;
+  PickingDetailData? data;
+  int? status;
+  dynamic error;
 
   PickingDetailResponse({this.success, this.message, this.data, this.status, this.error});
 
@@ -29,42 +25,45 @@ class PickingDetailResponse {
 }
 
 class PickingDetailData {
-  final String? id;
-  final String? tenantId;
-  final String? pickingNo;
-  final DateTime? pickingDate;
-  final String? invoiceId;
-  final String? pickRequestId;
-  final String? customerId;
-  final dynamic warehouseId;
-  final dynamic assignedTo;
-  final dynamic assignedAt;
-  final String? priority;
-  final dynamic remarks;
-  final String? status;
-  final dynamic startedAt;
-  final DateTime? completedAt;
-  final String? createdBy;
-  final String? updatedBy;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-  final bool? isDeleted;
-  final dynamic deletedBy;
-  final dynamic deletedAt;
-  final String? companyId;
-  final String? companyCode;
-  final String? finYear;
-  final String? locationId;
-  final String? locationCode;
-  final bool? isViewed;
-  final List<Item>? items;
-  final dynamic customerName;
-  final Invoice? invoice;
-  final List<String>? invoiceIds;
-  final String? companyName;
-  final String? locationName;
-  final List<Log>? logs;
-  final bool? hasPackingList;
+  String? id;
+  String? tenantId;
+  String? pickingNo;
+  DateTime? pickingDate;
+  String? invoiceId;
+  String? pickRequestId;
+  String? customerId;
+  dynamic warehouseId;
+  dynamic assignedTo;
+  dynamic assignedAt;
+  String? priority;
+  dynamic remarks;
+  String? status;
+  dynamic startedAt;
+  dynamic completedAt;
+  String? createdBy;
+  dynamic updatedBy;
+  DateTime? createdAt;
+  DateTime? updatedAt;
+  bool? isDeleted;
+  dynamic deletedBy;
+  dynamic deletedAt;
+  String? companyId;
+  String? companyCode;
+  String? finYear;
+  String? locationId;
+  String? locationCode;
+  bool? isViewed;
+  List<Item>? items;
+  String? customerName;
+  Invoice? invoice;
+  List<String>? invoiceIds;
+  dynamic contactPersonData;
+  String? companyName;
+  String? locationName;
+  List<Log>? logs;
+  bool? hasPackingList;
+  String? transportMode;
+  String? transportModeName;
 
   PickingDetailData({
     this.id,
@@ -99,10 +98,13 @@ class PickingDetailData {
     this.customerName,
     this.invoice,
     this.invoiceIds,
+    this.contactPersonData,
     this.companyName,
     this.locationName,
     this.logs,
     this.hasPackingList,
+    this.transportMode,
+    this.transportModeName,
   });
 
   factory PickingDetailData.fromJson(Map<String, dynamic> json) => PickingDetailData(
@@ -120,7 +122,7 @@ class PickingDetailData {
     remarks: json["remarks"],
     status: json["status"],
     startedAt: json["started_at"],
-    completedAt: json["completed_at"] == null ? null : DateTime.parse(json["completed_at"]),
+    completedAt: json["completed_at"],
     createdBy: json["created_by"],
     updatedBy: json["updated_by"],
     createdAt: json["created_at"] == null ? null : DateTime.parse(json["created_at"]),
@@ -134,22 +136,24 @@ class PickingDetailData {
     locationId: json["location_id"],
     locationCode: json["location_code"],
     isViewed: json["is_viewed"],
-    items: json["items"] == null ? [] : List<Item>.from(json["items"]!.map((x) => Item.fromJson(x))),
+    items: json["items"] == null ? [] : List<Item>.from(json["items"].map((x) => Item.fromJson(x))),
     customerName: json["customer_name"],
     invoice: json["invoice"] == null ? null : Invoice.fromJson(json["invoice"]),
-    invoiceIds: json["invoice_ids"] == null ? [] : List<String>.from(json["invoice_ids"]!.map((x) => x)),
+    invoiceIds: json["invoice_ids"] == null ? [] : List<String>.from(json["invoice_ids"].map((x) => x)),
+    contactPersonData: json["contact_person_data"],
     companyName: json["company_name"],
     locationName: json["location_name"],
-    logs: json["logs"] == null ? [] : List<Log>.from(json["logs"]!.map((x) => Log.fromJson(x))),
+    logs: json["logs"] == null ? [] : List<Log>.from(json["logs"].map((x) => Log.fromJson(x))),
     hasPackingList: json["has_packing_list"],
+    transportMode: json["transport_mode"],
+    transportModeName: json["transport_mode_name"],
   );
 
   Map<String, dynamic> toJson() => {
     "id": id,
     "tenant_id": tenantId,
     "picking_no": pickingNo,
-    "picking_date":
-        "${pickingDate!.year.toString().padLeft(4, '0')}-${pickingDate!.month.toString().padLeft(2, '0')}-${pickingDate!.day.toString().padLeft(2, '0')}",
+    "picking_date": pickingDate?.toIso8601String(),
     "invoice_id": invoiceId,
     "pick_request_id": pickRequestId,
     "customer_id": customerId,
@@ -160,7 +164,7 @@ class PickingDetailData {
     "remarks": remarks,
     "status": status,
     "started_at": startedAt,
-    "completed_at": completedAt?.toIso8601String(),
+    "completed_at": completedAt,
     "created_by": createdBy,
     "updated_by": updatedBy,
     "created_at": createdAt?.toIso8601String(),
@@ -178,169 +182,194 @@ class PickingDetailData {
     "customer_name": customerName,
     "invoice": invoice?.toJson(),
     "invoice_ids": invoiceIds == null ? [] : List<dynamic>.from(invoiceIds!.map((x) => x)),
+    "contact_person_data": contactPersonData,
     "company_name": companyName,
     "location_name": locationName,
     "logs": logs == null ? [] : List<dynamic>.from(logs!.map((x) => x.toJson())),
     "has_packing_list": hasPackingList,
+    "transport_mode": transportMode,
+    "transport_mode_name": transportModeName,
   };
 }
 
 class Invoice {
-  final String? id;
-  final String? tenantId;
-  final String? invoiceNo;
-  final String? invoiceType;
-  final dynamic parentInvoiceId;
-  final dynamic stockLocationId;
-  final String? collectionType;
-  final String? collectionTypeId;
-  final dynamic quotationId;
-  final String? customerId;
-  final dynamic opportunityId;
-  final DateTime? invoiceDate;
-  final DateTime? dueDate;
-  final String? subtotal;
-  final String? totalBeforeDiscountAmount;
-  final String? taxAmount;
-  final String? discountAmount;
-  final String? totalAmount;
-  final String? totalTaxableAmount;
-  final String? totalTaxAmount;
-  final String? overallDiscount;
-  final String? overallDiscountAmount;
-  final String? totalDiscount;
-  final String? totalChargesAmount;
-  final String? finalTotalAmount;
-  final String? roundOff;
-  final String? totalCgstAmount;
-  final String? totalSgstAmount;
-  final String? totalIgstAmount;
-  final String? paidAmount;
-  final String? balanceAmount;
-  final String? billingAddress;
-  final String? shippingAddress;
-  final String? paymentStatus;
-  final String? deliveryStatus;
-  final String? status;
-  final bool? isCancelled;
-  final dynamic cancelledAt;
-  final dynamic cancelledBy;
-  final dynamic remarks;
-  final dynamic termsConditions;
-  final String? paymentTerms;
-  final String? gstTreatmentId;
-  final dynamic gstCategoryCodeKey;
-  final String? createdBy;
-  final String? updatedBy;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-  final bool? isDeleted;
-  final dynamic deletedAt;
-  final bool? isApproval;
-  final String? approvalStatus;
-  final dynamic approvedBy;
-  final dynamic approvedAt;
-  final dynamic approvalRemarks;
-  final bool? isPiApproved;
-  final String? piApprovedBy;
-  final DateTime? piApprovedAt;
-  final bool? isPostedForPi;
-  final String? postedForPiBy;
-  final DateTime? postedForPiAt;
-  final String? advanceReceived;
-  final String? netPayable;
-  final bool? isAdvancePaymentTerm;
-  final int? advancePaymentsCount;
-  final dynamic transporterId;
-  final dynamic stockApprovalId;
-  final bool? isStockApproved;
-  final dynamic packingId;
-  final bool? isRequiredEwaybill;
-  final dynamic ewayBillNo;
-  final dynamic transporterGstin;
-  final dynamic transporterName;
-  final String? transportModeId;
-  final dynamic transportMode;
-  final dynamic lrNo;
-  final dynamic driverName;
-  final dynamic driverContact;
-  final dynamic transportRemarks;
-  final dynamic vehicleNo;
-  final bool? isConfirmed;
-  final dynamic confirmedBy;
-  final dynamic confirmedAt;
-  final String? attachments;
-  final String? advanceAmount;
-  final String? advanceAttachment;
-  final String? siteVisitRemark;
-  final String? siteVisitAttachment;
-  final String? creditAttachment;
-  final dynamic creditRemark;
-  final String? priority;
-  final String? companyId;
-  final String? companyCode;
-  final String? finYear;
-  final dynamic finYearInt;
-  final String? locationId;
-  final String? receiverName;
-  final String? receiverMobileNumber;
-  final String? receiverCountryCode;
-  final String? locationCode;
-  final dynamic poDate;
-  final dynamic poNumber;
-  final dynamic creditRequestStatus;
-  final String? email;
-  final bool? isExport;
-  final dynamic currencyId;
-  final String? exchangeRate;
-  final dynamic exportType;
-  final dynamic shippingBillNo;
-  final dynamic shippingBillDate;
-  final dynamic portOfLoading;
-  final dynamic portOfDischarge;
-  final dynamic vesselFlightNo;
-  final dynamic destinationCountryId;
-  final dynamic ewayPdfUrl;
-  final dynamic irn;
-  final dynamic einvoicePdfUrl;
-  final String? totalReturnedQty;
-  final String? totalReturnedAmount;
-  final bool? hasReturns;
-  final bool? isMigrated;
-  final bool? isSalesMigrated;
-  final dynamic migrationSource;
-  final dynamic migrationBatchId;
-  final bool? isAccounted;
-  final dynamic piAutoCancelAt;
-  final dynamic taxInvoiceId;
-  final dynamic taxInvoiceNo;
-  final dynamic dcId;
-  final dynamic dcNo;
-  final bool? isDcFlow;
-  final bool? isSaleReturnTaxInvoice;
-  final dynamic saleReturnId;
-  final dynamic customerRemark;
-  final dynamic outstandingRemarks;
-  final bool? isEwayCancelled;
-  final dynamic ewayCancelledAt;
-  final dynamic ewayCancelledBy;
-  final dynamic ewayCancelRemarks;
-  final bool? isIrnCancelled;
-  final dynamic irnCancelledAt;
-  final dynamic irnCancelledBy;
-  final dynamic irnCancelRemarks;
-  final dynamic cancelledTiRef;
-  final String? piTypeId;
-  final String? piType;
-  final dynamic customerName;
-  final dynamic customerMobile;
-  final dynamic customerEmail;
-  final IngAddressDetails? billingAddressDetails;
-  final IngAddressDetails? shippingAddressDetails;
-  final String? paymentTermsName;
-  final String? createdByName;
-  final String? updatedByName;
-  final String? piApprovedByName;
+  String? id;
+  String? tenantId;
+  String? invoiceNo;
+  String? invoiceType;
+  dynamic parentInvoiceId;
+  dynamic stockLocationId;
+  String? collectionType;
+  String? collectionTypeId;
+  String? quotationId;
+  String? customerId;
+  String? opportunityId;
+  DateTime? invoiceDate;
+  DateTime? dueDate;
+  String? subtotal;
+  String? totalBeforeDiscountAmount;
+  String? taxAmount;
+  String? discountAmount;
+  String? totalAmount;
+  String? totalTaxableAmount;
+  String? totalTaxAmount;
+  String? overallDiscount;
+  String? overallDiscountAmount;
+  String? totalDiscount;
+  String? averageDiscountRate;
+  String? averageDiscountAmount;
+  String? totalEffectiveDiscountAmount;
+  String? totalExtraMarginAmount;
+  String? totalChargesAmount;
+  String? finalTotalAmount;
+  String? roundOff;
+  String? totalCgstAmount;
+  String? totalSgstAmount;
+  String? totalIgstAmount;
+  String? paidAmount;
+  String? balanceAmount;
+  dynamic balancePast;
+  dynamic totalPast;
+  dynamic taxPast;
+  String? otherAdjSettledAmount;
+  String? otherAdjInvoiceWriteOffAmount;
+  String? billingAddress;
+  String? shippingAddress;
+  String? paymentStatus;
+  String? paidType;
+  String? deliveryStatus;
+  String? status;
+  dynamic discountRequestStatus;
+  bool? isCancelled;
+  dynamic cancelledAt;
+  dynamic cancelledBy;
+  dynamic piCancelRemarks;
+  dynamic remarks;
+  dynamic termsConditions;
+  String? paymentTerms;
+  String? gstTreatmentId;
+  String? gstCategoryCodeKey;
+  String? createdBy;
+  String? updatedBy;
+  DateTime? createdAt;
+  DateTime? updatedAt;
+  bool? isDeleted;
+  dynamic deletedAt;
+  bool? isApproval;
+  String? approvalStatus;
+  dynamic approvedBy;
+  dynamic approvedAt;
+  dynamic approvalRemarks;
+  bool? isPiApproved;
+  String? piApprovedBy;
+  DateTime? piApprovedAt;
+  bool? isPostedForPi;
+  String? postedForPiBy;
+  DateTime? postedForPiAt;
+  String? advanceReceived;
+  String? netPayable;
+  bool? isAdvancePaymentTerm;
+  int? advancePaymentsCount;
+  dynamic transporterId;
+  dynamic stockApprovalId;
+  bool? isStockApproved;
+  dynamic stockBookingValidUntil;
+  dynamic stockBookingApprovalId;
+  bool? isStockBookingApproved;
+  dynamic packingId;
+  bool? isRequiredEwaybill;
+  dynamic ewayBillNo;
+  dynamic transporterGstin;
+  dynamic transporterName;
+  String? transportModeId;
+  String? transportMode;
+  dynamic lrNo;
+  dynamic driverName;
+  dynamic driverContact;
+  dynamic transportRemarks;
+  dynamic vehicleNo;
+  bool? isConfirmed;
+  dynamic confirmedBy;
+  dynamic confirmedAt;
+  String? attachments;
+  String? advanceAmount;
+  String? advanceAttachment;
+  String? siteVisitRemark;
+  String? siteVisitAttachment;
+  String? creditAttachment;
+  dynamic creditRemark;
+  String? priority;
+  String? companyId;
+  String? companyCode;
+  String? finYear;
+  dynamic finYearInt;
+  String? locationId;
+  String? receiverName;
+  String? receiverMobileNumber;
+  String? receiverCountryCode;
+  String? locationCode;
+  dynamic poDate;
+  dynamic poNumber;
+  dynamic creditRequestStatus;
+  String? email;
+  bool? isExport;
+  dynamic currencyId;
+  String? exchangeRate;
+  dynamic exportType;
+  dynamic shippingBillNo;
+  dynamic shippingBillDate;
+  dynamic portOfLoading;
+  dynamic portOfDischarge;
+  dynamic vesselFlightNo;
+  dynamic destinationCountryId;
+  dynamic ewayPdfUrl;
+  dynamic irn;
+  dynamic einvoicePdfUrl;
+  String? totalReturnedQty;
+  String? totalReturnedAmount;
+  bool? hasReturns;
+  bool? isMigrated;
+  bool? isSalesMigrated;
+  dynamic salesMigAmount;
+  dynamic migrationSource;
+  dynamic migrationBatchId;
+  bool? isAccounted;
+  dynamic piAutoCancelAt;
+  dynamic taxInvoiceId;
+  dynamic taxInvoiceNo;
+  dynamic dcId;
+  dynamic dcNo;
+  bool? isDcFlow;
+  bool? isSaleReturnTaxInvoice;
+  dynamic saleReturnId;
+  dynamic customerRemark;
+  dynamic outstandingRemarks;
+  bool? isEwayCancelled;
+  dynamic ewayCancelledAt;
+  dynamic ewayCancelledBy;
+  dynamic ewayCancelRemarks;
+  bool? isIrnCancelled;
+  dynamic irnCancelledAt;
+  dynamic irnCancelledBy;
+  dynamic irnCancelRemarks;
+  dynamic cancelledTiRef;
+  dynamic revisedFromPiId;
+  dynamic supersededByPiId;
+  String? piTypeId;
+  String? piType;
+  dynamic receiverDocumentTypeId;
+  dynamic receiverDocumentType;
+  dynamic receiverDocumentTypeCodeKey;
+  String? customerName;
+  String? customerMobile;
+  dynamic customerEmail;
+  IngAddressDetails? billingAddressDetails;
+  IngAddressDetails? shippingAddressDetails;
+  String? paymentTermsName;
+  String? createdByName;
+  String? updatedByName;
+  String? piApprovedByName;
+  String? transportModeName;
 
   Invoice({
     this.id,
@@ -366,6 +395,10 @@ class Invoice {
     this.overallDiscount,
     this.overallDiscountAmount,
     this.totalDiscount,
+    this.averageDiscountRate,
+    this.averageDiscountAmount,
+    this.totalEffectiveDiscountAmount,
+    this.totalExtraMarginAmount,
     this.totalChargesAmount,
     this.finalTotalAmount,
     this.roundOff,
@@ -374,14 +407,22 @@ class Invoice {
     this.totalIgstAmount,
     this.paidAmount,
     this.balanceAmount,
+    this.balancePast,
+    this.totalPast,
+    this.taxPast,
+    this.otherAdjSettledAmount,
+    this.otherAdjInvoiceWriteOffAmount,
     this.billingAddress,
     this.shippingAddress,
     this.paymentStatus,
+    this.paidType,
     this.deliveryStatus,
     this.status,
+    this.discountRequestStatus,
     this.isCancelled,
     this.cancelledAt,
     this.cancelledBy,
+    this.piCancelRemarks,
     this.remarks,
     this.termsConditions,
     this.paymentTerms,
@@ -411,6 +452,9 @@ class Invoice {
     this.transporterId,
     this.stockApprovalId,
     this.isStockApproved,
+    this.stockBookingValidUntil,
+    this.stockBookingApprovalId,
+    this.isStockBookingApproved,
     this.packingId,
     this.isRequiredEwaybill,
     this.ewayBillNo,
@@ -465,6 +509,7 @@ class Invoice {
     this.hasReturns,
     this.isMigrated,
     this.isSalesMigrated,
+    this.salesMigAmount,
     this.migrationSource,
     this.migrationBatchId,
     this.isAccounted,
@@ -487,8 +532,13 @@ class Invoice {
     this.irnCancelledBy,
     this.irnCancelRemarks,
     this.cancelledTiRef,
+    this.revisedFromPiId,
+    this.supersededByPiId,
     this.piTypeId,
     this.piType,
+    this.receiverDocumentTypeId,
+    this.receiverDocumentType,
+    this.receiverDocumentTypeCodeKey,
     this.customerName,
     this.customerMobile,
     this.customerEmail,
@@ -498,6 +548,7 @@ class Invoice {
     this.createdByName,
     this.updatedByName,
     this.piApprovedByName,
+    this.transportModeName,
   });
 
   factory Invoice.fromJson(Map<String, dynamic> json) => Invoice(
@@ -524,6 +575,10 @@ class Invoice {
     overallDiscount: json["overall_discount"],
     overallDiscountAmount: json["overall_discount_amount"],
     totalDiscount: json["total_discount"],
+    averageDiscountRate: json["average_discount_rate"],
+    averageDiscountAmount: json["average_discount_amount"],
+    totalEffectiveDiscountAmount: json["total_effective_discount_amount"],
+    totalExtraMarginAmount: json["total_extra_margin_amount"],
     totalChargesAmount: json["total_charges_amount"],
     finalTotalAmount: json["final_total_amount"],
     roundOff: json["round_off"],
@@ -532,14 +587,22 @@ class Invoice {
     totalIgstAmount: json["total_igst_amount"],
     paidAmount: json["paid_amount"],
     balanceAmount: json["balance_amount"],
+    balancePast: json["balance_past"],
+    totalPast: json["total_past"],
+    taxPast: json["tax_past"],
+    otherAdjSettledAmount: json["other_adj_settled_amount"],
+    otherAdjInvoiceWriteOffAmount: json["other_adj_invoice_write_off_amount"],
     billingAddress: json["billing_address"],
     shippingAddress: json["shipping_address"],
     paymentStatus: json["payment_status"],
+    paidType: json["paid_type"],
     deliveryStatus: json["delivery_status"],
     status: json["status"],
+    discountRequestStatus: json["discount_request_status"],
     isCancelled: json["is_cancelled"],
     cancelledAt: json["cancelled_at"],
     cancelledBy: json["cancelled_by"],
+    piCancelRemarks: json["pi_cancel_remarks"],
     remarks: json["remarks"],
     termsConditions: json["terms_conditions"],
     paymentTerms: json["payment_terms"],
@@ -569,6 +632,9 @@ class Invoice {
     transporterId: json["transporter_id"],
     stockApprovalId: json["stock_approval_id"],
     isStockApproved: json["is_stock_approved"],
+    stockBookingValidUntil: json["stock_booking_valid_until"],
+    stockBookingApprovalId: json["stock_booking_approval_id"],
+    isStockBookingApproved: json["is_stock_booking_approved"],
     packingId: json["packing_id"],
     isRequiredEwaybill: json["is_required_ewaybill"],
     ewayBillNo: json["eway_bill_no"],
@@ -623,6 +689,7 @@ class Invoice {
     hasReturns: json["has_returns"],
     isMigrated: json["is_migrated"],
     isSalesMigrated: json["is_sales_migrated"],
+    salesMigAmount: json["sales_mig_amount"],
     migrationSource: json["migration_source"],
     migrationBatchId: json["migration_batch_id"],
     isAccounted: json["is_accounted"],
@@ -645,8 +712,13 @@ class Invoice {
     irnCancelledBy: json["irn_cancelled_by"],
     irnCancelRemarks: json["irn_cancel_remarks"],
     cancelledTiRef: json["cancelled_ti_ref"],
+    revisedFromPiId: json["revised_from_pi_id"],
+    supersededByPiId: json["superseded_by_pi_id"],
     piTypeId: json["pi_type_id"],
     piType: json["pi_type"],
+    receiverDocumentTypeId: json["receiver_document_type_id"],
+    receiverDocumentType: json["receiver_document_type"],
+    receiverDocumentTypeCodeKey: json["receiver_document_type_code_key"],
     customerName: json["customer_name"],
     customerMobile: json["customer_mobile"],
     customerEmail: json["customer_email"],
@@ -656,6 +728,7 @@ class Invoice {
     createdByName: json["created_by_name"],
     updatedByName: json["updated_by_name"],
     piApprovedByName: json["pi_approved_by_name"],
+    transportModeName: json["transport_mode_name"],
   );
 
   Map<String, dynamic> toJson() => {
@@ -670,9 +743,8 @@ class Invoice {
     "quotation_id": quotationId,
     "customer_id": customerId,
     "opportunity_id": opportunityId,
-    "invoice_date":
-        "${invoiceDate!.year.toString().padLeft(4, '0')}-${invoiceDate!.month.toString().padLeft(2, '0')}-${invoiceDate!.day.toString().padLeft(2, '0')}",
-    "due_date": "${dueDate!.year.toString().padLeft(4, '0')}-${dueDate!.month.toString().padLeft(2, '0')}-${dueDate!.day.toString().padLeft(2, '0')}",
+    "invoice_date": invoiceDate?.toIso8601String(),
+    "due_date": dueDate?.toIso8601String(),
     "subtotal": subtotal,
     "total_before_discount_amount": totalBeforeDiscountAmount,
     "tax_amount": taxAmount,
@@ -683,6 +755,10 @@ class Invoice {
     "overall_discount": overallDiscount,
     "overall_discount_amount": overallDiscountAmount,
     "total_discount": totalDiscount,
+    "average_discount_rate": averageDiscountRate,
+    "average_discount_amount": averageDiscountAmount,
+    "total_effective_discount_amount": totalEffectiveDiscountAmount,
+    "total_extra_margin_amount": totalExtraMarginAmount,
     "total_charges_amount": totalChargesAmount,
     "final_total_amount": finalTotalAmount,
     "round_off": roundOff,
@@ -691,14 +767,22 @@ class Invoice {
     "total_igst_amount": totalIgstAmount,
     "paid_amount": paidAmount,
     "balance_amount": balanceAmount,
+    "balance_past": balancePast,
+    "total_past": totalPast,
+    "tax_past": taxPast,
+    "other_adj_settled_amount": otherAdjSettledAmount,
+    "other_adj_invoice_write_off_amount": otherAdjInvoiceWriteOffAmount,
     "billing_address": billingAddress,
     "shipping_address": shippingAddress,
     "payment_status": paymentStatus,
+    "paid_type": paidType,
     "delivery_status": deliveryStatus,
     "status": status,
+    "discount_request_status": discountRequestStatus,
     "is_cancelled": isCancelled,
     "cancelled_at": cancelledAt,
     "cancelled_by": cancelledBy,
+    "pi_cancel_remarks": piCancelRemarks,
     "remarks": remarks,
     "terms_conditions": termsConditions,
     "payment_terms": paymentTerms,
@@ -728,6 +812,9 @@ class Invoice {
     "transporter_id": transporterId,
     "stock_approval_id": stockApprovalId,
     "is_stock_approved": isStockApproved,
+    "stock_booking_validUntil": stockBookingValidUntil,
+    "stock_booking_approval_id": stockBookingApprovalId,
+    "is_stock_booking_approved": isStockBookingApproved,
     "packing_id": packingId,
     "is_required_ewaybill": isRequiredEwaybill,
     "eway_bill_no": ewayBillNo,
@@ -782,6 +869,7 @@ class Invoice {
     "has_returns": hasReturns,
     "is_migrated": isMigrated,
     "is_sales_migrated": isSalesMigrated,
+    "sales_mig_amount": salesMigAmount,
     "migration_source": migrationSource,
     "migration_batch_id": migrationBatchId,
     "is_accounted": isAccounted,
@@ -804,8 +892,13 @@ class Invoice {
     "irn_cancelled_by": irnCancelledBy,
     "irn_cancel_remarks": irnCancelRemarks,
     "cancelled_ti_ref": cancelledTiRef,
+    "revised_from_pi_id": revisedFromPiId,
+    "superseded_by_pi_id": supersededByPiId,
     "pi_type_id": piTypeId,
     "pi_type": piType,
+    "receiver_document_type_id": receiverDocumentTypeId,
+    "receiver_document_type": receiverDocumentType,
+    "receiver_document_type_code_key": receiverDocumentTypeCodeKey,
     "customer_name": customerName,
     "customer_mobile": customerMobile,
     "customer_email": customerEmail,
@@ -815,21 +908,22 @@ class Invoice {
     "created_by_name": createdByName,
     "updated_by_name": updatedByName,
     "pi_approved_by_name": piApprovedByName,
+    "transport_mode_name": transportModeName,
   };
 }
 
 class IngAddressDetails {
-  final String? id;
-  final String? street;
-  final String? cityId;
-  final String? stateId;
-  final String? pincodeId;
-  final String? contactName;
-  final dynamic mobile1;
-  final String? companyName;
-  final String? cityName;
-  final String? stateName;
-  final String? pincode;
+  String? id;
+  String? street;
+  String? cityId;
+  String? stateId;
+  String? pincodeId;
+  String? contactName;
+  String? mobile1;
+  String? companyName;
+  String? cityName;
+  String? stateName;
+  String? pincode;
 
   IngAddressDetails({
     this.id,
@@ -875,31 +969,33 @@ class IngAddressDetails {
 }
 
 class Item {
-  final String? id;
-  final String? tenantId;
-  final String? pickingId;
-  final String? invoiceId;
-  final String? invoiceItemId;
-  final String? productId;
-  final String? orderedQty;
-  final String? pickedQty;
-  final String? pendingQty;
-  final dynamic batchNo;
-  final List<String>? serialIds;
-  final String? rackLocationId;
-  final dynamic binLocation;
-  final dynamic pickedBy;
-  final dynamic pickedAt;
-  final String? status;
-  final dynamic remarks;
-  final String? createdBy;
-  final String? updatedBy;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-  final bool? isDeleted;
-  final Product? product;
-  final RackLocation? rackLocation;
-  final List<dynamic>? suggestedSerials;
+  String? id;
+  String? tenantId;
+  String? pickingId;
+  String? invoiceId;
+  String? invoiceItemId;
+  String? productId;
+  String? orderedQty;
+  String? pickedQty;
+  String? pendingQty;
+  String? batchNo;
+  List<String>? serialIds;
+  String? rackLocationId;
+  dynamic binLocation;
+  dynamic pickedBy;
+  dynamic pickedAt;
+  String? status;
+  dynamic remarks;
+  String? createdBy;
+  dynamic updatedBy;
+  DateTime? createdAt;
+  DateTime? updatedAt;
+  bool? isDeleted;
+  Product? product;
+  RackLocation? rackLocation;
+  List<SuggestedSerial>? suggestedSerials;
+  List<String>? batchNumbers;
+  int? batchQuantity;
 
   Item({
     this.id,
@@ -927,6 +1023,8 @@ class Item {
     this.product,
     this.rackLocation,
     this.suggestedSerials,
+    this.batchNumbers,
+    this.batchQuantity,
   });
 
   factory Item.fromJson(Map<String, dynamic> json) => Item(
@@ -940,7 +1038,7 @@ class Item {
     pickedQty: json["picked_qty"],
     pendingQty: json["pending_qty"],
     batchNo: json["batch_no"],
-    serialIds: json["serial_ids"] == null ? [] : List<String>.from(json["serial_ids"]!.map((x) => x)),
+    serialIds: json["serial_ids"] == null ? [] : List<String>.from(json["serial_ids"].map((x) => x)),
     rackLocationId: json["rack_location_id"],
     binLocation: json["bin_location"],
     pickedBy: json["picked_by"],
@@ -954,7 +1052,13 @@ class Item {
     isDeleted: json["is_deleted"],
     product: json["product"] == null ? null : Product.fromJson(json["product"]),
     rackLocation: json["rack_location"] == null ? null : RackLocation.fromJson(json["rack_location"]),
-    suggestedSerials: json["suggested_serials"] == null ? [] : List<dynamic>.from(json["suggested_serials"]!.map((x) => x)),
+    suggestedSerials: json["suggested_serials"] == null
+        ? []
+        : List<SuggestedSerial>.from(json["suggested_serials"].map((x) => SuggestedSerial.fromJson(x))),
+    batchNumbers: json["batch_numbers"] == null || json['batch_numbers'] == [null]
+        ? []
+        : List<String>.from(json["batch_numbers"].map((x) => x.toString())),
+    batchQuantity: json["batch_quantity"],
   );
 
   Map<String, dynamic> toJson() => {
@@ -982,81 +1086,90 @@ class Item {
     "is_deleted": isDeleted,
     "product": product?.toJson(),
     "rack_location": rackLocation?.toJson(),
-    "suggested_serials": suggestedSerials == null ? [] : List<dynamic>.from(suggestedSerials!.map((x) => x)),
+    "suggested_serials": suggestedSerials == null ? [] : List<dynamic>.from(suggestedSerials!.map((x) => x.toJson())),
+    "batch_quantity": batchQuantity,
+    "batch_numbers": batchNumbers,
   };
 }
 
 class Product {
-  final String? id;
-  final String? tenantId;
-  final String? productGroupId;
-  final String? productCode;
-  final dynamic productLocationId;
-  final dynamic warehouseLocationId;
-  final String? productName;
-  final String? vendorId;
-  final String? departmentId;
-  final String? productBarcode;
-  final String? brandId;
-  final String? hsnCode;
-  final String? divisionId;
-  final String? productCategoryId;
-  final String? productTypeId;
-  final String? unitOfMeasurment;
-  final String? purchaseUomId;
-  final String? purchaseUom;
-  final String? saleUomId;
-  final String? saleUom;
-  final String? uomConversionValue;
-  final String? modelNo;
-  final String? features;
-  final String? sizeId;
-  final int? perBoxItemCount;
-  final dynamic masterBoxId;
-  final String? weight;
-  final String? netWeight;
-  final String? grossWeight;
-  final String? minimumQty;
-  final String? minOrderQty;
-  final String? cbm;
-  final String? itemLength;
-  final String? itemWidth;
-  final String? itemHeight;
-  final String? storageTemperatureId;
-  final dynamic powerRequirementId;
-  final String? countryOfOriginId;
-  final dynamic installationTypeId;
-  final int? leadTime;
-  final String? actualWeight;
-  final String? packingWeight;
-  final String? finishId;
-  final String? warrantyId;
-  final String? material;
-  final bool? requireInstallation;
-  final bool? arc;
-  final bool? isWidth;
-  final String? description;
-  final String? descriptionSales;
-  final String? descriptionPurchase;
-  final String? poReqRemarks1;
-  final String? poReqRemarks2;
-  final String? poReqRemarks3;
-  final String? trackingType;
-  final String? trackingPrefix;
-  final int? trackingStartNo;
-  final int? trackingLastNo;
-  final List<String>? imageUrl;
-  final String? productSpecSheet;
-  final String? product3DModel;
-  final String? youtubeVideoLink;
-  final List<dynamic>? companyIds;
-  final String? createdBy;
-  final String? updatedBy;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-  final bool? isActive;
-  final bool? isDeleted;
-  final dynamic deletedAt;
+  String? id;
+  String? tenantId;
+  String? productGroupId;
+  String? productCode;
+  dynamic productLocationId;
+  dynamic warehouseLocationId;
+  String? productName;
+  String? vendorId;
+  String? departmentId;
+  String? productBarcode;
+  String? brandId;
+  String? hsnCode;
+  String? divisionId;
+  String? productCategoryId;
+  String? productTypeId;
+  String? unitOfMeasurment;
+  String? purchaseUomId;
+  String? purchaseUom;
+  String? saleUomId;
+  String? saleUom;
+  String? uomConversionValue;
+  String? modelNo;
+  String? features;
+  String? sizeId;
+  int? perBoxItemCount;
+  dynamic masterBoxId;
+  String? weight;
+  String? netWeight;
+  String? grossWeight;
+  String? minimumQty;
+  String? minOrderQty;
+  String? cbm;
+  String? itemLength;
+  String? itemWidth;
+  String? itemHeight;
+  dynamic storageTemperatureId;
+  dynamic powerRequirementId;
+  String? countryOfOriginId;
+  dynamic installationTypeId;
+  int? leadTime;
+  String? actualWeight;
+  String? packingWeight;
+  String? finishId;
+  String? warrantyId;
+  String? material;
+  bool? requireInstallation;
+  bool? arc;
+  bool? isWidth;
+  bool? isDiscount;
+  bool? isRecommended;
+  bool? isDiscontinue;
+  bool? isDeadStockProduct;
+  String? description;
+  String? descriptionSales;
+  String? descriptionPurchase;
+  String? poReqRemarks1;
+  String? poReqRemarks2;
+  String? poReqRemarks3;
+  String? purchasePriceRmb;
+  String? purchasePriceUsd;
+  String? purchasePriceInr;
+  String? trackingType;
+  String? trackingPrefix;
+  int? trackingStartNo;
+  int? trackingLastNo;
+  List<String>? imageUrl;
+  String? productSpecSheet;
+  String? product3DModel;
+  String? youtubeVideoLink;
+  List<String>? companyIds;
+  String? createdBy;
+  String? updatedBy;
+  DateTime? createdAt;
+  DateTime? updatedAt;
+  bool? isActive;
+  bool? isDeleted;
+  dynamic deletedAt;
 
   Product({
     this.id,
@@ -1107,12 +1220,19 @@ class Product {
     this.requireInstallation,
     this.arc,
     this.isWidth,
+    this.isDiscount,
+    this.isRecommended,
+    this.isDiscontinue,
+    this.isDeadStockProduct,
     this.description,
     this.descriptionSales,
     this.descriptionPurchase,
     this.poReqRemarks1,
     this.poReqRemarks2,
     this.poReqRemarks3,
+    this.purchasePriceRmb,
+    this.purchasePriceUsd,
+    this.purchasePriceInr,
     this.trackingType,
     this.trackingPrefix,
     this.trackingStartNo,
@@ -1180,21 +1300,28 @@ class Product {
     requireInstallation: json["require_installation"],
     arc: json["arc"],
     isWidth: json["is_width"],
+    isDiscount: json["is_discount"],
+    isRecommended: json["is_recommended"],
+    isDiscontinue: json["is_discontinue"],
+    isDeadStockProduct: json["is_dead_stock_product"],
     description: json["description"],
     descriptionSales: json["description_sales"],
     descriptionPurchase: json["description_purchase"],
     poReqRemarks1: json["po_req_remarks_1"],
     poReqRemarks2: json["po_req_remarks_2"],
     poReqRemarks3: json["po_req_remarks_3"],
+    purchasePriceRmb: json["purchase_price_rmb"],
+    purchasePriceUsd: json["purchase_price_usd"],
+    purchasePriceInr: json["purchase_price_inr"],
     trackingType: json["tracking_type"],
     trackingPrefix: json["tracking_prefix"],
     trackingStartNo: json["tracking_start_no"],
     trackingLastNo: json["tracking_last_no"],
-    imageUrl: json["image_url"] == null ? [] : List<String>.from(json["image_url"]!.map((x) => x)),
+    imageUrl: json["image_url"] == null ? [] : List<String>.from(json["image_url"].map((x) => x)),
     productSpecSheet: json["product_spec_sheet"],
     product3DModel: json["product_3d_model"],
     youtubeVideoLink: json["youtube_video_link"],
-    companyIds: json["company_ids"] == null ? [] : List<dynamic>.from(json["company_ids"]!.map((x) => x)),
+    companyIds: json["company_ids"] == null ? [] : List<String>.from(json["company_ids"].map((x) => x)),
     createdBy: json["created_by"],
     updatedBy: json["updated_by"],
     createdAt: json["created_at"] == null ? null : DateTime.parse(json["created_at"]),
@@ -1253,12 +1380,19 @@ class Product {
     "require_installation": requireInstallation,
     "arc": arc,
     "is_width": isWidth,
+    "is_discount": isDiscount,
+    "is_recommended": isRecommended,
+    "is_discontinue": isDiscontinue,
+    "is_dead_stock_product": isDeadStockProduct,
     "description": description,
     "description_sales": descriptionSales,
     "description_purchase": descriptionPurchase,
     "po_req_remarks_1": poReqRemarks1,
     "po_req_remarks_2": poReqRemarks2,
     "po_req_remarks_3": poReqRemarks3,
+    "purchase_price_rmb": purchasePriceRmb,
+    "purchase_price_usd": purchasePriceUsd,
+    "purchase_price_inr": purchasePriceInr,
     "tracking_type": trackingType,
     "tracking_prefix": trackingPrefix,
     "tracking_start_no": trackingStartNo,
@@ -1279,38 +1413,38 @@ class Product {
 }
 
 class RackLocation {
-  final String? id;
-  final String? rackCode;
-  final String? rackName;
-  final dynamic rackDescription;
-  final String? rackSide;
-  final String? warehouseLocationId;
-  final dynamic warehouseId;
-  final dynamic locationId;
-  final String? tenantId;
-  final String? storageType;
-  final String? length;
-  final String? breadth;
-  final String? height;
-  final String? unitOfMeasure;
-  final String? totalCbm;
-  final String? usedCbm;
-  final String? availableCbm;
-  final String? totalCft;
-  final String? usedCft;
-  final dynamic noOfRows;
-  final dynamic noOfColumns;
-  final dynamic noOfPallatesPerCell;
-  final String? usableSpacePercent;
-  final dynamic rackBarcode;
-  final dynamic floorId;
-  final String? createdBy;
-  final dynamic updatedBy;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-  final bool? isActive;
-  final bool? isDeleted;
-  final dynamic deletedAt;
+  String? id;
+  String? rackCode;
+  String? rackName;
+  dynamic rackDescription;
+  String? rackSide;
+  String? warehouseLocationId;
+  dynamic warehouseId;
+  dynamic locationId;
+  String? tenantId;
+  String? storageType;
+  String? length;
+  String? breadth;
+  String? height;
+  String? unitOfMeasure;
+  String? totalCbm;
+  String? usedCbm;
+  String? availableCbm;
+  String? totalCft;
+  String? usedCft;
+  dynamic noOfRows;
+  dynamic noOfColumns;
+  dynamic noOfPallatesPerCell;
+  String? usableSpacePercent;
+  dynamic rackBarcode;
+  dynamic floorId;
+  String? createdBy;
+  dynamic updatedBy;
+  DateTime? createdAt;
+  DateTime? updatedAt;
+  bool? isActive;
+  bool? isDeleted;
+  dynamic deletedAt;
 
   RackLocation({
     this.id,
@@ -1418,22 +1552,86 @@ class RackLocation {
   };
 }
 
+class SuggestedSerial {
+  String? serialId;
+  String? serialNumber;
+  String? status;
+  dynamic binLocation;
+  dynamic warehouseId;
+  dynamic rackId;
+  dynamic cellId;
+  String? quantity;
+  DateTime? createdAt;
+  dynamic rackName;
+  dynamic rackCode;
+  dynamic warehouseName;
+  dynamic warehouseCode;
+
+  SuggestedSerial({
+    this.serialId,
+    this.serialNumber,
+    this.status,
+    this.binLocation,
+    this.warehouseId,
+    this.rackId,
+    this.cellId,
+    this.quantity,
+    this.createdAt,
+    this.rackName,
+    this.rackCode,
+    this.warehouseName,
+    this.warehouseCode,
+  });
+
+  factory SuggestedSerial.fromJson(Map<String, dynamic> json) => SuggestedSerial(
+    serialId: json["serial_id"],
+    serialNumber: json["serial_number"],
+    status: json["status"],
+    binLocation: json["bin_location"],
+    warehouseId: json["warehouse_id"],
+    rackId: json["rack_id"],
+    cellId: json["cell_id"],
+    quantity: json["quantity"],
+    createdAt: json["created_at"] == null ? null : DateTime.parse(json["created_at"]),
+    rackName: json["rack_name"],
+    rackCode: json["rack_code"],
+    warehouseName: json["warehouse_name"],
+    warehouseCode: json["warehouse_code"],
+  );
+
+  Map<String, dynamic> toJson() => {
+    "serial_id": serialId,
+    "serial_number": serialNumber,
+    "status": status,
+    "bin_location": binLocation,
+    "warehouse_id": warehouseId,
+    "rack_id": rackId,
+    "cell_id": cellId,
+    "quantity": quantity,
+    "created_at": createdAt?.toIso8601String(),
+    "rack_name": rackName,
+    "rack_code": rackCode,
+    "warehouse_name": warehouseName,
+    "warehouse_code": warehouseCode,
+  };
+}
+
 class Log {
-  final String? id;
-  final String? entityType;
-  final String? entityId;
-  final String? parentType;
-  final String? parentId;
-  final String? rootType;
-  final String? rootId;
-  final String? notes;
-  final String? logType;
-  final Metadata? metadata;
-  final dynamic attachmentUrl;
-  final String? createdBy;
-  final String? tenantId;
-  final DateTime? createdAt;
-  final String? createdByName;
+  String? id;
+  String? entityType;
+  String? entityId;
+  dynamic parentType;
+  String? parentId;
+  String? rootType;
+  String? rootId;
+  String? notes;
+  String? logType;
+  Map<String, dynamic>? metadata;
+  dynamic attachmentUrl;
+  String? createdBy;
+  String? tenantId;
+  DateTime? createdAt;
+  String? createdByName;
 
   Log({
     this.id,
@@ -1463,7 +1661,7 @@ class Log {
     rootId: json["root_id"],
     notes: json["notes"],
     logType: json["log_type"],
-    metadata: json["metadata"] == null ? null : Metadata.fromJson(json["metadata"]),
+    metadata: json["metadata"],
     attachmentUrl: json["attachment_url"],
     createdBy: json["created_by"],
     tenantId: json["tenant_id"],
@@ -1481,71 +1679,11 @@ class Log {
     "root_id": rootId,
     "notes": notes,
     "log_type": logType,
-    "metadata": metadata?.toJson(),
+    "metadata": metadata,
     "attachment_url": attachmentUrl,
     "created_by": createdBy,
     "tenant_id": tenantId,
     "created_at": createdAt?.toIso8601String(),
     "created_by_name": createdByName,
-  };
-}
-
-class Metadata {
-  final String? to;
-  final String? from;
-  final String? field;
-  final String? invoiceNo;
-  final String? pickingNo;
-  final bool? autoCreated;
-  final String? confirmedBy;
-  final bool? proformaConfirmation;
-  final String? piNo;
-  final int? itemsCount;
-  final String? invoiceType;
-  final num? totalAmount;
-
-  Metadata({
-    this.to,
-    this.from,
-    this.field,
-    this.invoiceNo,
-    this.pickingNo,
-    this.autoCreated,
-    this.confirmedBy,
-    this.proformaConfirmation,
-    this.piNo,
-    this.itemsCount,
-    this.invoiceType,
-    this.totalAmount,
-  });
-
-  factory Metadata.fromJson(Map<String, dynamic> json) => Metadata(
-    to: json["to"],
-    from: json["from"],
-    field: json["field"],
-    invoiceNo: json["invoice_no"],
-    pickingNo: json["picking_no"],
-    autoCreated: json["auto_created"],
-    confirmedBy: json["confirmed_by"],
-    proformaConfirmation: json["proforma_confirmation"],
-    piNo: json["pi_no"],
-    itemsCount: json["items_count"],
-    invoiceType: json["invoice_type"],
-    totalAmount: json["total_amount"],
-  );
-
-  Map<String, dynamic> toJson() => {
-    "to": to,
-    "from": from,
-    "field": field,
-    "invoice_no": invoiceNo,
-    "picking_no": pickingNo,
-    "auto_created": autoCreated,
-    "confirmed_by": confirmedBy,
-    "proforma_confirmation": proformaConfirmation,
-    "pi_no": piNo,
-    "items_count": itemsCount,
-    "invoice_type": invoiceType,
-    "total_amount": totalAmount,
   };
 }

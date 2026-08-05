@@ -67,6 +67,9 @@ class PickingListDatum {
   final String? invoiceAmount;
   final String? piRemarks;
   final String? salesPerson;
+  final String? transport_mode_id;
+  final String? transport_mode;
+  final String? transport_mode_name;
   final String? companyName;
   final String? locationName;
   final String? orderType;
@@ -105,6 +108,9 @@ class PickingListDatum {
     this.invoiceAmount,
     this.piRemarks,
     this.salesPerson,
+    this.transport_mode_id,
+    this.transport_mode,
+    this.transport_mode_name,
     this.companyName,
     this.locationName,
     this.orderType,
@@ -144,6 +150,9 @@ class PickingListDatum {
     invoiceAmount: json["invoice_amount"],
     piRemarks: json["pi_remarks"],
     salesPerson: json["sales_person"],
+    transport_mode_id: json["transport_mode_id"],
+    transport_mode: json["transport_mode"],
+    transport_mode_name: json["transport_mode_name"],
     companyName: json["company_name"],
     locationName: json["location_name"],
     orderType: json["order_type"] ?? "",
@@ -183,6 +192,9 @@ class PickingListDatum {
     "invoice_amount": invoiceAmount,
     "pi_remarks": piRemarks,
     "sales_person": salesPerson,
+    "transport_mode_id": transport_mode_id,
+    "transport_mode": transport_mode,
+    "transport_mode_name": transport_mode_name,
     "company_name": companyName,
     "location_name": locationName,
     "order_type": orderType,

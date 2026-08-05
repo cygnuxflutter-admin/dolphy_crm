@@ -11,6 +11,8 @@ import 'package:intl/intl.dart';
 
 import '../../config/app_colors.dart';
 import '../../config/app_images.dart';
+import '../../config/app_routes.dart';
+import '../notification_screen/controller/notification_controller.dart';
 import 'Inquiry_controller.dart';
 
 class InquiryScreen extends StatefulWidget {
@@ -24,6 +26,7 @@ class _InquiryScreenState extends State<InquiryScreen> {
   final InquiryScreenController inquiryScreenController = Get.find<InquiryScreenController>();
   final PermissionHandler permissionHandler = Get.find<PermissionHandler>();
   final HomeScreenController homeScreenController = Get.find<HomeScreenController>();
+  final NotificationController notificationController = Get.find<NotificationController>();
 
   final ScrollController scrollController = ScrollController();
 
@@ -83,6 +86,34 @@ class _InquiryScreenState extends State<InquiryScreen> {
         ),
         actions: [
           Obx(
+            () => Stack(
+              children: [
+                IconButton(
+                  onPressed: () {
+                    notificationController.markAllNotificationsAsRead();
+                    Get.toNamed(AppRoutes.notificationScreen);
+                  },
+                  icon: const Icon(Icons.notifications_none_outlined, size: 26, color: Colors.white),
+                ),
+                if (notificationController.unreadCount.value > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        '${notificationController.unreadCount.value}',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Obx(
             () => permissionHandler.isInquiryCreateAllowed
                 ? IconButton(
                     icon: const Icon(
@@ -107,7 +138,30 @@ class _InquiryScreenState extends State<InquiryScreen> {
           }
 
           if (leads.isEmpty) {
-            return Center(child: Image.asset(AppImages.noDataFound, scale: 3));
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(AppImages.noDataFound, scale: 3),
+                  if (permissionHandler.isInquiryCreateAllowed) ...[
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () => Get.to(AddInquiryScreen(), binding: InquiryScreenBinding()),
+                      icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
+                      label: const Text("ADD YOUR FIRST INQUIRY", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.indigo600Main,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 4,
+                        shadowColor: AppColors.indigo600Main.withValues(alpha: 0.3),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
           }
 
           final allLoaded = leads.length >= totalCount;
@@ -137,6 +191,16 @@ class _InquiryScreenState extends State<InquiryScreen> {
             },
           );
         }),
+      ),
+
+      floatingActionButton: Obx(
+        () => permissionHandler.isInquiryCreateAllowed
+            ? FloatingActionButton(
+                onPressed: () => Get.to(AddInquiryScreen(), binding: InquiryScreenBinding()),
+                backgroundColor: AppColors.indigo600Main,
+                child: const Icon(Icons.add, color: Colors.white),
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }

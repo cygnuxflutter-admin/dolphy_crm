@@ -434,6 +434,10 @@ class VisitTechnician {
   bool isPrimary;
   String fieldStatus;
   DateTime? assignedAt;
+  DateTime? reachedAt;
+  String? reachedLatitude;
+  String? reachedLongitude;
+  List<String> reachedAttachments;
   DateTime? startedAt;
   String startLatitude;
   String startLongitude;
@@ -454,6 +458,10 @@ class VisitTechnician {
     required this.isPrimary,
     required this.fieldStatus,
     this.assignedAt,
+    this.reachedAt,
+    this.reachedLatitude,
+    this.reachedLongitude,
+    required this.reachedAttachments,
     this.startedAt,
     required this.startLatitude,
     required this.startLongitude,
@@ -475,6 +483,10 @@ class VisitTechnician {
     isPrimary: json["is_primary"] ?? false,
     fieldStatus: json["field_status"] ?? "",
     assignedAt: json["assigned_at"] != null ? DateTime.parse(json["assigned_at"]) : null,
+    reachedAt: json["reached_at"] == null ? null : DateTime.parse(json["reached_at"]),
+    reachedLatitude: json["reached_latitude"],
+    reachedLongitude: json["reached_longitude"],
+    reachedAttachments: json["reached_attachments"] != null ? List<String>.from(json["reached_attachments"].map((x) => x)) : [],
     startedAt: json["started_at"] != null ? DateTime.parse(json["started_at"]) : null,
     startLatitude: json["start_latitude"] ?? "",
     startLongitude: json["start_longitude"] ?? "",
@@ -496,6 +508,10 @@ class VisitTechnician {
     "is_primary": isPrimary,
     "field_status": fieldStatus,
     "assigned_at": assignedAt?.toIso8601String(),
+    "reached_at": reachedAt?.toIso8601String(),
+    "reached_latitude": reachedLatitude,
+    "reached_longitude": reachedLongitude,
+    "reached_attachments": List<dynamic>.from(reachedAttachments.map((x) => x)),
     "started_at": startedAt?.toIso8601String(),
     "start_latitude": startLatitude,
     "start_longitude": startLongitude,

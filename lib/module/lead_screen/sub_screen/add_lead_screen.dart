@@ -1,5 +1,6 @@
 import 'package:crm/config/app_shared_pref.dart';
 import 'package:crm/module/inquiry_screen/Inquiry_controller.dart';
+import 'package:crm/module/inquiry_screen/model/Inquiry_view_response.dart';
 import 'package:crm/module/inquiry_screen/sub_screen/Inquiry_view_screen.dart';
 import 'package:crm/module/lead_screen/model/get_assign_partner.dart';
 import 'package:crm/widget/dropdown.dart';
@@ -24,8 +25,6 @@ import '../model/lead_model.dart';
 import '../model/lead_type.dart';
 import '../widget/tab_screen.dart';
 import 'create_contact_person_screen.dart';
-
-import 'package:crm/module/inquiry_screen/model/Inquiry_view_response.dart';
 
 class AddLeadScreen extends StatefulWidget {
   final bool isEdit;
@@ -130,10 +129,10 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
     });
     if (widget.isEdit == false) {
       leadController.clearData();
-      
+
       if (widget.prefillFromInquiry != null) {
         final inquiry = widget.prefillFromInquiry!;
-        
+
         if (inquiry.id != null && inquiry.id!.isNotEmpty) {
           leadController.selectedContactName.value = ContactNameDatum(
             id: inquiry.id ?? "",
@@ -186,36 +185,51 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
 
         leadController.companyNameController.value.text = inquiry.companyName ?? "";
         leadController.leadContactNameController.value.text = inquiry.companyName ?? "";
-        leadController.leadNameController.value.text = inquiry.contactName ?? "";
+        leadController.leadNameController.value.text = "${inquiry.contactName ?? ""} - ${inquiry.companyName ?? ""}";
         leadController.emailController.value.text = inquiry.email ?? "";
         leadController.mobileNumberController.value.text = inquiry.mobile1 ?? "";
         leadController.secondMobileNumberController.value.text = inquiry.mobile2 ?? "";
-        
+
         leadController.stateController.value.text = inquiry.stateName ?? "";
         leadController.stateIdController.value.text = inquiry.stateId ?? "";
         leadController.cityController.value.text = inquiry.cityName ?? "";
         leadController.cityIdController.value.text = inquiry.cityId ?? "";
         leadController.pinCodeController.value.text = inquiry.pincodeName ?? "";
         leadController.pinCodeIdController.value.text = inquiry.pincodeId ?? "";
-        
+
         if (inquiry.sourceId != null && inquiry.sourceId!.isNotEmpty) {
-            leadController.selectedSource.value = LeadItem(id: inquiry.sourceId!, name: inquiry.sourceName ?? "");
-            leadController.isEnableSource.value = false;
+          leadController.selectedSource.value = LeadItem(id: inquiry.sourceId!, name: inquiry.sourceName ?? "");
+          leadController.isEnableSource.value = false;
         } else {
-            leadController.selectedSource.value = null;
-            leadController.isEnableSource.value = true;
+          leadController.selectedSource.value = null;
+          leadController.isEnableSource.value = true;
         }
-        
+
         if (inquiry.stateId != null && inquiry.stateId!.isNotEmpty) {
-            leadController.selectedState.value = StateDatum(id: inquiry.stateId!, name: inquiry.stateName ?? "", countryId: CountryId(id: inquiry.countryId ?? "", name: inquiry.countryName ?? ""));
+          leadController.selectedState.value = StateDatum(
+            id: inquiry.stateId!,
+            name: inquiry.stateName ?? "",
+            countryId: CountryId(id: inquiry.countryId ?? "", name: inquiry.countryName ?? ""),
+          );
         }
         if (inquiry.cityId != null && inquiry.cityId!.isNotEmpty) {
-            leadController.selectedCity.value = CityDatum(id: inquiry.cityId!, name: inquiry.cityName ?? "", stateId: StateId(id: inquiry.stateId ?? "", name: inquiry.stateName ?? ""), countryId: StateId(id: inquiry.countryId ?? "", name: inquiry.countryName ?? ""));
+          leadController.selectedCity.value = CityDatum(
+            id: inquiry.cityId!,
+            name: inquiry.cityName ?? "",
+            stateId: StateId(id: inquiry.stateId ?? "", name: inquiry.stateName ?? ""),
+            countryId: StateId(id: inquiry.countryId ?? "", name: inquiry.countryName ?? ""),
+          );
         }
         if (inquiry.pincodeId != null && inquiry.pincodeId!.isNotEmpty) {
-            leadController.selectedPinCode.value = PinCodeDatum(id: inquiry.pincodeId!, pinCode: inquiry.pincodeName ?? "", cityId: Id(id: inquiry.cityId ?? "", name: inquiry.cityName ?? ""), stateId: Id(id: inquiry.stateId ?? "", name: inquiry.stateName ?? ""), countryId: Id(id: inquiry.countryId ?? "", name: inquiry.countryName ?? ""));
+          leadController.selectedPinCode.value = PinCodeDatum(
+            id: inquiry.pincodeId!,
+            pinCode: inquiry.pincodeName ?? "",
+            cityId: Id(id: inquiry.cityId ?? "", name: inquiry.cityName ?? ""),
+            stateId: Id(id: inquiry.stateId ?? "", name: inquiry.stateName ?? ""),
+            countryId: Id(id: inquiry.countryId ?? "", name: inquiry.countryName ?? ""),
+          );
         }
-        
+
         leadController.remarksController.value.text = inquiry.remarks ?? "";
       }
 
@@ -718,7 +732,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                             Container(
                               decoration: const BoxDecoration(
                                 color: AppColors.white,
-                                borderRadius: BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+                                borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
                               ),
                               height: Get.height * 0.75,
                               child: SafeArea(
@@ -771,13 +785,21 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                                             return ListTile(
                                               title: Text(item.contactName),
                                               subtitle: Text("${item.companyName} ${item.stateName.isNotEmpty ? "- ${item.stateName}" : ""}"),
+                                              trailing: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(6)),
+                                                child: Text(
+                                                  item.isCustomer ? "Customer" : "Inquiry",
+                                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                                                ),
+                                              ),
                                               onTap: () {
                                                 leadController.selectedContactName.value = item;
                                                 leadController.selectedContactPerson.value = null;
                                                 leadController.getContactPersonApi(customerId: item.id);
                                                 leadController.companyNameController.value.text = item.companyName;
                                                 leadController.leadContactNameController.value.text = item.companyName;
-                                                leadController.leadNameController.value.text = item.contactName;
+                                                leadController.leadNameController.value.text = "${item.contactName} - ${item.companyName}";
                                                 leadController.emailController.value.text = item.email;
                                                 leadController.mobileNumberController.value.text = item.mobile1;
                                                 leadController.secondMobileNumberController.value.text = item.mobile2;
@@ -808,8 +830,70 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
                           );
                         },
                         validationMessage: "Contact Name is required",
-                        suffixIcon: const Icon(Icons.arrow_drop_down_sharp),
+                        padding: 8,
+                        suffixIcon: Obx(() {
+                          final selected = leadController.selectedContactName.value;
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (selected != null) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.indigo50,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    selected.isCustomer ? "Customer" : "Inquiry",
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.indigo600Main),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () {
+                                    leadController.selectedContactName.value = null;
+                                    leadController.leadNameController.value.clear();
+                                    leadController.companyNameController.value.clear();
+                                    leadController.leadContactNameController.value.clear();
+                                    leadController.emailController.value.clear();
+                                    leadController.mobileNumberController.value.clear();
+                                    leadController.secondMobileNumberController.value.clear();
+                                    leadController.stateController.value.clear();
+                                    leadController.cityController.value.clear();
+                                    leadController.pinCodeController.value.clear();
+                                    leadController.selectedSource.value = null;
+                                    leadController.isEnableSource.value = true;
+                                  },
+                                  icon: const Icon(Icons.close, size: 18, color: AppColors.gray400),
+                                ),
+                              ],
+                              Container(height: 24, width: 1, color: AppColors.gray300),
+                              const Icon(Icons.arrow_drop_down_sharp, color: AppColors.gray400),
+                              const SizedBox(width: 8),
+                            ],
+                          );
+                        }),
                       ),
+                      Obx(() {
+                        final selected = leadController.selectedContactName.value;
+                        if (selected != null && selected.gstNumber.isNotEmpty) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 16.0),
+                            child: Row(
+                              children: [
+                                const Text(
+                                  "GST Number ",
+                                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                ),
+                                Text(
+                                  "[${selected.gstNumber}]",
+                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      }),
                       commonTextField(
                         labelText: "Company Name",
                         hintText: "Enter Company Name",

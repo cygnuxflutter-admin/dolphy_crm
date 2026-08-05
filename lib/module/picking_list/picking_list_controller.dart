@@ -37,7 +37,6 @@ class PickingListController extends GetxController {
   Rx<SuggestionsData?> pickingSuggestions = Rx<SuggestionsData?>(null);
   Rx<RackSuggestion?> selectedRack = Rx<RackSuggestion?>(null);
 
-  final RxBool isInvoiceExpanded = false.obs;
   final RxInt selectedAttachmentTab = 0.obs;
   final quantityController = TextEditingController();
   final barcodeController = TextEditingController();
@@ -275,9 +274,7 @@ class PickingListController extends GetxController {
         toastMessage(text: "Pick submitted successfully");
         isLoading.value = false;
         // Refresh detail
-        if (pickingDetail.value != null) {
-          getPickingDetail(pickingDetail.value!.id!);
-        }
+        getPickingDetail(pickingId);
         Get.back();
       } else {
         isLoading.value = false;
@@ -314,6 +311,52 @@ class PickingListController extends GetxController {
     } catch (e) {
       debugPrint("Error rejecting picking: $e");
       toastMessage(text: "An error occurred while rejecting picking");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<bool> updateSerialCode({required String serialId, required String oldSerialNo, required String newSerialNo}) async {
+    isLoading.value = true;
+    try {
+      final body = {"serial_id": serialId, "serial_number": oldSerialNo, "new_serial_number": newSerialNo};
+
+      final response = await ApiHandler.patchRequest(url: ApiEndPoint.updateSerialNumber, body: body);
+      final data = response.data;
+
+      if (response.statusCode == 200 && (data['status'] == 200 || data['status'] == 201)) {
+        toastMessage(text: data['message'] ?? "Serial number updated successfully");
+
+        if (pickingSuggestions.value != null) {
+          final updatedSerials = pickingSuggestions.value!.serials.map((s) {
+            if (s.id == serialId) {
+              return Serial(id: s.id, serialNo: newSerialNo, batchNumber: s.batchNumber, expiryDate: s.expiryDate, rackId: s.rackId);
+            }
+            return s;
+          }).toList();
+
+          pickingSuggestions.value = SuggestionsData(serials: updatedSerials, byRack: pickingSuggestions.value!.byRack);
+
+          final index = selectedSerials.indexWhere((s) => s.id == serialId);
+          if (index != -1) {
+            selectedSerials[index] = Serial(
+              id: serialId,
+              serialNo: newSerialNo,
+              batchNumber: selectedSerials[index].batchNumber,
+              expiryDate: selectedSerials[index].expiryDate,
+              rackId: selectedSerials[index].rackId,
+            );
+          }
+        }
+        return true;
+      } else {
+        toastMessage(text: data['message'] ?? "Failed to update serial number");
+        return false;
+      }
+    } catch (e) {
+      debugPrint("Error updating serial number: $e");
+      toastMessage(text: "An error occurred while updating serial number");
+      return false;
     } finally {
       isLoading.value = false;
     }

@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 
 class AddVisitController extends GetxController {
   RxBool isLoading = false.obs;
+  RxBool isSubmitLoading = false.obs;
   RxBool isComplaintLoading = false.obs;
   RxBool isTechnicianLoading = false.obs;
   RxBool isProductLoading = false.obs;
@@ -48,6 +49,9 @@ class AddVisitController extends GetxController {
   RxList<AssignSalesPerson> technicianList = <AssignSalesPerson>[].obs;
   RxList<Product> complaintProducts = <Product>[].obs;
 
+  RxList<dynamic> statusOptionsList = <dynamic>[].obs;
+  Rxn<dynamic> selectedStatus = Rxn<dynamic>();
+
   @override
   void onInit() {
     super.onInit();
@@ -56,18 +60,18 @@ class AddVisitController extends GetxController {
 
   Future<void> initData() async {
     isLoading.value = true;
+    await getVisitPurposes();
+    await getTechnicians();
+    await getStatusOptions();
     if (Get.arguments != null && Get.arguments is String) {
       isEdit.value = true;
       visitId = Get.arguments;
-      fetchVisitDetailForEdit(visitId!);
+      await fetchVisitDetailForEdit(visitId!);
     }
-    await getVisitPurposes();
-    await getTechnicians();
     isLoading.value = false;
   }
 
   Future<void> fetchVisitDetailForEdit(String id) async {
-    isLoading.value = true;
     try {
       final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}service-visit/find/$id");
       final data = json.decode(response.data);
@@ -92,19 +96,41 @@ class AddVisitController extends GetxController {
         addressController.value.text = visit.address;
         remarkController.value.text = visit.remark ?? "";
 
-        startDateController.value.text = DateFormat('yyyy-MM-dd HH:mm').format(visit.visitStartDatetime);
-        endDateController.value.text = DateFormat('yyyy-MM-dd HH:mm').format(visit.visitEndDatetime);
+        selectedStatus.value = statusOptionsList.firstWhereOrNull((e) => e['value'] == visit.status);
+
+        startDateController.value.text = DateFormat('yyyy-MM-dd HH:mm').format(visit.visitStartDatetime.toLocal());
+        endDateController.value.text = DateFormat('yyyy-MM-dd HH:mm').format(visit.visitEndDatetime.toLocal());
 
         // Selection variables
-        selectedVisitPurpose.value = visitPurposeList.firstWhereOrNull((e) => e.id == visit.visitPurpose);
-        selectedPrimaryTechnician.value = technicianList.firstWhereOrNull((e) => e.id == visit.primaryTechnicianId);
+        selectedVisitPurpose.value =
+            visitPurposeList.firstWhereOrNull((e) => e.id == visit.visitPurpose) ?? LeadItem(id: visit.visitPurpose, name: visit.visitPurposeName);
 
         selectedTechnicians.clear();
-        for (var tid in visit.technicianIds) {
-          final tech = technicianList.firstWhereOrNull((e) => e.id == tid);
-          if (tech != null) {
-            selectedTechnicians.add(tech);
+        for (var tech in visit.technicians) {
+          AssignSalesPerson? salesPerson = technicianList.firstWhereOrNull((e) => e.id == tech.id);
+          if (salesPerson == null) {
+            final names = tech.name.split(' ');
+            final firstName = names.isNotEmpty ? names[0] : tech.name;
+            final lastName = names.length > 1 ? names.sublist(1).join(' ') : "";
+            salesPerson = AssignSalesPerson(id: tech.id, firstName: firstName, lastName: lastName);
           }
+          selectedTechnicians.add(salesPerson);
+
+          if (tech.id == visit.primaryTechnicianId) {
+            selectedPrimaryTechnician.value = salesPerson;
+          }
+        }
+
+        // Double check if primary was set
+        if (selectedPrimaryTechnician.value == null && visit.primaryTechnicianId.isNotEmpty) {
+          AssignSalesPerson? salesPerson = technicianList.firstWhereOrNull((e) => e.id == visit.primaryTechnicianId);
+          if (salesPerson == null) {
+            final names = visit.primaryTechnicianName.split(' ');
+            final firstName = names.isNotEmpty ? names[0] : visit.primaryTechnicianName;
+            final lastName = names.length > 1 ? names.sublist(1).join(' ') : "";
+            salesPerson = AssignSalesPerson(id: visit.primaryTechnicianId, firstName: firstName, lastName: lastName);
+          }
+          selectedPrimaryTechnician.value = salesPerson;
         }
 
         // Products
@@ -112,8 +138,6 @@ class AddVisitController extends GetxController {
       }
     } catch (e) {
       debugPrint("Error fetching visit for edit: $e");
-    } finally {
-      isLoading.value = false;
     }
   }
 
@@ -164,6 +188,18 @@ class AddVisitController extends GetxController {
       debugPrint("Error fetching technicians: $e");
     } finally {
       isTechnicianLoading.value = false;
+    }
+  }
+
+  Future<void> getStatusOptions() async {
+    try {
+      final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}service-visit/status-options");
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+        statusOptionsList.assignAll(data['data']);
+      }
+    } catch (e) {
+      debugPrint("Error fetching status options: $e");
     }
   }
 
@@ -275,7 +311,7 @@ class AddVisitController extends GetxController {
       return;
     }
 
-    isLoading.value = true;
+    isSubmitLoading.value = true;
     try {
       // Helper to convert yyyy-MM-dd HH:mm to ISO8601
       String formatToIso(String dateStr) {
@@ -304,7 +340,7 @@ class AddVisitController extends GetxController {
       };
 
       if (isEdit.value) {
-        body["status"] = currentStatus ?? "cancelled";
+        body["status"] = selectedStatus.value?['value'] ?? currentStatus ?? "pending";
       }
 
       final url = isEdit.value ? "${ApiEndPoint.baseUrl}service-visit/update/$visitId" : "${ApiEndPoint.baseUrl}service-visit/create";
@@ -322,7 +358,7 @@ class AddVisitController extends GetxController {
       debugPrint("Error submitting visit: $e");
       toastMessage(text: "Something went wrong");
     } finally {
-      isLoading.value = false;
+      isSubmitLoading.value = false;
     }
   }
 }

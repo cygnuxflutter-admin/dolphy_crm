@@ -62,4 +62,23 @@ class NotificationController extends GetxController {
       if (unreadCount.value > 0) unreadCount.value--;
     }
   }
+
+  Future<void> markAllNotificationsAsRead() async {
+    try {
+      final response = await ApiHandler.patchTokenRequest(
+        url: ApiEndPoint.markReadNotifications,
+        body: jsonEncode({"markAll": true}),
+      );
+
+      if (response.statusCode == 200) {
+        unreadCount.value = 0;
+        for (var notification in notificationList) {
+          notification.isRead = true;
+        }
+        notificationList.refresh();
+      }
+    } catch (e) {
+      print("Error marking all notifications as read: $e");
+    }
+  }
 }
