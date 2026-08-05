@@ -37,7 +37,6 @@ List<GetPage> getPages = [
   GetPage(name: AppRoutes.splashScreen, page: () => SplashScreen(), binding: SplashBinding()),
   GetPage(name: AppRoutes.loginScreen, page: () => LoginScreen(), binding: LoginScreenBinding()),
   GetPage(name: AppRoutes.homeScreen, page: () => HomeScreen(), binding: HomeScreenBinding()),
-  // GetPage(name: AppRoutes.addLeadScreen, page: () => AddInquiryScreen(), binding: InquiryScreenBinding()),
   GetPage(name: AppRoutes.leadScreen, page: () => LeadScreen(), binding: LeadBinding()),
   GetPage(name: AppRoutes.addLeadScreen, page: () => AddLeadScreen(), binding: LeadBinding()),
   GetPage(name: AppRoutes.LeadDetailScreen, page: () => LeadDetailScreen(), binding: LeadBinding()),

@@ -1,9 +1,11 @@
+import 'package:crm/module/packing_screen/model/physical_box_status_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import '../../../config/app_colors.dart';
 import '../model/box_config_model.dart';
+import '../model/box_suggestion_response_model.dart';
 import '../model/packing_list_detail_response_model.dart';
 import '../packing_controller.dart';
 
@@ -100,7 +102,7 @@ class PackingListScreen extends GetView<PackingController> {
             ),
             if (controller.isLoading.value)
               Container(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 child: const Center(child: CircularProgressIndicator(color: AppColors.white)),
               ),
           ],
@@ -117,7 +119,7 @@ class PackingListScreen extends GetView<PackingController> {
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.gray200, width: 0.8),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,7 +148,7 @@ class PackingListScreen extends GetView<PackingController> {
             color: AppColors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.gray200, width: 0.8),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,7 +184,7 @@ class PackingListScreen extends GetView<PackingController> {
             color: AppColors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.gray200, width: 0.8),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,16 +204,22 @@ class PackingListScreen extends GetView<PackingController> {
                 child: Divider(height: 1, color: AppColors.gray100),
               ),
               Obx(() {
-                final int totalProducts = data.items?.length ?? 0;
-                int totalPackedQty = 0;
-                int totalSuggestedBoxes = 0;
-                for (var item in data.items ?? []) {
-                  final double pq = double.tryParse(item.packedQty ?? "0") ?? 0;
-                  totalPackedQty += pq.toInt();
+                final suggestionSummary = controller.boxSuggestionData.value?.summary;
+                int totalProducts = suggestionSummary?.totalProducts ?? data.items?.length ?? 0;
+                int totalPackedQty = suggestionSummary?.totalPackedQty ?? 0;
+                int totalSuggestedBoxes = suggestionSummary?.totalSuggestedBoxes ?? 0;
 
-                  final int perBox = item.product?.perBoxItemCount ?? 1;
-                  final int basePerBox = perBox > 0 ? perBox : 1;
-                  totalSuggestedBoxes += (pq / basePerBox).ceil();
+                if (suggestionSummary == null) {
+                  totalPackedQty = 0;
+                  totalSuggestedBoxes = 0;
+                  for (var item in data.items ?? []) {
+                    final double pq = double.tryParse(item.packedQty ?? "0") ?? 0;
+                    totalPackedQty += pq.toInt();
+
+                    final int perBox = item.product?.perBoxItemCount ?? 1;
+                    final int basePerBox = perBox > 0 ? perBox : 1;
+                    totalSuggestedBoxes += (pq / basePerBox).ceil();
+                  }
                 }
 
                 return Column(
@@ -222,7 +230,10 @@ class PackingListScreen extends GetView<PackingController> {
                     const SizedBox(height: 8),
                     _buildSummaryRow("Total Suggested Boxes:", "$totalSuggestedBoxes"),
                     const SizedBox(height: 8),
-                    _buildSummaryRow("Actual Boxes:", "${controller.boxConfigs.length}"),
+                    _buildSummaryRow(
+                      "Actual Boxes:",
+                      "${controller.boxConfigs.fold(0, (sum, config) => sum + (config.toBox - config.fromBox + 1).clamp(1, 99999))}",
+                    ),
                   ],
                 );
               }),
@@ -277,7 +288,7 @@ class PackingListScreen extends GetView<PackingController> {
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.gray200, width: 0.8),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,254 +308,46 @@ class PackingListScreen extends GetView<PackingController> {
           ),
           const Divider(height: 1, color: AppColors.gray100),
           Obx(() {
-            // Register boxConfigs dependency
             controller.boxConfigs.length;
-            final items = data.items ?? [];
+            final suggestionItems = controller.boxSuggestionData.value?.items;
+
+            if (suggestionItems != null && suggestionItems.isNotEmpty) {
+              final items = List<BoxSuggestionItem>.from(suggestionItems);
+              items.sort((a, b) => (a.productName ?? "").toLowerCase().compareTo((b.productName ?? "").toLowerCase()));
+
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    for (int i = 0; i < items.length; i++) ...[
+                      _buildSuggestionItemCard(items[i], i + 1),
+                      if (i < items.length - 1) const SizedBox(height: 16),
+                    ],
+                  ],
+                ),
+              );
+            }
+
+            final items = List<PackingListDataItem>.from(data.items ?? []);
+            items.sort((a, b) => (a.product?.productName ?? "").toLowerCase().compareTo((b.product?.productName ?? "").toLowerCase()));
 
             if (items.isEmpty) {
               return Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Text("No items available", style: TextStyle(color: AppColors.textSecondary.withOpacity(0.7), fontSize: 12)),
+                child: Text("No items available", style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.7), fontSize: 12)),
               );
             }
 
-            return ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
+            return Padding(
               padding: const EdgeInsets.all(16),
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                final double pqDouble = double.tryParse(item.packedQty ?? "0") ?? 0;
-                final int packedQty = pqDouble.toInt();
-                final int perBoxCount = item.product?.perBoxItemCount ?? 1;
-                final int basePerBox = perBoxCount > 0 ? perBoxCount : 1;
-
-                final int fullBoxes = packedQty ~/ basePerBox;
-                final int remaining = packedQty % basePerBox;
-                final int suggestedBoxes = (packedQty / basePerBox).ceil();
-
-                final int physicallyPacked = controller.getPhysicallyPackedQty(item.product?.id ?? "");
-                final int pendingPack = packedQty - physicallyPacked;
-                final int actualBox = controller.getActualBoxesForProduct(item.product?.id ?? "");
-
-                String breakdown = "$suggestedBoxes box(es) * $basePerBox items each = ${suggestedBoxes * basePerBox} items";
-                if (remaining > 0) {
-                  breakdown = "$fullBoxes box(es) * $basePerBox + 1 box * $remaining = $packedQty items";
-                }
-
-                final imageUrl = item.product?.imageUrl;
-
-                // Find actual boxes containing this product
-                final packedBoxes = controller.boxConfigs.where((box) {
-                  return box.items.any((bi) => bi.productId == item.product?.id && bi.qty > 0);
-                }).toList();
-
-                return Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.gray50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.gray200, width: 0.6),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Product Image
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                width: 56,
-                                height: 56,
-                                color: AppColors.gray200,
-                                child: imageUrl != null && imageUrl.isNotEmpty
-                                    ? Image.network(
-                                        imageUrl,
-                                        fit: BoxFit.cover,
-                                        loadingBuilder: (context, child, loadingProgress) {
-                                          if (loadingProgress == null) return child;
-                                          return const Center(
-                                            child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                                          );
-                                        },
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return const Icon(Icons.image_not_supported, size: 24, color: AppColors.gray400);
-                                        },
-                                      )
-                                    : const Icon(Icons.widgets_outlined, size: 24, color: AppColors.gray400),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // Product Name & Code
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.product?.productName ?? "-",
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.qr_code, size: 12, color: AppColors.gray400),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        item.product?.productCode ?? "-",
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.indigo600Main),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Divider(height: 1, color: AppColors.gray200),
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _suggestionStat("Packed Qty", "$packedQty"),
-                                _suggestionStat("Per Box Count", "$basePerBox"),
-                                _suggestionStat("Full Boxes", "$fullBoxes"),
-                                _suggestionStat("Remaining", "$remaining"),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _suggestionStat("Suggested Boxes", "$suggestedBoxes"),
-                                _suggestionStat(
-                                  "Physically Packed",
-                                  "$physicallyPacked",
-                                  valueColor: physicallyPacked >= packedQty ? AppColors.green500Success : AppColors.orangeColor,
-                                ),
-                                _suggestionStat("Actual Box", "$actualBox"),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    const Text(
-                                      "Status",
-                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    physicallyPacked >= packedQty
-                                        ? Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(color: AppColors.green100, borderRadius: BorderRadius.circular(4)),
-                                            child: const Text(
-                                              "Completed",
-                                              style: TextStyle(color: AppColors.green800, fontWeight: FontWeight.bold, fontSize: 9),
-                                            ),
-                                          )
-                                        : Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(color: AppColors.red100, borderRadius: BorderRadius.circular(4)),
-                                            child: Text(
-                                              "Pending $pendingPack",
-                                              style: const TextStyle(color: AppColors.red800, fontWeight: FontWeight.bold, fontSize: 9),
-                                            ),
-                                          ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AppColors.white,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: AppColors.gray200, width: 0.6),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.info_outline, size: 13, color: AppColors.textSecondary),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      breakdown,
-                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Padding(
-                                  padding: EdgeInsets.only(top: 4),
-                                  child: Text(
-                                    "Packed In:  ",
-                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: packedBoxes.isEmpty
-                                      ? Padding(
-                                          padding: const EdgeInsets.only(top: 4),
-                                          child: Text(
-                                            "Not packed in any box yet",
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: AppColors.textSecondary.withOpacity(0.6),
-                                              fontStyle: FontStyle.italic,
-                                            ),
-                                          ),
-                                        )
-                                      : Wrap(
-                                          spacing: 6,
-                                          runSpacing: 6,
-                                          children: packedBoxes.map((box) {
-                                            final boxItem = box.items.firstWhere((bi) => bi.productId == item.product?.id);
-                                            return Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: AppColors.indigo600Main.withOpacity(0.08),
-                                                borderRadius: BorderRadius.circular(6),
-                                                border: Border.all(color: AppColors.indigo600Light.withOpacity(0.2), width: 0.6),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  const Icon(Icons.inventory_2_outlined, size: 10, color: AppColors.indigo600Main),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    "${box.boxName} (${boxItem.qty} pc)",
-                                                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          }).toList(),
-                                        ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+              child: Column(
+                children: [
+                  for (int i = 0; i < items.length; i++) ...[
+                    _buildSuggestionItemCard(items[i], i + 1),
+                    if (i < items.length - 1) const SizedBox(height: 16),
+                  ],
+                ],
+              ),
             );
           }),
         ],
@@ -552,19 +355,234 @@ class PackingListScreen extends GetView<PackingController> {
     );
   }
 
-  Widget _suggestionStat(String label, String value, {Color? valueColor}) {
+  Widget _buildSuggestionItemCard(dynamic item, int index) {
+    String productName = "-";
+    String productCode = "-";
+    String imageUrl = "";
+    int packedQty = 0;
+    int perBoxCount = 1;
+    int fullBoxes = 0;
+    int remaining = 0;
+    int suggestedBoxes = 0;
+    int physicallyPacked = 0;
+    int actualBox = 0;
+    String breakdown = "";
+    String? productId;
+
+    if (item is BoxSuggestionItem) {
+      productId = item.productId;
+      productName = item.productName ?? "-";
+      productCode = item.productCode ?? "-";
+      imageUrl = item.imageUrl ?? "";
+      packedQty = item.packedQty ?? 0;
+      perBoxCount = item.perBoxCount ?? 1;
+      fullBoxes = item.fullBoxes ?? 0;
+      remaining = item.remainingItems ?? 0;
+      suggestedBoxes = item.suggestedBoxes ?? 0;
+      physicallyPacked = controller.getPhysicallyPackedQty(productId ?? "");
+      actualBox = item.actualBoxes ?? controller.getActualBoxesForProduct(productId ?? "");
+      breakdown = item.boxBreakdown ?? "";
+    } else if (item is PackingListDataItem) {
+      productId = item.product?.id;
+      productName = item.product?.productName ?? "-";
+      productCode = item.product?.productCode ?? "-";
+      imageUrl = item.product?.imageUrl ?? "";
+      final double pqDouble = double.tryParse(item.packedQty ?? "0") ?? 0;
+      packedQty = item.packedQty != null ? pqDouble.toInt() : (item.orderedQty ?? 0);
+      perBoxCount = item.perBoxCount ?? item.product?.perBoxItemCount ?? 1;
+      fullBoxes = item.fullBoxes ?? (packedQty ~/ (perBoxCount > 0 ? perBoxCount : 1));
+      remaining = item.remainingItems ?? (packedQty % (perBoxCount > 0 ? perBoxCount : 1));
+      suggestedBoxes = item.suggestedBoxes ?? (packedQty / (perBoxCount > 0 ? perBoxCount : 1)).ceil();
+      physicallyPacked = controller.getPhysicallyPackedQty(productId ?? "");
+      actualBox = item.actualBoxes ?? controller.getActualBoxesForProduct(productId ?? "");
+      breakdown = item.boxBreakdown ?? "";
+      if (breakdown.isEmpty) {
+        final int bpb = perBoxCount > 0 ? perBoxCount : 1;
+        if (remaining > 0) {
+          breakdown = "$fullBoxes box(es) × $bpb + 1 box × $remaining = $packedQty items";
+        } else {
+          breakdown = "$suggestedBoxes box(es) × $bpb items each = ${suggestedBoxes * bpb} items";
+        }
+      }
+    }
+
+    final int basePerBox = perBoxCount > 0 ? perBoxCount : 1;
+    final int pendingPack = packedQty - physicallyPacked;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200, width: 0.6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Index, Image, Name
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: AppColors.indigo600Main, borderRadius: BorderRadius.circular(6)),
+                  child: Text(
+                    "#$index",
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: imageUrl.isNotEmpty
+                      ? Image.network(
+                          imageUrl,
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported, size: 24, color: AppColors.gray400),
+                        )
+                      : const Icon(Icons.image_not_supported, size: 24, color: AppColors.gray400),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        productName,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        productCode,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.indigo600Main),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.gray200),
+          // Stats Grid
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: _itemStat("Packed Qty", "$packedQty")),
+                    Expanded(child: _itemStat("Per Box Count", "$basePerBox")),
+                    Expanded(child: _itemStat("Full Boxes", "$fullBoxes")),
+                    Expanded(child: _itemStat("Remaining", "$remaining")),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(child: _itemStat("Suggested Boxes", "$suggestedBoxes")),
+                    Expanded(
+                      child: _itemStat(
+                        "Physically Packed",
+                        "$physicallyPacked",
+                        valueColor: physicallyPacked >= packedQty ? AppColors.green500Success : AppColors.orangeColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(child: _itemStat("Actual Boxes", "$actualBox", isBordered: true)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "PENDING PACK",
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                          ),
+                          const SizedBox(height: 4),
+                          physicallyPacked >= packedQty
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(color: AppColors.green500Success, borderRadius: BorderRadius.circular(4)),
+                                  child: const Text(
+                                    "Completed",
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
+                                  ),
+                                )
+                              : Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(color: AppColors.red500, borderRadius: BorderRadius.circular(4)),
+                                  child: Text(
+                                    "$pendingPack Left",
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
+                                  ),
+                                ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Footer: Breakdown
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: const BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(12), bottomRight: Radius.circular(12)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "Box Breakdown: $breakdown",
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _itemStat(String label, String value, {Color? valueColor, bool isBordered = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 0.3),
+          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.textSecondary, letterSpacing: 0.3),
         ),
-        const SizedBox(height: 3),
-        Text(
-          value,
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: valueColor ?? AppColors.textPrimary),
-        ),
+        const SizedBox(height: 4),
+        isBordered
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.indigo600Main.withValues(alpha: 0.5)),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  value,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.indigo600Main),
+                ),
+              )
+            : Text(
+                value,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary),
+              ),
       ],
     );
   }
@@ -576,7 +594,7 @@ class PackingListScreen extends GetView<PackingController> {
         color: AppColors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.gray200, width: 0.8),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -653,8 +671,11 @@ class PackingListScreen extends GetView<PackingController> {
                 Obx(() {
                   // Register boxConfigs dependency
                   controller.boxConfigs.length;
-                  final summary = controller.productSummary;
-                  final items = data.items ?? [];
+                  final summary = List<ProductSummary>.from(controller.productSummary);
+                  summary.sort((a, b) => (a.productName ?? "").toLowerCase().compareTo((b.productName ?? "").toLowerCase()));
+
+                  final items = List<PackingListDataItem>.from(data.items ?? []);
+                  items.sort((a, b) => (a.product?.productName ?? "").toLowerCase().compareTo((b.product?.productName ?? "").toLowerCase()));
 
                   return ListView.separated(
                     shrinkWrap: true,
@@ -801,7 +822,7 @@ class PackingListScreen extends GetView<PackingController> {
                       alignment: Alignment.center,
                       child: Text(
                         "No box configurations created yet.",
-                        style: TextStyle(color: AppColors.textSecondary.withOpacity(0.7), fontSize: 12),
+                        style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.7), fontSize: 12),
                       ),
                     );
                   }
@@ -812,6 +833,9 @@ class PackingListScreen extends GetView<PackingController> {
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final config = controller.boxConfigs[index];
+                      final int numBoxes = (config.toBox - config.fromBox + 1).clamp(1, 99999);
+                      final String boxTitle = numBoxes > 1 ? "Boxes ${config.fromBox} - ${config.toBox}" : "Box ${config.fromBox}";
+
                       return Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -824,51 +848,63 @@ class PackingListScreen extends GetView<PackingController> {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.inventory_2, color: AppColors.indigo600Main, size: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        boxTitle,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.indigo600Main),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        "Qty: $numBoxes box(es) • ${config.weight.toStringAsFixed(3)} kg",
+                                        style: const TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () => _showBoxConfigBottomSheet(context, data, config: config, index: index),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(color: AppColors.indigo600Main, borderRadius: BorderRadius.circular(4)),
+                                    child: const Icon(Icons.edit, size: 14, color: Colors.white),
+                                  ),
+                                ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  config.boxName,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.indigo600Main),
-                                ),
-                                const Spacer(),
-                                IconButton(
-                                  icon: const Icon(Icons.edit, size: 16, color: AppColors.indigo600Light),
-                                  onPressed: () => _showBoxConfigBottomSheet(context, data, config: config, index: index),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                ),
-                                const SizedBox(width: 12),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, size: 16, color: AppColors.red500),
-                                  onPressed: () => controller.deleteBoxConfig(config.id),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
+                                GestureDetector(
+                                  onTap: () => controller.deleteBoxConfig(config.id),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(color: AppColors.red100, borderRadius: BorderRadius.circular(4)),
+                                    child: const Icon(Icons.delete, size: 14, color: AppColors.red500),
+                                  ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "Qty: ${config.items.fold(0, (sum, i) => sum + i.qty)} item(s) • ${config.weight.toStringAsFixed(3)} kg",
-                              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
-                            ),
-                            const Divider(height: 16, color: AppColors.gray100),
-                            ...config.items.map((item) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.check_circle_outline, color: AppColors.green500Success, size: 14),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        "${item.productName} (${item.qty} pc/box)",
-                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                            const Divider(height: 20, color: AppColors.gray100),
+                            ...(() {
+                              final sortedBoxItems = List<BoxConfigItem>.from(config.items);
+                              sortedBoxItems.sort((a, b) => a.productName.toLowerCase().compareTo(b.productName.toLowerCase()));
+                              return sortedBoxItems.map((item) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle, color: AppColors.green500Success, size: 14),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          "${item.productName} (${item.qty} pc/box)",
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }),
+                                    ],
+                                  ),
+                                );
+                              });
+                            })(),
                           ],
                         ),
                       );
@@ -1035,7 +1071,7 @@ class _BoxConfigBottomSheetState extends State<BoxConfigBottomSheet> {
     final int totalItems = numBoxes * totalQtyPerBox;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(context).padding.bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1348,32 +1384,32 @@ class _BoxConfigBottomSheetState extends State<BoxConfigBottomSheet> {
             ),
           ),
           const Divider(height: 32, color: AppColors.gray200),
+          if (isEdit)
+            OutlinedButton.icon(
+              onPressed: () {
+                Get.find<PackingController>().deleteBoxConfig(widget.config!.id);
+                Navigator.pop(context);
+                Get.snackbar("Success", "Box configuration deleted", backgroundColor: Colors.red, colorText: Colors.white);
+              },
+              icon: const Icon(Icons.delete, size: 16, color: AppColors.red500),
+              label: const Text(
+                "Delete",
+                style: TextStyle(color: AppColors.red500, fontWeight: FontWeight.bold),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.red500),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          SizedBox(height: 20),
           Row(
             children: [
-              if (isEdit)
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Get.find<PackingController>().deleteBoxConfig(widget.config!.id);
-                    Navigator.pop(context);
-                    Get.snackbar("Success", "Box configuration deleted", backgroundColor: Colors.red, colorText: Colors.white);
-                  },
-                  icon: const Icon(Icons.delete, size: 16, color: AppColors.red500),
-                  label: const Text(
-                    "Delete",
-                    style: TextStyle(color: AppColors.red500, fontWeight: FontWeight.bold),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.red500),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              const Spacer(),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
                 child: const Text("Cancel"),
               ),
-              const SizedBox(width: 12),
+              Spacer(),
               ElevatedButton(
                 onPressed: () {
                   List<BoxConfigItem> boxItems = [];

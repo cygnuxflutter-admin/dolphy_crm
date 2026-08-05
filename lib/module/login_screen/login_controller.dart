@@ -9,14 +9,13 @@ import '../../config/app_colors.dart';
 import '../../config/app_shared_pref.dart';
 import '../../config/app_strings.dart';
 import '../../config/app_url.dart';
-import '../../main.dart';
 import '../../utils/api_handler.dart';
 import '../../utils/permission_handler.dart';
 import '../../widget/toast_message.dart';
 
 class LoginScreenController extends GetxController {
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController emailController = TextEditingController(text: "dipl@gmail.com");
+  final TextEditingController passwordController = TextEditingController(text: "TenantAdmin#2025");
   final FocusNode emailFocusNode = FocusNode();
   final FocusNode passwordFocusNode = FocusNode();
 
@@ -137,40 +136,49 @@ class LoginScreenController extends GetxController {
 
   Future<void> login() async {
     isLoading.value = true;
-    var response = await ApiHandler.postRequest(url: ApiEndPoint.logIn, body: {"email": emailController.text, "password": passwordController.text});
+    try {
+      var response = await ApiHandler.postRequest(
+        url: ApiEndPoint.logIn,
+        body: {"email": emailController.text.trim(), "password": passwordController.text},
+      );
 
-    final data = response.data;
+      final data = response.data;
+      debugPrint("Login Response: $data");
 
-    if (response.statusCode == 200) {
-      if (data['status'] == 200) {
-        if (rememberMe.value) {
-          await pref!.setBool(SharedPrefKey.isRememberMe, true);
-          await pref!.setString(SharedPrefKey.userEmail, emailController.text);
-          await pref!.setString(SharedPrefKey.userPassword, passwordController.text);
-          await Pref.saveRememberedUser(emailController.text, passwordController.text);
-          loadRememberedUsers();
+      if (response.statusCode == 200) {
+        if (data != null && data['status'] == 200) {
+          if (rememberMe.value) {
+            await Pref.setRememberMe(true);
+            await Pref.setUserEmail(emailController.text.trim());
+            await Pref.setUserPassword(passwordController.text);
+            await Pref.saveRememberedUser(emailController.text.trim(), passwordController.text);
+            loadRememberedUsers();
+          } else {
+            await Pref.setRememberMe(false);
+          }
+
+          await Pref.setToken(data['accessToken'] ?? "");
+          await Pref.setUserId(data['data']?['id']?.toString() ?? "");
+          await Pref.setUserName("${data['data']?['first_name'] ?? ""} ${data['data']?['last_name'] ?? ""}");
+          await Pref.setUserInfo(json.encode(data['data']));
+
+          Get.find<PermissionHandler>().getUserRolePermission();
+
+          isLoading.value = false;
+          toastMessage(text: AppStrings.loginSuccessfully, color: AppColors.greenColor, isTop: false);
+          Get.offAll(() => HomeScreen(), binding: HomeScreenBinding());
         } else {
-          await pref!.setBool(SharedPrefKey.isRememberMe, false);
-          await pref!.setString(SharedPrefKey.userEmail, "");
-          await pref!.setString(SharedPrefKey.userPassword, "");
+          isLoading.value = false;
+          toastMessage(text: data?['message'] ?? AppStrings.invalidCredential, color: AppColors.redColor, isTop: false);
         }
-        await pref!.setString(SharedPrefKey.token, data['accessToken']);
-        await pref!.setString(SharedPrefKey.userId, data['data']['id']);
-        await pref!.setString(SharedPrefKey.userName, "${data['data']['first_name']} ${data['data']['last_name']}");
-        await pref!.setString(SharedPrefKey.userInfo, json.encode(data['data']));
-
-        Get.find<PermissionHandler>().getUserRolePermission();
-
-        isLoading.value = false;
-        toastMessage(text: AppStrings.loginSuccessfully, color: AppColors.greenColor, isTop: false);
-        Get.offAll(() => HomeScreen(), binding: HomeScreenBinding());
       } else {
         isLoading.value = false;
-        toastMessage(text: AppStrings.invalidCredential, color: AppColors.redColor, isTop: false);
+        toastMessage(text: data?['message'] ?? "Server error: ${response.statusCode}", color: AppColors.redColor, isTop: false);
       }
-    } else {
+    } catch (e) {
+      debugPrint("Login Error: $e");
       isLoading.value = false;
-      toastMessage(text: AppStrings.invalidCredential, color: AppColors.redColor, isTop: false);
+      toastMessage(text: "Connection error. Please check your network.", color: AppColors.redColor, isTop: false);
     }
   }
 }

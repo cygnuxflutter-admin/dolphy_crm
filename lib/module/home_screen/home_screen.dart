@@ -11,6 +11,7 @@ import 'package:get/get.dart';
 
 import '../../config/app_shared_pref.dart';
 import '../../main.dart';
+import '../notification_screen/controller/notification_controller.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,11 +21,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  HomeScreenController homeScreenController = Get.find<HomeScreenController>();
-  PermissionHandler permissionHandler = Get.find<PermissionHandler>();
+  late HomeScreenController homeScreenController;
+  late PermissionHandler permissionHandler;
+  late NotificationController notificationController;
 
   @override
   void initState() {
+    homeScreenController = Get.find<HomeScreenController>();
+    permissionHandler = Get.find<PermissionHandler>();
+    notificationController = Get.find<NotificationController>();
     initCall();
     super.initState();
   }
@@ -35,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
     homeScreenController.selectedLocationData.value = LocationDatum(id: Pref.getLocationId(), locName: Pref.getLocationName());
     homeScreenController.selectedCompanyData.value = CompanyDatum(id: Pref.getCompanyId(), companyName: Pref.getCompanyName());
     homeScreenController.selectedFinancialYears.value = Pref.getFinancialYears();
+    notificationController.getNotifications();
   }
 
   @override
@@ -48,6 +54,34 @@ class _HomeScreenState extends State<HomeScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
+          Obx(
+            () => Stack(
+              children: [
+                IconButton(
+                  onPressed: () {
+                    notificationController.markAllNotificationsAsRead();
+                    Get.toNamed(AppRoutes.notificationScreen);
+                  },
+                  icon: const Icon(Icons.notifications_none_outlined, size: 26),
+                ),
+                if (notificationController.unreadCount.value > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(10)),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        '${notificationController.unreadCount.value}',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
           IconButton(
             onPressed: () {
               showAlertDialog(context);

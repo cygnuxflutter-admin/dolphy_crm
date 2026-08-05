@@ -1,5 +1,4 @@
 import 'package:crm/module/lead_screen/sub_screen/add_activity_screen.dart';
-import 'package:crm/widget/textfield.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -8,7 +7,6 @@ import '../../../config/app_colors.dart';
 import '../../../config/app_images.dart';
 import '../../../widget/button_view.dart';
 import '../lead_controller.dart';
-import '../model/lead_type.dart';
 
 class LeadDetailScreen extends StatefulWidget {
   const LeadDetailScreen({super.key});
@@ -37,6 +35,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    if (leadController.opportunitySectionList.isEmpty) {
+      leadController.getOpportunitySection();
+    }
+  }
+
+  @override
   void dispose() {
     _stagesScrollController.dispose();
     super.dispose();
@@ -60,8 +66,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
         ),
       ),
 
-
-
       body: SafeArea(
         child: Obx(() {
           if (leadController.isOpportunityLoading.isTrue) {
@@ -74,11 +78,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (leadController.opportunitySectionList.isNotEmpty) ...[_stagesBreadcrumbs(), const SizedBox(height: 16)],
                   _headerSection(),
-                  if (leadController.opportunitySectionList.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    _stagesBreadcrumbs(),
-                  ],
                   const SizedBox(height: 20),
                   _identityAndContactCard(),
                   const SizedBox(height: 20),
@@ -125,9 +126,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
               _headerStatItem(Icons.monetization_on_outlined, "₹${opp.expectedAmount}", "ESTIMATED VALUE"),
               _headerStatItem(Icons.pie_chart_outline, "${opp.probability}%", "PROBABILITY"),
               _headerStatItem(
-                  Icons.calendar_today_outlined,
-                  opp.expectedClosingDate.isEmpty ? "-" : DateFormat("dd MMM yyyy").format(DateTime.parse(opp.expectedClosingDate)),
-                  "CLOSE DATE"),
+                Icons.calendar_today_outlined,
+                opp.expectedClosingDate.isEmpty ? "-" : DateFormat("dd MMM yyyy").format(DateTime.parse(opp.expectedClosingDate)),
+                "CLOSE DATE",
+              ),
             ],
           ),
         ],
@@ -149,7 +151,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+            ),
           ],
         ),
       ],
@@ -158,52 +163,75 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
 
   // Stages Breadcrumb
   Widget _stagesBreadcrumbs() {
-    return Container(
-      height: 40,
-      child: ListView.builder(
-        controller: _stagesScrollController,
-        scrollDirection: Axis.horizontal,
-        itemCount: leadController.opportunitySectionList.length,
-        itemBuilder: (context, index) {
-          final item = leadController.opportunitySectionList[index];
-          final bool isSelected = leadController.selectedOpportunitySection.value?.id == item.id;
-          
-          return GestureDetector(
-            onTap: () {
-               leadController.selectedOpportunitySection.value = item;
-               leadController.updateOpportunitySection(
-                 id: leadController.leadViewData.value!.opportunity.id!,
-                 sectionId: item.id,
-                 sectionName: item.name,
-               );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
-              margin: const EdgeInsets.only(right: 4),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.green500Success : AppColors.gray200,
-                borderRadius: BorderRadius.circular(20), // Pill shape to act like chevron
-              ),
-              child: Row(
-                children: [
-                  if (isSelected) const Icon(Icons.check, size: 14, color: AppColors.white),
-                  if (isSelected) const SizedBox(width: 4),
-                  Text(
-                    item.name,
-                    style: TextStyle(
-                      color: isSelected ? AppColors.white : AppColors.gray600,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      fontSize: 12,
+    return Obx(() {
+      if (leadController.opportunitySectionList.isEmpty) return const SizedBox.shrink();
+
+      return Container(
+        height: 44,
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: AppColors.gray200),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          controller: _stagesScrollController,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: leadController.opportunitySectionList.asMap().entries.map((entry) {
+                int index = entry.key;
+                var item = entry.value;
+                final bool isSelected = leadController.selectedOpportunitySection.value?.id == item.id;
+                final bool isFirst = index == 0;
+                final bool isLast = index == leadController.opportunitySectionList.length - 1;
+                const double arrowWidth = 12.0;
+
+                return Align(
+                  widthFactor: isFirst ? 1.0 : 0.78,
+                  alignment: Alignment.centerLeft,
+                  child: GestureDetector(
+                    onTap: () {
+                      leadController.selectedOpportunitySection.value = item;
+                      leadController.updateOpportunitySection(
+                        id: leadController.leadViewData.value!.opportunity.id!,
+                        sectionId: item.id,
+                        sectionName: item.name,
+                      );
+                    },
+                    child: ClipPath(
+                      clipper: ChevronClipper(isFirst: isFirst, isLast: isLast),
+                      child: Container(
+                        padding: EdgeInsets.only(left: isFirst ? 24 : 24 + arrowWidth, right: isLast ? 24 : 24 + arrowWidth),
+                        height: 34,
+                        alignment: Alignment.center,
+                        color: isSelected ? AppColors.green500Success : AppColors.gray100,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isSelected) ...[const Icon(Icons.check, size: 14, color: AppColors.white), const SizedBox(width: 4)],
+                            Text(
+                              item.name,
+                              style: TextStyle(
+                                color: isSelected ? AppColors.white : AppColors.gray600,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ],
-              ),
+                );
+              }).toList(),
             ),
-          );
-        },
-      ),
-    );
+          ),
+        ),
+      );
+    });
   }
 
   // Identity & Contact Details
@@ -220,22 +248,48 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
             children: const [
               Icon(Icons.person_outline, size: 20, color: AppColors.indigo600Main),
               SizedBox(width: 8),
-              Text("Identity & Contact Details", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.indigo600Main)),
+              Text(
+                "Identity & Contact Details",
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+              ),
             ],
           ),
           const SizedBox(height: 20),
-          _detailRow("COMPANY NAME", opp.companyName.isNotEmpty ? opp.companyName : (opp.opportunityName.isNotEmpty ? opp.opportunityName : "-"), "CUSTOMER NAME", opp.customerName),
-          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: AppColors.gray200)),
+          _detailRow(
+            "COMPANY NAME",
+            opp.companyName.isNotEmpty ? opp.companyName : (opp.opportunityName.isNotEmpty ? opp.opportunityName : "-"),
+            "CUSTOMER NAME",
+            opp.customerName,
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, color: AppColors.gray200),
+          ),
           _detailRow("OWNER", opp.salesPersonName, "PROBABILITY", "${opp.probability}%"),
-          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: AppColors.gray200)),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, color: AppColors.gray200),
+          ),
           _detailRow("CONTACT MO", opp.mobile1, "EMAIL", opp.email),
-          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: AppColors.gray200)),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, color: AppColors.gray200),
+          ),
           _detailRow("GST NO", opp.customerGstNumber, "LOCATION", opp.locationCode),
-          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: AppColors.gray200)),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, color: AppColors.gray200),
+          ),
           _detailRow("CITY", opp.cityName, "STATE", opp.stateName),
-          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: AppColors.gray200)),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, color: AppColors.gray200),
+          ),
           _detailFullRow("ADDRESS", opp.address),
-          const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: AppColors.gray200)),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, color: AppColors.gray200),
+          ),
           _detailFullRow("REMARKS", opp.remarks),
         ],
       ),
@@ -262,9 +316,15 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(key, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+        Text(
+          key,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+        ),
         const SizedBox(height: 4),
-        Text(displayValue, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        Text(
+          displayValue,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+        ),
       ],
     );
   }
@@ -279,17 +339,17 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("SUMMARY", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+          const Text(
+            "SUMMARY",
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.indigo600Light.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  decoration: BoxDecoration(color: AppColors.indigo600Light.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                   child: Row(
                     children: [
                       CircleAvatar(
@@ -313,10 +373,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                   child: Row(
                     children: [
                       CircleAvatar(
@@ -332,10 +389,16 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                           RichText(
                             text: TextSpan(
                               children: [
-                                TextSpan(text: "${summary.totalQuotations} ", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                                TextSpan(text: "₹${summary.totalQuotationValue}", style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.green500Success)),
-                              ]
-                            )
+                                TextSpan(
+                                  text: "${summary.totalQuotations} ",
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                ),
+                                TextSpan(
+                                  text: "₹${summary.totalQuotationValue}",
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.green500Success),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -387,12 +450,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: isSelected ? AppColors.indigo600Main : Colors.transparent,
-              width: 2,
-            ),
-          ),
+          border: Border(bottom: BorderSide(color: isSelected ? AppColors.indigo600Main : Colors.transparent, width: 2)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -402,7 +460,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
             Text(
               title,
               style: TextStyle(
-                fontSize: 13, 
+                fontSize: 13,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                 color: isSelected ? AppColors.indigo600Main : AppColors.gray600,
               ),
@@ -411,10 +469,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
               const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.indigo600Light.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                decoration: BoxDecoration(color: AppColors.indigo600Light.withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
                 child: Text(
                   badgeCount.toString(),
                   style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
@@ -471,9 +526,18 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
               decoration: const BoxDecoration(color: Color(0xFFF1F3F5)),
               child: Row(
                 children: const [
-                  SizedBox(width: 160, child: Text("Date", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                  SizedBox(width: 150, child: Text("Assigned by", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                  SizedBox(width: 150, child: Text("Assigned to", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                  SizedBox(
+                    width: 160,
+                    child: Text("Date", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: Text("Assigned by", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: Text("Assigned to", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
                 ],
               ),
             ),
@@ -486,14 +550,25 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     child: Row(
                       children: [
-                        SizedBox(width: 160, child: Text(DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.parse(data.assignedAt)), style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
-                        SizedBox(width: 150, child: Text(data.assignedByName, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary))),
-                        SizedBox(width: 150, child: Text(data.assignedToName, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary))),
+                        SizedBox(
+                          width: 160,
+                          child: Text(
+                            DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.parse(data.assignedAt)),
+                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 150,
+                          child: Text(data.assignedByName, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+                        ),
+                        SizedBox(
+                          width: 150,
+                          child: Text(data.assignedToName, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+                        ),
                       ],
                     ),
                   ),
-                  if (index < assignments.length - 1)
-                    const Divider(height: 1, color: AppColors.gray200),
+                  if (index < assignments.length - 1) const Divider(height: 1, color: AppColors.gray200),
                 ],
               );
             }).toList(),
@@ -523,7 +598,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
         final startTime = DateTime.tryParse(activity.startTime) ?? DateTime.now();
         final endTime = DateTime.tryParse(activity.endTime) ?? DateTime.now();
         final timeString = "${DateFormat('dd MMM yyyy, hh:mm a').format(startTime)} - ${DateFormat('hh:mm a').format(endTime)}";
-        
+
         return Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -543,22 +618,28 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(activity.subject.isNotEmpty ? activity.subject : "-", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
+                    child: Text(
+                      activity.subject.isNotEmpty ? activity.subject : "-",
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                    ),
                   ),
                   Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: AppColors.gray100,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
+                    decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(4)),
                     child: const Icon(Icons.edit_outlined, size: 14, color: AppColors.indigo600Main),
                   ),
                   const SizedBox(width: 8),
-                  Text(activity.invitationStatus.isNotEmpty ? activity.invitationStatus : "Pending", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.orange)),
+                  Text(
+                    activity.invitationStatus.isNotEmpty ? activity.invitationStatus : "Pending",
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.orange),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
-              Text(activity.description.isNotEmpty ? activity.description : "-", style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              Text(
+                activity.description.isNotEmpty ? activity.description : "-",
+                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
               const SizedBox(height: 12),
               const Divider(height: 1, color: AppColors.gray200),
               const SizedBox(height: 12),
@@ -579,7 +660,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                       border: Border.all(color: AppColors.green500Success),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text("Done", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.green500Success)),
+                    child: const Text(
+                      "Done",
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.green500Success),
+                    ),
                   ),
                 ],
               ),
@@ -612,9 +696,18 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
               decoration: const BoxDecoration(color: Color(0xFFF1F3F5)),
               child: Row(
                 children: const [
-                  SizedBox(width: 140, child: Text("Name", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                  SizedBox(width: 180, child: Text("Email", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                  SizedBox(width: 140, child: Text("Assigned By", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                  SizedBox(
+                    width: 140,
+                    child: Text("Name", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                  SizedBox(
+                    width: 180,
+                    child: Text("Email", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                  SizedBox(
+                    width: 140,
+                    child: Text("Assigned By", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
                 ],
               ),
             ),
@@ -627,14 +720,22 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     child: Row(
                       children: [
-                        SizedBox(width: 140, child: Text(data.user.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                        SizedBox(width: 180, child: Text(data.user.email, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary))),
-                        SizedBox(width: 140, child: Text(data.assignedByName, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary))),
+                        SizedBox(
+                          width: 140,
+                          child: Text(data.user.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                        SizedBox(
+                          width: 180,
+                          child: Text(data.user.email, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+                        ),
+                        SizedBox(
+                          width: 140,
+                          child: Text(data.assignedByName, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+                        ),
                       ],
                     ),
                   ),
-                  if (index < secondarySales.length - 1)
-                    const Divider(height: 1, color: AppColors.gray200),
+                  if (index < secondarySales.length - 1) const Divider(height: 1, color: AppColors.gray200),
                 ],
               );
             }).toList(),
@@ -647,7 +748,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
   Widget _contactDetailsTab() {
     final opp = leadController.leadViewData.value!.opportunity;
     final contact = opp.contactPersonData;
-    
+
     if (contact == null) {
       return const Center(
         child: Padding(
@@ -658,7 +759,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
     }
 
     final name = "${contact.firstName} ${contact.lastName}".trim();
-    
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -700,8 +801,14 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
     return Text.rich(
       TextSpan(
         children: [
-          TextSpan(text: "$label: ", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
-          TextSpan(text: value.isNotEmpty ? value : "-", style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+          TextSpan(
+            text: "$label: ",
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+          ),
+          TextSpan(
+            text: value.isNotEmpty ? value : "-",
+            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+          ),
         ],
       ),
     );
@@ -757,7 +864,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
     );
   }
 
-
   Widget _activityTimelineSection() {
     return Container(
       width: double.infinity,
@@ -766,7 +872,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("ACTIVITY TIMELINE", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+          const Text(
+            "ACTIVITY TIMELINE",
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+          ),
           const SizedBox(height: 16),
           _logsList(),
         ],
@@ -793,7 +902,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
         final currentDate = DateFormat('yyyy-MM-dd').format(DateTime.parse(data.createdAt));
         final previousDate = index > 0 ? DateFormat('yyyy-MM-dd').format(DateTime.parse(logs[index - 1].createdAt)) : null;
         final bool showDateHeader = index == 0 || currentDate != previousDate;
-        
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -894,4 +1003,44 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       boxShadow: [BoxShadow(color: AppColors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
     );
   }
+}
+
+class ChevronClipper extends CustomClipper<Path> {
+  final bool isFirst;
+  final bool isLast;
+
+  ChevronClipper({this.isFirst = false, this.isLast = false});
+
+  @override
+  Path getClip(Size size) {
+    Path path = Path();
+    double arrowWidth = 10.0;
+
+    if (isFirst) {
+      path.moveTo(0, 0);
+      path.lineTo(size.width - arrowWidth, 0);
+      path.lineTo(size.width, size.height / 2);
+      path.lineTo(size.width - arrowWidth, size.height);
+      path.lineTo(0, size.height);
+    } else if (isLast) {
+      path.moveTo(0, 0);
+      path.lineTo(arrowWidth, size.height / 2);
+      path.lineTo(0, size.height);
+      path.lineTo(size.width, size.height);
+      path.lineTo(size.width, 0);
+    } else {
+      path.moveTo(0, 0);
+      path.lineTo(arrowWidth, size.height / 2);
+      path.lineTo(0, size.height);
+      path.lineTo(size.width - arrowWidth, size.height);
+      path.lineTo(size.width, size.height / 2);
+      path.lineTo(size.width - arrowWidth, 0);
+    }
+
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(ChevronClipper oldClipper) => oldClipper.isFirst != isFirst || oldClipper.isLast != isLast;
 }

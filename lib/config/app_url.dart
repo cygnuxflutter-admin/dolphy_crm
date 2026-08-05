@@ -1,5 +1,6 @@
 class ApiEndPoint {
   static String baseUrl = "https://tradeapi.cygnux.in/api/v1/";
+  // static String baseUrl = "http://192.168.0.230:4032/api/v1/";
   // static String baseUrl = "https://traderpuatapi.cygnux.in/api/v1/";
   // static String baseUrl = "http://192.168.0.180:4032/api/v1/";
 
@@ -23,6 +24,7 @@ class ApiEndPoint {
   static String pickingUpdate = "${baseUrl}picking-list/update-item/";
   static String pickingSubmitPick = "${baseUrl}picking-list/submit-pick";
   static String pickingReject = "${baseUrl}picking-list/reject/";
+  static String updateSerialNumber = "${baseUrl}stock/serial-numbers/update";
   static String inquiryView = "${baseUrl}customer/find/";
   static String oppTags = "${baseUrl}commonMaster/findByGroup?type=Tag+Type";
   static String oppLabel = "${baseUrl}commonMaster/findByGroup?type=Lead+Label";
@@ -60,17 +62,19 @@ class ApiEndPoint {
   static String packingCounts = "${baseUrl}packing-list/counts";
   static String packingDetail = "${baseUrl}packing-list/find/";
   static String createFromPicking = "${baseUrl}packing-list/create-from-picking";
-  static String startPacking = "${baseUrl}packing-list/start-packing";
+  static String startPacking = "${baseUrl}packing-list/start-from-picking";
   static String updatePackedQty = "${baseUrl}packing-list/update-item";
   static String completePacking = "${baseUrl}packing-list/complete-packing";
   static String requestInvoice = "${baseUrl}packing-list/send-to-invoice";
+  static String deletePacking = "${baseUrl}packing-list/delete/";
   static String requestEWayBill = "${baseUrl}packing-list/request-e-way-bill";
+  static String updateEWayBill = "${baseUrl}packing-list/update-eway-bill";
   static String viewPackingList = "${baseUrl}packing-list/view-pdf/";
   static String packingListBoxWise = "${baseUrl}packing-list/view-box-wise-pdf/";
   static String shippingLabel = "${baseUrl}packing-list/shipping-label";
   static String shippingLabelPdf = "${baseUrl}packing-list/shipping-label-pdf/";
   static String packingPhysicalBoxStatus = "${baseUrl}packing-list/physical-box/status";
-  static String packingReject = "${baseUrl}packing-list/reject/";
+  static String packingReject = "${baseUrl}picking-list/reject/";
   static String transporters = "${baseUrl}vendor/transporters";
   static String transportMode = "${baseUrl}commonMaster/findByGroup?type=Transport+Mode";
   static String boxSuggestion = "${baseUrl}packing-list/box-suggestion";
@@ -88,4 +92,5 @@ class ApiEndPoint {
 
   // Notification Endpoints
   static String notifications = "${baseUrl}notifications/my";
+  static String markReadNotifications = "${baseUrl}notifications/mark-read";
 }

@@ -94,5 +94,32 @@ class Pref {
     users.removeWhere((u) => u['email'] == email);
     await pref!.setString(SharedPrefKey.rememberedUsers, json.encode(users));
   }
-}
 
+  static Future<void> setToken(String value) async {
+    await pref!.setString(SharedPrefKey.token, value);
+  }
+
+  static Future<void> setUserName(String value) async {
+    await pref!.setString(SharedPrefKey.userName, value);
+  }
+
+  static Future<void> setUserId(String value) async {
+    await pref!.setString(SharedPrefKey.userId, value);
+  }
+
+  static Future<void> setUserInfo(String value) async {
+    await pref!.setString(SharedPrefKey.userInfo, value);
+  }
+
+  static Future<void> setRememberMe(bool value) async {
+    await pref!.setBool(SharedPrefKey.isRememberMe, value);
+  }
+
+  static Future<void> setUserEmail(String value) async {
+    await pref!.setString(SharedPrefKey.userEmail, value);
+  }
+
+  static Future<void> setUserPassword(String value) async {
+    await pref!.setString(SharedPrefKey.userPassword, value);
+  }
+}

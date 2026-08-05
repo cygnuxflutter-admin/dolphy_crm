@@ -21,8 +21,8 @@ class FieldReportScreen extends GetView<VisitController> {
   @override
   Widget build(BuildContext context) {
     final String visitId = Get.arguments ?? "";
-    if (visitId.isNotEmpty) {
-      controller.getFieldReport(visitId);
+    if (visitId.isNotEmpty && controller.fieldReportDetail.value?.id != visitId) {
+      Future.microtask(() => controller.getFieldReport(visitId));
     }
 
     return Scaffold(
@@ -43,8 +43,8 @@ class FieldReportScreen extends GetView<VisitController> {
           Obx(() {
             final data = controller.fieldReportDetail.value;
             if (data == null) return const SizedBox.shrink();
-            final currentUserTech = data.visitTechnicians?.firstWhereOrNull((t) => t.isCurrentUser == true);
-            final String fieldStatus = currentUserTech?.fieldStatus?.toLowerCase() ?? "";
+            final currentUserTech = data.visitTechnicians.firstWhereOrNull((t) => t.isCurrentUser == true);
+            final String fieldStatus = currentUserTech?.fieldStatus.toLowerCase() ?? "";
 
             if (fieldStatus == "completed") {
               return Padding(
@@ -79,100 +79,101 @@ class FieldReportScreen extends GetView<VisitController> {
 
         final currentUserId = Pref.getUserId();
         final bool canAddProduct =
-            (data.status?.toUpperCase() != "CANCELLED") &&
-            ((data.createdBy == currentUserId) || (data.technicians?.any((t) => t.id == currentUserId && t.isPrimary == true) ?? false));
+            (data.status.toUpperCase() != "CANCELLED") &&
+            ((data.createdBy == currentUserId) || (data.technicians.any((t) => t.id == currentUserId && t.isPrimary == true)));
 
-        final currentUserTech = data.visitTechnicians?.firstWhereOrNull((t) => t.isCurrentUser == true);
-        final String fieldStatus = currentUserTech?.fieldStatus?.toLowerCase() ?? "";
+        final currentUserTech = data.visitTechnicians.firstWhereOrNull((t) => t.isCurrentUser == true);
+        final String fieldStatus = currentUserTech?.fieldStatus.toLowerCase() ?? "";
         final bool showEndButton = (fieldStatus == "started" || fieldStatus == "paused") && currentUserTech?.canStart == false;
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTopHeader(data, visitId),
-              const SizedBox(height: 16),
-              _buildVisitInfoCard(data),
-              const SizedBox(height: 24),
-              _buildSiteArrivalCard(data, visitId),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Expanded(
-                    child: Text(
-                      "Product Complaint Details",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFEAB308)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (canAddProduct)
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        controller.clearAddProductForm();
-                        Get.dialog(AddProductToVisitDialog(visitId: visitId));
-                      },
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text("Add Product"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.indigo600Main,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(top: 16, right: 16, left: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildTopHeader(data, visitId),
+                const SizedBox(height: 16),
+                _buildVisitInfoCard(data),
+                const SizedBox(height: 24),
+                _buildSiteArrivalCard(data, visitId),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        "Product Complaint Details",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFEAB308)),
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (data.products != null && data.products!.isNotEmpty)
-                ...data.products!.asMap().entries.map((entry) => _buildProductItem(entry.key + 1, entry.value))
-              else
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40),
-                    child: Text("No products added to this report", style: TextStyle(color: AppColors.gray500)),
-                  ),
-                ),
-              if (showEndButton) ...[const SizedBox(height: 24), _buildEndTrackingForm(visitId)],
-              const SizedBox(height: 40),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Get.back(),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.redColor,
-                        side: const BorderSide(color: AppColors.redColor),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Obx(
-                      () => ElevatedButton(
-                        onPressed: controller.isLoading.value ? null : () => controller.saveFieldReport(visitId),
+                    const SizedBox(width: 8),
+                    if (canAddProduct)
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          controller.clearAddProductForm();
+                          Get.dialog(AddProductToVisitDialog(visitId: visitId));
+                        },
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text("Add Product"),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.indigo600Main,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
-                        child: controller.isLoading.value
-                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : const Text("Save & Draft", style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (data.products.isNotEmpty)
+                  ...data.products.asMap().entries.map((entry) => _buildProductItem(entry.key + 1, entry.value))
+                else
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40),
+                      child: Text("No products added to this report", style: TextStyle(color: AppColors.gray500)),
                     ),
                   ),
-                ],
-              ),
-
-              const SizedBox(height: 30),
-            ],
+                if (showEndButton) ...[const SizedBox(height: 24), _buildEndTrackingForm(visitId)],
+                const SizedBox(height: 0),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Get.back(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.redColor,
+                          side: const BorderSide(color: AppColors.redColor),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Obx(
+                        () => ElevatedButton(
+                          onPressed: controller.isLoading.value ? null : () => controller.saveFieldReport(visitId),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.indigo600Main,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                          child: controller.isLoading.value
+                              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Text("Save & Draft", style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       }),
@@ -180,8 +181,8 @@ class FieldReportScreen extends GetView<VisitController> {
   }
 
   Widget _buildTopHeader(FieldReportData data, String visitId) {
-    final currentUserTech = data.visitTechnicians?.firstWhereOrNull((t) => t.isCurrentUser == true);
-    final String status = currentUserTech?.fieldStatus?.toLowerCase() ?? "";
+    final currentUserTech = data.visitTechnicians.firstWhereOrNull((t) => t.isCurrentUser == true);
+    final String status = currentUserTech?.fieldStatus.toLowerCase() ?? "";
 
     final bool showStartButton = currentUserTech != null && (status == "assigned" || status == "reached") && currentUserTech.canStart == true;
     final bool showPauseStopButtons = currentUserTech != null && status == "started" && currentUserTech.canStart == false;
@@ -203,7 +204,7 @@ class FieldReportScreen extends GetView<VisitController> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    "${data.visitNo ?? ''}  Complaint ${data.complaintNo ?? ''}",
+                    "${data.visitNo}  Complaint ${data.complaintNo}",
                     style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -229,7 +230,7 @@ class FieldReportScreen extends GetView<VisitController> {
         const SizedBox(height: 12),
         Row(
           children: [
-            _statusBadge(data.statusName ?? data.status ?? "Pending"),
+            _statusBadge(data.statusName),
             const Spacer(),
             if (showStartButton)
               ElevatedButton.icon(
@@ -291,7 +292,7 @@ class FieldReportScreen extends GetView<VisitController> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
-                    onPressed: controller.isLoading.value ? null : () => controller.stopVisit(visitId),
+                    onPressed: controller.isLoading.value ? null : () => _showEndVisitConfirmation(visitId),
                     icon: controller.isLoading.value
                         ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : const Icon(Icons.stop_circle_outlined, size: 18),
@@ -328,7 +329,7 @@ class FieldReportScreen extends GetView<VisitController> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
-                    onPressed: controller.isLoading.value ? null : () => controller.stopVisit(visitId),
+                    onPressed: controller.isLoading.value ? null : () => _showEndVisitConfirmation(visitId),
                     icon: controller.isLoading.value
                         ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : const Icon(Icons.stop_circle_outlined, size: 18),
@@ -347,21 +348,22 @@ class FieldReportScreen extends GetView<VisitController> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: (currentUserTech?.fieldStatus?.toLowerCase() == "completed" ? AppColors.green500Success : AppColors.orangeColor).withValues(
+                  color: (currentUserTech?.fieldStatus.toLowerCase() == "completed" ? AppColors.green500Success : AppColors.orangeColor).withValues(
                     alpha: 0.1,
                   ),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: (currentUserTech?.fieldStatus?.toLowerCase() == "completed" ? AppColors.green500Success : AppColors.orangeColor)
-                        .withValues(alpha: 0.3),
+                    color: (currentUserTech?.fieldStatus.toLowerCase() == "completed" ? AppColors.green500Success : AppColors.orangeColor).withValues(
+                      alpha: 0.3,
+                    ),
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      currentUserTech?.fieldStatus?.toLowerCase() == "completed" ? Icons.check_circle : Icons.watch_later_outlined,
+                      currentUserTech?.fieldStatus.toLowerCase() == "completed" ? Icons.check_circle : Icons.watch_later_outlined,
                       size: 14,
-                      color: currentUserTech?.fieldStatus?.toLowerCase() == "completed" ? AppColors.green500Success : AppColors.orangeColor,
+                      color: currentUserTech?.fieldStatus.toLowerCase() == "completed" ? AppColors.green500Success : AppColors.orangeColor,
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -369,7 +371,7 @@ class FieldReportScreen extends GetView<VisitController> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: currentUserTech?.fieldStatus?.toLowerCase() == "completed" ? AppColors.green500Success : AppColors.orangeColor,
+                        color: currentUserTech?.fieldStatus.toLowerCase() == "completed" ? AppColors.green500Success : AppColors.orangeColor,
                       ),
                     ),
                   ],
@@ -414,14 +416,8 @@ class FieldReportScreen extends GetView<VisitController> {
             _infoItem("CUSTOMER", data.customerName ?? "-"),
             _infoItem("STATUS", data.statusName ?? "-"),
             _infoItem("VISIT PURPOSE", data.visitPurposeName ?? "-"),
-            _infoItem(
-              "VISIT START DATE & TIME",
-              data.visitStartDatetime != null ? DateFormat('dd/MM/yyyy hh:mm a').format(data.visitStartDatetime!.toLocal()) : "-",
-            ),
-            _infoItem(
-              "VISIT END DATE & TIME",
-              data.visitEndDatetime != null ? DateFormat('dd/MM/yyyy hh:mm a').format(data.visitEndDatetime!.toLocal()) : "-",
-            ),
+            _infoItem("VISIT START DATE & TIME", DateFormat('dd/MM/yyyy hh:mm a').format(data.visitStartDatetime.toLocal())),
+            _infoItem("VISIT END DATE & TIME", DateFormat('dd/MM/yyyy hh:mm a').format(data.visitEndDatetime.toLocal())),
             _infoItem("TECHNICIAN", data.technicianNames ?? "-"),
           ]),
         ],
@@ -504,19 +500,19 @@ class FieldReportScreen extends GetView<VisitController> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  p.productName ?? "-",
+                                  p.productName,
                                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              if (p.productCode != null)
+                              if (p.productCode.isNotEmpty)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(color: AppColors.indigo50, borderRadius: BorderRadius.circular(4)),
                                   child: Text(
-                                    p.productCode!,
+                                    p.productCode,
                                     style: const TextStyle(fontSize: 9, color: AppColors.indigo600Main, fontWeight: FontWeight.bold),
                                   ),
                                 ),
@@ -570,8 +566,50 @@ class FieldReportScreen extends GetView<VisitController> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _productMainDetails(p),
-                    const SizedBox(height: 20),
-                    _formLabel("ISSUE DESCRIPTION"),
+                    const SizedBox(height: 16),
+                    if (p.usageNote.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.indigo600Main.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.indigo600Main.withValues(alpha: 0.1)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.note_alt_outlined, size: 18, color: AppColors.indigo600Main),
+                            const SizedBox(width: 10),
+                            RichText(
+                              text: TextSpan(
+                                text: "Usage Note  ",
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.indigo600Main),
+                                children: [
+                                  TextSpan(
+                                    text: p.usageNote,
+                                    style: const TextStyle(fontWeight: FontWeight.w500),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.sticky_note_2_outlined, size: 16, color: AppColors.indigo600Main),
+                          const SizedBox(width: 8),
+                          Text(
+                            "ISSUE DESCRIPTION",
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.gray600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -589,6 +627,8 @@ class FieldReportScreen extends GetView<VisitController> {
                     const SizedBox(height: 20),
                     _buildWorkAttachmentsSection(p),
                     const SizedBox(height: 20),
+                    _buildPartsAvailableSection(p),
+                    const SizedBox(height: 20),
                     _buildPartsRequiredSection(p),
                   ],
                 ),
@@ -598,6 +638,72 @@ class FieldReportScreen extends GetView<VisitController> {
         ),
       );
     });
+  }
+
+  Widget _buildPartsAvailableSection(Product p) {
+    if (p.partsAvailable == null || p.partsAvailable!.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _formLabelWithIcon(Icons.inventory_2_outlined, "Parts Available"),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.green500Success.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              children: [
+                ...p.partsAvailable!.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final part = entry.value as Map<String, dynamic>;
+                  return Container(
+                    padding: const EdgeInsets.all(12.0),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: index == p.partsAvailable!.length - 1 ? BorderSide.none : const BorderSide(color: AppColors.gray100)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              part['part_name'] ?? "Available Part #${index + 1}",
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.green500Success),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.green500Success.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                "QTY: ${part['qty'] ?? 0}",
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.green500Success),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (part['remark'] != null && part['remark'].toString().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text("Remark: ${part['remark']}", style: const TextStyle(fontSize: 11, color: AppColors.gray500)),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _productMainDetails(Product p) {
@@ -1082,11 +1188,34 @@ class FieldReportScreen extends GetView<VisitController> {
                                 "PART #${index + 1}",
                                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
                               ),
-                              IconButton(
-                                onPressed: () => controller.removePartRequest(p.id ?? "", index),
-                                icon: const Icon(Icons.delete_outline, color: AppColors.redColor, size: 20),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
+                              Row(
+                                children: [
+                                  if (part.status.isNotEmpty)
+                                    Container(
+                                      margin: const EdgeInsets.only(right: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: (part.status == 'requested' ? AppColors.orangeColor : AppColors.green500Success).withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        part.status.toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: part.status == 'requested' ? AppColors.orangeColor : AppColors.green500Success,
+                                        ),
+                                      ),
+                                    ),
+                                  IconButton(
+                                    onPressed: () => controller.removePartRequest(p.id ?? "", index),
+                                    icon: const Icon(Icons.delete_outline, color: AppColors.redColor, size: 20),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -1095,9 +1224,18 @@ class FieldReportScreen extends GetView<VisitController> {
                           CustomDropdown<dynamic>(
                             hintText: "Search part...",
                             items: (filter, loadProps) async => await controller.searchProducts(filter),
-                            itemAsString: (item) => "[${item['product_code'] ?? ''}] ${item['product_name'] ?? '-'}",
-                            selectedItem: part['product_id'] != null ? part : null,
-                            compareFn: (i, s) => (i?['id'] ?? i?['product_id']) == (s?['id'] ?? s?['product_id']),
+                            itemAsString: (item) {
+                              if (item is PartRequest) return item.partName;
+                              if (item is Map) return "[${item['product_code'] ?? ''}] ${item['product_name'] ?? '-'}";
+                              return item.toString();
+                            },
+                            selectedItem: part.partName.isNotEmpty ? part : null,
+                            compareFn: (i, s) {
+                              if (i is PartRequest && s is PartRequest) return i.id == s.id;
+                              if (i is Map && s is Map) return (i['id'] ?? i['product_id']) == (s['id'] ?? s['product_id']);
+                              if (i is PartRequest && s is Map) return i.partName.contains(s['product_name'] ?? '');
+                              return false;
+                            },
                             onChanged: (val) => controller.updatePartRequest(p.id ?? "", index, 'product', val),
                             showSearchBox: true,
                             padding: 0,
@@ -1112,7 +1250,7 @@ class FieldReportScreen extends GetView<VisitController> {
                                   children: [
                                     _formLabel("Qty"),
                                     TextFormField(
-                                      initialValue: "${part['qty'] ?? 1}",
+                                      initialValue: "${part.qty}",
                                       keyboardType: TextInputType.number,
                                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                                       style: const TextStyle(fontSize: 12),
@@ -1140,7 +1278,7 @@ class FieldReportScreen extends GetView<VisitController> {
                                   children: [
                                     _formLabel("Remark"),
                                     TextFormField(
-                                      initialValue: part['remark'] ?? "",
+                                      initialValue: part.remark,
                                       style: const TextStyle(fontSize: 12),
                                       onChanged: (val) => controller.updatePartRequest(p.id ?? "", index, 'remark', val),
                                       decoration: InputDecoration(
@@ -1190,9 +1328,7 @@ class FieldReportScreen extends GetView<VisitController> {
                                         child: Padding(
                                           padding: const EdgeInsets.symmetric(horizontal: 12),
                                           child: Text(
-                                            part['attachments'] != null && part['attachments'].isNotEmpty
-                                                ? "${part['attachments'].length} files"
-                                                : "No file chosen",
+                                            part.attachments.isNotEmpty ? "${part.attachments.length} files" : "No file chosen",
                                             style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -1204,10 +1340,10 @@ class FieldReportScreen extends GetView<VisitController> {
                               ),
                             ],
                           ),
-                          if (part['attachments'] != null && part['attachments'].isNotEmpty) ...[
+                          if (part.attachments.isNotEmpty) ...[
                             const SizedBox(height: 8),
-                            ...List.generate(part['attachments'].length, (attIndex) {
-                              final url = part['attachments'][attIndex];
+                            ...List.generate(part.attachments.length, (attIndex) {
+                              final url = part.attachments[attIndex];
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 4),
                                 child: Row(
@@ -1700,7 +1836,7 @@ class FieldReportScreen extends GetView<VisitController> {
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Divider(height: 1, color: AppColors.gray100),
           ),
-          Wrap(spacing: 16, runSpacing: 16, children: technicians.map((tech) => _buildTechnicianArrivalCard(tech, visitId)).toList()),
+          Wrap(spacing: 16, runSpacing: 16, children: [...technicians.map((tech) => _buildTechnicianArrivalCard(tech, visitId))]),
         ],
       ),
     );
@@ -1921,7 +2057,6 @@ class FieldReportScreen extends GetView<VisitController> {
                                   return;
                                 }
                                 await controller.reachVisit(visitId);
-                                if (!controller.isLoading.value) Get.back();
                               },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.green500Success,
@@ -1997,5 +2132,46 @@ class FieldReportScreen extends GetView<VisitController> {
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       toastMessage(text: "Could not launch $url");
     }
+  }
+
+  void _showEndVisitConfirmation(String visitId) {
+    Get.dialog(
+      Obx(
+        () => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text("End Visit", style: TextStyle(fontWeight: FontWeight.bold)),
+          content: const Text("Are you sure you want to end this visit tracking? This will submit your final report and stop the timer."),
+          actions: [
+            TextButton(
+              onPressed: controller.isLoading.value ? null : () => Get.back(),
+              style: TextButton.styleFrom(foregroundColor: AppColors.gray500),
+              child: controller.isLoading.value
+                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.gray400))
+                  : const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton(
+              onPressed: controller.isLoading.value
+                  ? null
+                  : () async {
+                      await controller.stopVisit(visitId);
+                      if (!controller.isLoading.value && (Get.isDialogOpen ?? false)) {
+                        Get.back();
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.redColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+              child: controller.isLoading.value
+                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text("End Visit", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+      barrierDismissible: false,
+    );
   }
 }

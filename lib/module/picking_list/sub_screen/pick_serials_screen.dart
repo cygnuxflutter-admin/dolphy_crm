@@ -17,63 +17,19 @@ class PickSerialsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Obx(() {
-        if (controller.isSuggestionsLoading.value) {
-          return const SizedBox(height: 300, child: Center(child: CircularProgressIndicator()));
-        }
+    return Obx(() {
+      bool isBatchProduct = item.product?.trackingType?.toUpperCase() == "BATCH";
+      bool showTabs = item.product?.trackingType?.toUpperCase() == "SERIAL";
+      final suggestions = controller.pickingSuggestions.value;
 
-        if (controller.suggestionsError.value.isNotEmpty) {
-          return SizedBox(
-            height: 200,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 40, color: AppColors.redColor),
-                const SizedBox(height: 16),
-                Text(controller.suggestionsError.value, textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton(onPressed: () => Get.back(), child: const Text("Go Back")),
-                    const SizedBox(width: 16),
-                    ElevatedButton(
-                      onPressed: () => controller.getPickingSuggestions(productId: item.product?.id ?? "", requiredQty: item.pendingQty ?? "0"),
-                      child: const Text("Retry"),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        }
-
-        final suggestions = controller.pickingSuggestions.value;
-        if (suggestions == null) {
-          return SizedBox(
-            height: 200,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text("No suggestions available"),
-                const SizedBox(height: 16),
-                ElevatedButton(onPressed: () => Get.back(), child: const Text("Go Back")),
-              ],
-            ),
-          );
-        }
-
-        bool isBatchProduct = item.product?.trackingType?.toUpperCase() == "BATCH";
-        bool showTabs = item.product?.trackingType?.toUpperCase() == "SERIAL";
-
-        return Column(
+      return Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+        ),
+        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).padding.bottom + 10),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -84,43 +40,100 @@ class PickSerialsScreen extends StatelessWidget {
                 decoration: BoxDecoration(color: AppColors.gray300, borderRadius: BorderRadius.circular(2)),
               ),
             ),
-            const SizedBox(height: 20),
-            _header(context, isBatchProduct),
-            const SizedBox(height: 16),
-            Flexible(
-              child: SingleChildScrollView(
+            const SizedBox(height: 12),
+            if (controller.isSuggestionsLoading.value)
+              const SizedBox(height: 300, child: Center(child: CircularProgressIndicator()))
+            else if (controller.suggestionsError.value.isNotEmpty)
+              _suggestionsErrorView()
+            else if (suggestions == null)
+              _noSuggestionsView()
+            else
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85 - MediaQuery.of(context).viewInsets.bottom - 80),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (isBatchProduct) ...[_batchInfo(), const SizedBox(height: 16)],
-                    if (showTabs && controller.selectedInputTabIndex.value == 2) ...[_rangeErrorBanner(), const SizedBox(height: 16)],
-                    if (showTabs) ...[_serialTabs(), const SizedBox(height: 16)],
-                    if (isBatchProduct) ...[
-                      _step1SelectRack(suggestions),
-                      const SizedBox(height: 16),
-                      _batchFlow(),
-                    ] else if (controller.selectedInputTabIndex.value == 0) ...[
-                      _barcodeFlow(),
-                    ] else if (controller.selectedInputTabIndex.value == 1) ...[
-                      _step1SelectRack(suggestions),
-                      const SizedBox(height: 16),
-                      _serialFlow(suggestions),
-                    ] else if (controller.selectedInputTabIndex.value == 2) ...[
-                      _rangeFlow(),
-                    ],
+                    _header(context, isBatchProduct),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (isBatchProduct) ...[_batchInfo(), const SizedBox(height: 16)],
+                            if (showTabs && controller.selectedInputTabIndex.value == 2 && controller.rangeError.value.isNotEmpty) ...[
+                              _rangeErrorBanner(),
+                              const SizedBox(height: 16),
+                            ],
+                            if (showTabs) ...[_serialTabs(), const SizedBox(height: 16)],
+                            if (isBatchProduct) ...[
+                              _step1SelectRack(suggestions),
+                              const SizedBox(height: 16),
+                              _batchFlow(),
+                            ] else if (controller.selectedInputTabIndex.value == 0) ...[
+                              _barcodeFlow(),
+                            ] else if (controller.selectedInputTabIndex.value == 1) ...[
+                              _step1SelectRack(suggestions),
+                              const SizedBox(height: 16),
+                              _serialFlow(suggestions),
+                            ] else if (controller.selectedInputTabIndex.value == 2) ...[
+                              _rangeFlow(),
+                            ],
+                            const SizedBox(height: 16),
+                            _selectedSerialsSummary(),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 16),
-                    _selectedSerialsSummary(),
+                    _footerActions(context, suggestions, isBatchProduct, item),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            _footerActions(context, suggestions, isBatchProduct, item),
-            SizedBox(height: MediaQuery.of(context).viewInsets.bottom + 20),
           ],
-        );
-      }),
+        ),
+      );
+    });
+  }
+
+  Widget _suggestionsErrorView() {
+    return SizedBox(
+      height: 200,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 40, color: AppColors.redColor),
+          const SizedBox(height: 16),
+          Text(controller.suggestionsError.value, textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(onPressed: () => Get.back(), child: const Text("Go Back")),
+              const SizedBox(width: 16),
+              ElevatedButton(
+                onPressed: () => controller.getPickingSuggestions(productId: item.product?.id ?? "", requiredQty: item.pendingQty ?? "0"),
+                child: const Text("Retry"),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _noSuggestionsView() {
+    return SizedBox(
+      height: 200,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text("No suggestions available"),
+          const SizedBox(height: 16),
+          ElevatedButton(onPressed: () => Get.back(), child: const Text("Go Back")),
+        ],
+      ),
     );
   }
 
@@ -209,7 +222,7 @@ class PickSerialsScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: isSelected ? AppColors.white : AppColors.transparent,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: isSelected ? [BoxShadow(color: AppColors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))] : [],
+            boxShadow: isSelected ? [BoxShadow(color: AppColors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))] : [],
           ),
           child: Text(
             label,
@@ -249,7 +262,7 @@ class PickSerialsScreen extends StatelessWidget {
                       onPressed: () {
                         Get.to(
                           () => BarcodeScannerWidget(
-                            onResult: (barcode) async {
+                            onResult: (barcode) {
                               return _addSerialByBarcode(barcode);
                             },
                           ),
@@ -294,38 +307,182 @@ class PickSerialsScreen extends StatelessWidget {
     );
   }
 
-  bool _addSerialByBarcode(String barcode) {
-    print("Adding serial by barcode: $barcode");
+  Future<bool> _addSerialByBarcode(String barcode) async {
     if (barcode.isEmpty) return false;
 
     if (controller.selectedSerials.length >= (double.tryParse(item.pendingQty ?? "0")?.toInt() ?? 0)) {
-      print("Limit reached ${double.tryParse(item.pendingQty ?? "0")?.toInt() ?? 0}");
       toastMessage(text: "You have already selected the required quantity (${item.pendingQty ?? "0"})", color: AppColors.redColor);
       return false;
     }
 
     if (controller.selectedSerials.any((s) => s.serialNo == barcode)) {
-      print("Already added");
       toastMessage(text: "This serial number is already in the list", color: AppColors.redColor);
       controller.barcodeController.clear();
       return false;
     }
 
     final allSerials = controller.pickingSuggestions.value?.serials ?? [];
-    print("Total available serials: ${allSerials.length}");
-
     final suggestion = allSerials.firstWhereOrNull((s) => s.serialNo == barcode);
 
     if (suggestion != null) {
-      print("Found suggestion: ${suggestion.serialNo}");
       controller.selectedSerials.add(suggestion);
       controller.barcodeController.clear();
       return true;
     } else {
-      print("Serial not found in suggestions");
-      toastMessage(text: "Serial number not found in available stock", color: AppColors.redColor);
-      return false;
+      await _showUpdateConfirmationDialog(barcode);
+      return true; // Return true to the scanner so it doesn't show its generic error dialog
     }
+  }
+
+  Future<void> _showUpdateConfirmationDialog(String newBarcode) async {
+    final result = await Get.dialog<bool>(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("Update Code?", style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text("Serial '$newBarcode' not found in system. Are you want to update code?"),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text("No", style: TextStyle(color: AppColors.gray600)),
+          ),
+          ElevatedButton(
+            onPressed: () => Get.back(result: true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.indigo600Main,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text("Yes", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      await _showSerialSelectionDialog(newBarcode);
+    }
+  }
+
+  Future<void> _showSerialSelectionDialog(String newBarcode) async {
+    final newBarcodeController = TextEditingController(text: newBarcode);
+    final allSerials = controller.pickingSuggestions.value?.serials ?? [];
+    final availableSerials = allSerials.where((s) => !controller.selectedSerials.any((selected) => selected.id == s.id)).toList();
+
+    if (availableSerials.isEmpty) {
+      toastMessage(text: "No available serials to update", color: AppColors.redColor);
+      return;
+    }
+
+    Rx<Serial?> selectedSerialToUpdate = Rx<Serial?>(null);
+
+    await Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Update Serial Code", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              const Text("New Barcode:", style: TextStyle(fontSize: 12, color: AppColors.gray600)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: newBarcodeController,
+                decoration: InputDecoration(
+                  hintText: "Enter new barcode",
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.gray300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.gray300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.indigo600Main),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text("Select System Serial to Replace:", style: TextStyle(fontSize: 12, color: AppColors.gray600)),
+              const SizedBox(height: 8),
+              Obx(
+                () => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.gray300),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<Serial>(
+                      isExpanded: true,
+                      value: selectedSerialToUpdate.value,
+                      hint: const Text("Select system serial..."),
+                      items: availableSerials
+                          .map(
+                            (s) => DropdownMenuItem(
+                              value: s,
+                              child: Text(s.serialNo, style: const TextStyle(fontSize: 13)),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (val) => selectedSerialToUpdate.value = val,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Get.back(),
+                    child: const Text("Cancel", style: TextStyle(color: AppColors.gray600)),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final barcodeToUse = newBarcodeController.text.trim();
+                      if (barcodeToUse.isEmpty) {
+                        toastMessage(text: "Please enter new barcode");
+                        return;
+                      }
+                      if (selectedSerialToUpdate.value == null) {
+                        toastMessage(text: "Please select a serial to replace");
+                        return;
+                      }
+                      Get.back();
+
+                      final success = await controller.updateSerialCode(
+                        serialId: selectedSerialToUpdate.value!.id,
+                        oldSerialNo: selectedSerialToUpdate.value!.serialNo,
+                        newSerialNo: barcodeToUse,
+                      );
+
+                      if (success) {
+                        final updatedSerial = controller.pickingSuggestions.value?.serials.firstWhereOrNull((s) => s.serialNo == barcodeToUse);
+                        if (updatedSerial != null) {
+                          controller.selectedSerials.add(updatedSerial);
+                          controller.barcodeController.clear();
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.indigo600Main,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text("Update & Pick", style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _rangeFlow() {
@@ -456,7 +613,7 @@ class PickSerialsScreen extends StatelessWidget {
           const Icon(Icons.error_outline, size: 18, color: AppColors.red600Error),
           const SizedBox(width: 8),
           Expanded(
-            child: Text("No valid serials found in range. Please check and try again.", style: TextStyle(fontSize: 12, color: AppColors.red800)),
+            child: Text(controller.rangeError.value, style: const TextStyle(fontSize: 12, color: AppColors.red800)),
           ),
         ],
       ),
@@ -483,8 +640,8 @@ class PickSerialsScreen extends StatelessWidget {
         const SizedBox(height: 12),
         Container(
           width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 100),
-          padding: const EdgeInsets.all(16),
+          constraints: const BoxConstraints(minHeight: 60),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: AppColors.green100,
             borderRadius: BorderRadius.circular(12),
@@ -739,12 +896,10 @@ class PickSerialsScreen extends StatelessWidget {
             int needed = maxQty - controller.selectedSerials.length;
 
             if (allSelected) {
-              // Remove all items in this chunk from selectedSerials
               for (var s in chunk) {
                 controller.selectedSerials.removeWhere((selected) => selected.id == s.id);
               }
             } else {
-              // Add only those items from chunk that are not already selected, respecting the limit
               if (needed <= 0) {
                 toastMessage(text: "You have already selected the required quantity ($maxQty)", color: AppColors.redColor);
                 return;

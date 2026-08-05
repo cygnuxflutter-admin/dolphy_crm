@@ -13,13 +13,13 @@ import 'package:crm/module/lead_screen/model/lead_section_response.dart';
 import 'package:crm/module/lead_screen/model/lead_update_request.dart';
 import 'package:crm/module/lead_screen/model/search_suggestion_model.dart';
 import 'package:crm/utils/api_handler.dart';
+import 'package:crm/utils/image_picker_utils.dart';
 import 'package:crm/widget/toast_message.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:multi_dropdown/multi_dropdown.dart';
 
-import 'package:crm/utils/image_picker_utils.dart';
 import '../inquiry_screen/model/city_model.dart';
 import '../inquiry_screen/model/country_model.dart';
 import '../inquiry_screen/model/pincode_model.dart';
@@ -456,7 +456,8 @@ class LeadController extends GetxController {
     if (response.statusCode == 200) {
       if (data['status'] == 200) {
         LeadSectionResponse opportunitySectionData = LeadSectionResponse.fromJson(data);
-        opportunitySectionList.value = opportunitySectionData.opportunitySectionData;
+        opportunitySectionList.assignAll(opportunitySectionData.opportunitySectionData);
+        debugPrint("Sections Loaded: ${opportunitySectionList.length}");
       }
     }
   }
@@ -972,6 +973,9 @@ class LeadController extends GetxController {
   Future<void> getOpportunityView({required String id}) async {
     isOpportunityLoading.value = true;
     try {
+      if (opportunitySectionList.isEmpty) {
+        await getOpportunitySection();
+      }
       final response = await ApiHandler.getRequest("${ApiEndPoint.opportunityOverview}$id");
       final data = json.decode(response.data);
 

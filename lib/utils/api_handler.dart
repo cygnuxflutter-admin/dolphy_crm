@@ -71,18 +71,27 @@ class ApiHandler {
   static Future<Response> postRequest({required String url, required Map body, Map<String, dynamic>? headers}) async {
     logger.i("post $url");
     logger.i(JsonEncoder.withIndent("" * 4).convert(body));
-    Response? response;
     try {
-      response = await createRequest().post(
+      Response response = await createRequest().post(
         url,
         data: body,
         options: Options(headers: headers ?? await getHeaders()),
       );
-      logger.i(JsonEncoder.withIndent(" " * 4).convert(json.encode(response.data)));
+      logger.i("Response Data: ${response.data}");
       return response;
+    } on DioException catch (e) {
+      debugPrint("DioError ===> ${e.type} : ${e.message}");
+      if (e.error is SocketException) {
+        debugPrint("SocketException: Check if your server is reachable at $url");
+      }
+      return Response(requestOptions: e.requestOptions, data: {"message": "Connection error: ${e.message}", "status": 500}, statusCode: 500);
     } catch (e) {
-      print("error === $e");
-      return Response(requestOptions: RequestOptions(data: {"message": "Something went wrong!"}));
+      debugPrint("General Error ===> $e");
+      return Response(
+        requestOptions: RequestOptions(path: url),
+        data: {"message": "Something went wrong: $e", "status": 500},
+        statusCode: 500,
+      );
     }
   }
 

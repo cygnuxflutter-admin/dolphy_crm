@@ -79,6 +79,7 @@ class PackingList {
   final String? locationName;
   final String? packingNo;
   final int? totalPackages;
+  final bool? isShrinkWrapped;
   final bool? isRegularInvoiceApproved;
   final bool? isPackingDetailSaved;
   final bool? isDCFlow;
@@ -148,6 +149,7 @@ class PackingList {
     this.companyName,
     this.locationName,
     this.packingNo,
+    this.isShrinkWrapped,
     this.totalPackages,
     this.isRegularInvoiceApproved,
     this.packingDate,
@@ -219,6 +221,7 @@ class PackingList {
     companyName: json["company_name"],
     locationName: json["location_name"],
     packingNo: json["packing_no"],
+    isShrinkWrapped: json["is_shrink_wrapped"],
     totalPackages: json["total_packages"],
     isRegularInvoiceApproved: json["is_regular_invoice_approved"],
     isPackingDetailSaved: json["is_packing_detail_saved"],
@@ -289,6 +292,7 @@ class PackingList {
     "pi_remarks": piRemarks,
     "sales_person": salesPerson,
     "company_name": companyName,
+    "is_shrink_wrapped": isShrinkWrapped,
     "location_name": locationName,
     "packing_no": packingNo,
     "total_packages": totalPackages,

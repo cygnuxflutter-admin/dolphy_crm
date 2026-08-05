@@ -3,6 +3,7 @@ import 'package:crm/config/app_images.dart';
 import 'package:crm/module/inquiry_screen/Inquiry_controller.dart';
 import 'package:crm/module/inquiry_screen/model/Inquiry_view_response.dart';
 import 'package:crm/module/inquiry_screen/sub_screen/add_Inquiry_screen.dart';
+import 'package:crm/utils/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,6 +12,7 @@ class InquiryDetailScreen extends StatelessWidget {
   InquiryDetailScreen({super.key});
 
   final InquiryScreenController controller = Get.find<InquiryScreenController>();
+  final PermissionHandler permissionHandler = Get.find<PermissionHandler>();
   final RxInt selectedTab = 0.obs;
 
   @override
@@ -76,13 +78,17 @@ class InquiryDetailScreen extends StatelessWidget {
         onPressed: () => Get.back(),
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.edit_note_rounded, color: Colors.white, size: 28),
-          onPressed: () {
-            if (lead.id != null) {
-              Get.to(() => AddInquiryScreen(isEdit: true, id: lead.id));
-            }
-          },
+        Obx(
+          () => permissionHandler.isInquiryUpdateAllowed
+              ? IconButton(
+                  icon: const Icon(Icons.edit_note_rounded, color: Colors.white, size: 28),
+                  onPressed: () {
+                    if (lead.id != null) {
+                      Get.to(() => AddInquiryScreen(isEdit: true, id: lead.id));
+                    }
+                  },
+                )
+              : const SizedBox.shrink(),
         ),
       ],
       flexibleSpace: FlexibleSpaceBar(
@@ -225,7 +231,12 @@ class InquiryDetailScreen extends StatelessWidget {
           const Divider(indent: 20, endIndent: 20),
           _infoTileRow("Company Name", lead.companyName ?? "-", "Customer Code", lead.customerCode ?? "-"),
           _infoTileRow("PAN Number", lead.pan ?? "-", "GST Treatment", lead.gstCategoryName?.toString() ?? "-"),
-          _infoTileRow("Mobile 1", "${lead.mobile1CountryCode ?? ""} ${lead.mobile1 ?? "-"}".trim(), "Mobile 2", "${lead.mobile2CountryCode ?? ""} ${lead.mobile2 ?? "-"}".trim()),
+          _infoTileRow(
+            "Mobile 1",
+            "${lead.mobile1CountryCode ?? ""} ${lead.mobile1 ?? "-"}".trim(),
+            "Mobile 2",
+            "${lead.mobile2CountryCode ?? ""} ${lead.mobile2 ?? "-"}".trim(),
+          ),
           _infoTileRow("Email Address", lead.email ?? "-", "Website", lead.website ?? "-"),
           _infoTileRow("Customer Group", lead.customerGroupName ?? "-", "Brand Name", lead.customerBrandName ?? "-"),
           _infoTileRow("GST / Tax ID", lead.gstNumber?.toString() ?? "-", "Tags", tagText.isEmpty ? "-" : tagText),
@@ -313,10 +324,12 @@ class InquiryDetailScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
           ),
-          child: Row(children: [
-            _tabButton(0, "Addresses", Icons.person_outline_rounded, lead.addresses?.length ?? 0),
-            _tabButton(1, "Configuration", Icons.settings_outlined, null),
-          ]),
+          child: Row(
+            children: [
+              _tabButton(0, "Addresses", Icons.person_outline_rounded, lead.addresses?.length ?? 0),
+              _tabButton(1, "Configuration", Icons.settings_outlined, null),
+            ],
+          ),
         ),
         const SizedBox(height: 20),
         Obx(() {
@@ -338,7 +351,10 @@ class InquiryDetailScreen extends StatelessWidget {
           return AnimatedContainer(
             duration: const Duration(milliseconds: 250),
             padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(color: isSelected ? AppColors.primaryColor.withOpacity(0.1) : Colors.transparent, borderRadius: BorderRadius.circular(14)),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.primaryColor.withOpacity(0.1) : Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -388,11 +404,12 @@ class InquiryDetailScreen extends StatelessWidget {
               _infoTileRow("Credit Limit", "₹${lead.creditLimit ?? "0"}", "Temp Limit", "₹${lead.temporaryCreditLimit ?? "0"}"),
               _infoTileRow("Credit Days", "${lead.creditDays ?? "0"} Days", "Tax Type", lead.defaultTaxType?.toString() ?? "-"),
               _infoTileRow(
-                  "Price Type",
-                  lead.defaultPriceType != null ? controller.getPriceTypeItem(lead.defaultPriceType!).name : "-",
-                  "Disc / Int (%)",
-                  "${lead.specialDiscountPercent ?? "0.00"}% / ${lead.overdueInterestPercent ?? "0.00"}%",
-                  isLast: true),
+                "Price Type",
+                lead.defaultPriceType != null ? controller.getPriceTypeItem(lead.defaultPriceType!).name : "-",
+                "Disc / Int (%)",
+                "${lead.specialDiscountPercent ?? "0.00"}% / ${lead.overdueInterestPercent ?? "0.00"}%",
+                isLast: true,
+              ),
             ],
           ),
         ),

@@ -34,8 +34,8 @@ class VisitScreen extends GetView<VisitController> {
       ),
       body: Column(
         children: [
-          _buildCountCards(),
           _searchBar(),
+          _buildCountCards(),
           Expanded(
             child: Obx(() {
               if (controller.isLoading.value && controller.visitList.isEmpty) {
@@ -101,7 +101,7 @@ class VisitScreen extends GetView<VisitController> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
             decoration: BoxDecoration(
               color: AppColors.indigo600Main.withOpacity(0.05),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
@@ -226,12 +226,11 @@ class VisitScreen extends GetView<VisitController> {
     final String currentUserId = Pref.getUserId();
     final bool isCreatedByMe = item.createdBy?.toString() == currentUserId.toString();
 
-    final bool showEdit = isPending || (isCancelled && isCreatedByMe) || isCompleted;
-    final bool showCancel = isPending;
+    final bool showEdit = isCreatedByMe;
+    final bool showCancel = isCreatedByMe;
 
     return PopupMenuButton<String>(
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(),
       icon: const Icon(Icons.more_vert, color: AppColors.indigo600Main, size: 20),
       onSelected: (value) async {
         if (value == 'view') {
@@ -400,7 +399,7 @@ class VisitScreen extends GetView<VisitController> {
                                   : const Icon(Icons.cancel_outlined, size: 16),
                               const SizedBox(width: 8),
                               Text(
-                                controller.isActionLoading.value ? "Cancelling..." : "Confirm Cancel",
+                                controller.isActionLoading.value ? "Cancelling..." : "Cancel",
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                             ],
@@ -517,8 +516,8 @@ class VisitScreen extends GetView<VisitController> {
 
   Widget _buildCountCards() {
     return Container(
-      height: 110,
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      height: 80,
+      padding: const EdgeInsets.symmetric(vertical: 5),
       child: Obx(() {
         final counts = controller.visitCounts.value;
         final selectedIndex = controller.selectedTabIndex.value;
@@ -529,6 +528,7 @@ class VisitScreen extends GetView<VisitController> {
           {"label": "IN PROGRESS", "count": counts?.inProgress ?? 0, "icon": Icons.directions_run, "color": AppColors.blue500},
           {"label": "COMPLETED", "count": counts?.completed ?? 0, "icon": Icons.check_circle_outline, "color": AppColors.green500Success},
           {"label": "CANCELLED", "count": counts?.cancelled ?? 0, "icon": Icons.cancel_outlined, "color": AppColors.red500},
+          {"label": "TODAY VISIT", "count": counts?.todayTask ?? 0, "icon": Icons.today, "color": AppColors.blue500},
         ];
 
         return ListView.builder(

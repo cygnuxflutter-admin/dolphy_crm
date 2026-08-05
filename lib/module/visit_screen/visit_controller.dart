@@ -195,9 +195,8 @@ class VisitController extends GetxController {
     DateTime? startTime;
 
     for (var log in logs) {
-      final action = log.action?.toLowerCase();
+      final action = log.action.toLowerCase();
       final time = log.createdAt;
-      if (time == null) continue;
 
       if (action == 'start' || action == 'resume') {
         startTime = time;
@@ -428,7 +427,7 @@ class VisitController extends GetxController {
       if (response.statusCode == 201 || response.statusCode == 200) {
         toastMessage(text: "Product added to visit successfully");
         Get.back(); // Close dialog
-        getFieldReport(visitId); // Refresh report
+        getFieldReport(visitId, isRefresh: true); // Refresh report
       } else {
         toastMessage(text: data['message'] ?? "Failed to add product");
       }
@@ -457,16 +456,16 @@ class VisitController extends GetxController {
   }
 
   void updateSolveQty(String productId, String value) {
-    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
+    if (fieldReportDetail.value == null) return;
     int? newQty = int.tryParse(value);
     if (newQty == null) return;
 
-    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    final productIndex = fieldReportDetail.value!.products.indexWhere((p) => p.id == productId);
     if (productIndex != -1) {
-      final product = fieldReportDetail.value!.products![productIndex];
+      final product = fieldReportDetail.value!.products[productIndex];
 
-      if (newQty > (product.clientSideQty ?? 0)) {
-        toastMessage(text: "Solve Qty cannot be greater than Client Side Qty (${product.clientSideQty ?? 0})");
+      if (newQty > product.clientSideQty) {
+        toastMessage(text: "Solve Qty cannot be greater than Client Side Qty (${product.clientSideQty})");
         fieldReportDetail.refresh(); // Refresh to revert UI value if needed
         return;
       }
@@ -474,7 +473,7 @@ class VisitController extends GetxController {
       product.solveQty = newQty;
 
       // Adjust serial numbers list size
-      List<String> currentSerials = product.serialNumbers ?? [];
+      List<String> currentSerials = List<String>.from(product.serialNumbers);
       if (currentSerials.length < newQty) {
         // Add empty strings
         currentSerials.addAll(List.generate(newQty - currentSerials.length, (_) => ""));
@@ -488,22 +487,22 @@ class VisitController extends GetxController {
   }
 
   void updateSerialNumber(String productId, int index, String value) {
-    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
-    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    if (fieldReportDetail.value == null) return;
+    final productIndex = fieldReportDetail.value!.products.indexWhere((p) => p.id == productId);
     if (productIndex != -1) {
-      final product = fieldReportDetail.value!.products![productIndex];
-      if (product.serialNumbers != null && index < product.serialNumbers!.length) {
-        product.serialNumbers![index] = value;
+      final product = fieldReportDetail.value!.products[productIndex];
+      if (index < product.serialNumbers.length) {
+        product.serialNumbers[index] = value;
         fieldReportDetail.refresh();
       }
     }
   }
 
   void updateWorkRemark(String productId, String value) {
-    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
-    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    if (fieldReportDetail.value == null) return;
+    final productIndex = fieldReportDetail.value!.products.indexWhere((p) => p.id == productId);
     if (productIndex != -1) {
-      fieldReportDetail.value!.products![productIndex].workRemark = value;
+      fieldReportDetail.value!.products[productIndex].workRemark = value;
     }
   }
 
@@ -544,11 +543,10 @@ class VisitController extends GetxController {
       if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
         String? fileUrl = data['data'] != null ? data['data']['url'] : null;
         if (fileUrl != null) {
-          final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+          final productIndex = fieldReportDetail.value!.products.indexWhere((p) => p.id == productId);
           if (productIndex != -1) {
-            final product = fieldReportDetail.value!.products![productIndex];
-            product.attachments ??= [];
-            product.attachments!.add(fileUrl);
+            final product = fieldReportDetail.value!.products[productIndex];
+            product.attachments.add(fileUrl);
             fieldReportDetail.refresh();
             toastMessage(text: "File uploaded successfully");
           }
@@ -567,24 +565,25 @@ class VisitController extends GetxController {
   }
 
   void removeProductAttachment(String productId, int index) {
-    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
-    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    if (fieldReportDetail.value == null) return;
+    final productIndex = fieldReportDetail.value!.products.indexWhere((p) => p.id == productId);
     if (productIndex != -1) {
-      final product = fieldReportDetail.value!.products![productIndex];
-      if (product.attachments != null && index < product.attachments!.length) {
-        product.attachments!.removeAt(index);
+      final product = fieldReportDetail.value!.products[productIndex];
+      if (index < product.attachments.length) {
+        product.attachments.removeAt(index);
         fieldReportDetail.refresh();
       }
     }
   }
 
   void addPartRequest(String productId) {
-    if (fieldReportDetail.value == null || fieldReportDetail.value!.products == null) return;
-    final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
+    if (fieldReportDetail.value == null) return;
+    final productIndex = fieldReportDetail.value!.products.indexWhere((p) => p.id == productId);
     if (productIndex != -1) {
       final product = fieldReportDetail.value!.products![productIndex];
-      product.partRequests ??= [];
-      product.partRequests!.add({"product_id": null, "product_name": null, "product_code": null, "qty": 1, "remark": "", "attachments": []});
+      product.partRequests.add(
+        PartRequest(id: "", partName: "", qty: 1, remark: "", attachments: [], status: "requested", createdAt: DateTime.now()),
+      );
       fieldReportDetail.refresh();
     }
   }
@@ -600,9 +599,8 @@ class VisitController extends GetxController {
           final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
           if (productIndex != -1) {
             final product = fieldReportDetail.value!.products![productIndex];
-            if (product.partRequests != null && partIndex < product.partRequests!.length) {
-              product.partRequests![partIndex]['attachments'] ??= [];
-              product.partRequests![partIndex]['attachments'].add(fileUrl);
+            if (partIndex < product.partRequests.length) {
+              product.partRequests[partIndex].attachments.add(fileUrl);
               fieldReportDetail.refresh();
               toastMessage(text: "File uploaded successfully");
             }
@@ -624,9 +622,9 @@ class VisitController extends GetxController {
     final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
     if (productIndex != -1) {
       final product = fieldReportDetail.value!.products![productIndex];
-      if (product.partRequests != null && partIndex < product.partRequests!.length) {
-        if (product.partRequests![partIndex]['attachments'] != null && attachmentIndex < product.partRequests![partIndex]['attachments'].length) {
-          product.partRequests![partIndex]['attachments'].removeAt(attachmentIndex);
+      if (partIndex < product.partRequests.length) {
+        if (attachmentIndex < product.partRequests[partIndex].attachments.length) {
+          product.partRequests[partIndex].attachments.removeAt(attachmentIndex);
           fieldReportDetail.refresh();
         }
       }
@@ -638,13 +636,14 @@ class VisitController extends GetxController {
     final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
     if (productIndex != -1) {
       final product = fieldReportDetail.value!.products![productIndex];
-      if (product.partRequests != null && index < product.partRequests!.length) {
+      if (index < product.partRequests.length) {
+        final part = product.partRequests[index];
         if (key == 'product') {
-          product.partRequests![index]['product_id'] = value['id'];
-          product.partRequests![index]['product_name'] = value['product_name'];
-          product.partRequests![index]['product_code'] = value['product_code'];
-        } else {
-          product.partRequests![index][key] = value;
+          part.partName = "[${value['product_code'] ?? ''}] ${value['product_name'] ?? '-'}";
+        } else if (key == 'qty') {
+          part.qty = value as int;
+        } else if (key == 'remark') {
+          part.remark = value as String;
         }
         fieldReportDetail.refresh();
       }
@@ -656,8 +655,8 @@ class VisitController extends GetxController {
     final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
     if (productIndex != -1) {
       final product = fieldReportDetail.value!.products![productIndex];
-      if (product.partRequests != null && index < product.partRequests!.length) {
-        product.partRequests!.removeAt(index);
+      if (index < product.partRequests.length) {
+        product.partRequests.removeAt(index);
         fieldReportDetail.refresh();
       }
     }
@@ -714,8 +713,36 @@ class VisitController extends GetxController {
 
     try {
       String status = getStatusFromTabIndex(selectedTabIndex.value);
-      final url =
-          "${ApiEndPoint.serviceVisitList}?page=${currentPage.value}&rowsPerPage=${rowsPerPage.value}&search=${searchController.value.text}&status=$status&company_id=${Pref.getCompanyId()}&location_id=${Pref.getLocationId()}&fin_year=${Pref.getFinancialYears()}";
+      String filter = "";
+
+      if (selectedTabIndex.value == 5) {
+        // TODAY VISIT
+        filter = jsonEncode([
+          {
+            "logic": "AND",
+            "conditions": [
+              {"field": "today_task", "operator": "eq", "value": true},
+            ],
+          },
+        ]);
+      } else if (status.isNotEmpty) {
+        filter = jsonEncode([
+          {
+            "logic": "AND",
+            "conditions": [
+              {"field": "status", "operator": "eq", "value": status},
+            ],
+          },
+        ]);
+      }
+
+      String url = "${ApiEndPoint.serviceVisitList}?page=${currentPage.value}&rowsPerPage=${rowsPerPage.value}&search=${searchController.value.text}";
+
+      if (filter.isNotEmpty) {
+        url += "&filterGroups=${Uri.encodeComponent(filter)}";
+      }
+
+      url += "&company_id=${Pref.getCompanyId()}&location_id=${Pref.getLocationId()}&fin_year=${Pref.getFinancialYears()}";
 
       final response = await ApiHandler.getRequest(url);
       final data = json.decode(response.data);
@@ -784,10 +811,11 @@ class VisitController extends GetxController {
     }
   }
 
-  Future<void> getFieldReport(String id) async {
+  Future<void> getFieldReport(String id, {bool isRefresh = false}) async {
+    if (!isRefresh && fieldReportDetail.value?.id == id && !isFieldReportLoading.value) return;
+
     isFieldReportLoading.value = true;
     fieldReportError.value = "";
-    fieldReportDetail.value = null;
 
     try {
       final response = await ApiHandler.getRequest("${ApiEndPoint.baseUrl}service-visit/$id/field-report");
@@ -798,25 +826,22 @@ class VisitController extends GetxController {
         fieldReportDetail.value = res.data;
 
         // Pre-fill End Tracking Form
-        if (res.data != null) {
-          serviceReceivedByController.value.text = res.data!.contactPerson ?? res.data!.siteReceiverName ?? "";
-          contactNumberController.value.text = res.data!.mobile ?? res.data!.siteReceiverMobile ?? "";
-          siteReceiverMobileCountryCode.value = res.data!.mobileCountryCode ?? res.data!.siteReceiverMobileCountryCode ?? "+91";
-          visitOutcome.value = res.data!.visitOutcome ?? "";
-          overallRemarkController.value.text = res.data!.overallRemark ?? "";
-          finalUsageNoteController.value.text = res.data!.crowdNote ?? "";
-          finalAttachmentUrls.assignAll(res.data!.attachments ?? []);
+        serviceReceivedByController.value.text = res.data.contactPerson ?? res.data.siteReceiverName ?? "";
+        contactNumberController.value.text = res.data.mobile ?? res.data.siteReceiverMobile ?? "";
+        siteReceiverMobileCountryCode.value = res.data.mobileCountryCode ?? res.data.siteReceiverMobileCountryCode ?? "+91";
+        visitOutcome.value = res.data.visitOutcome ?? "";
+        overallRemarkController.value.text = res.data.overallRemark ?? "";
+        finalUsageNoteController.value.text = res.data.crowdNote ?? "";
+        finalAttachmentUrls.assignAll(List<String>.from(res.data.attachments ?? []));
 
-          final currentUserTech = res.data!.visitTechnicians?.firstWhereOrNull((t) => t.isCurrentUser == true);
-          if (currentUserTech != null) {
-            siteArrivalAttachmentUrls.assignAll(currentUserTech.reachedAttachments ?? []);
-            siteArrivalRemarkController.value.text = currentUserTech.remark ?? "";
-          }
+        final currentUserTech = res.data.visitTechnicians.firstWhereOrNull((t) => t.isCurrentUser == true);
+        if (currentUserTech != null) {
+          siteArrivalAttachmentUrls.assignAll(currentUserTech.reachedAttachments ?? []);
+          siteArrivalRemarkController.value.text = currentUserTech.remark ?? "";
         }
 
         // Manage Timer
-        final currentUserTech = res.data?.visitTechnicians?.firstWhereOrNull((t) => t.isCurrentUser == true);
-        if (currentUserTech != null && currentUserTech.fieldStatus?.toLowerCase() == "started") {
+        if (currentUserTech != null && currentUserTech.fieldStatus.toLowerCase() == "started") {
           startTimer(currentUserTech.trackingLogs);
         } else {
           stopTimer();
@@ -836,13 +861,13 @@ class VisitController extends GetxController {
   String getStatusFromTabIndex(int index) {
     switch (index) {
       case 1:
-        return "PENDING";
+        return "pending";
       case 2:
-        return "IN_PROGRESS";
+        return "in_progress";
       case 3:
-        return "COMPLETED";
+        return "completed";
       case 4:
-        return "CANCELLED";
+        return "cancelled";
       default:
         return "";
     }
@@ -915,11 +940,14 @@ class VisitController extends GetxController {
   }
 
   Future<void> _updateVisitStatus(String visitId, String action, String successMsg, {Map<String, dynamic>? extraBody}) async {
-    Position? position = await _handleLocation();
-    if (position == null) return;
-
     isLoading.value = true;
     try {
+      Position? position = await _handleLocation();
+      if (position == null) {
+        isLoading.value = false;
+        return;
+      }
+
       final body = {"latitude": position.latitude, "longitude": position.longitude, if (extraBody != null) ...extraBody};
       final url = "${ApiEndPoint.baseUrl}service-visit/$visitId/$action";
       final response = await ApiHandler.postRequest(url: url, body: body);
@@ -927,7 +955,18 @@ class VisitController extends GetxController {
       final data = response.data;
       if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
         toastMessage(text: data['message'] ?? successMsg);
-        getFieldReport(visitId);
+
+        if (Get.isDialogOpen ?? false) {
+          Get.back();
+        }
+
+        if (action == "end") {
+          Get.back(); // Close screen
+        }
+
+        getFieldReport(visitId, isRefresh: true);
+        fetchData();
+        getVisitCounts();
       } else {
         toastMessage(text: data['message'] ?? "Failed to $action visit");
       }
@@ -1032,8 +1071,8 @@ class VisitController extends GetxController {
       "crowd_note": finalUsageNoteController.value.text.trim(),
       "attachments": finalAttachmentUrls,
       "products":
-          fieldReportDetail.value?.products
-              ?.map(
+          fieldReportDetail.value!.products
+              .map(
                 (p) => {
                   "id": p.id,
                   "product_id": p.productId,
@@ -1047,16 +1086,9 @@ class VisitController extends GetxController {
                   "usage_note": p.usageNote ?? "",
                   "work_remark": p.workRemark ?? "",
                   "attachments": p.attachments ?? [],
-                  "serial_numbers": (p.serialNumbers ?? []).where((s) => s.trim().isNotEmpty).toList(),
-                  "part_requests": (p.partRequests ?? []).map((pr) {
-                    String name = pr['product_name'] ?? "";
-                    String code = pr['product_code'] ?? "";
-                    return {
-                      "part_name": code.isNotEmpty ? "[$code] - $name" : name,
-                      "qty": pr['qty'] ?? 1,
-                      "remark": pr['remark'] ?? "",
-                      "attachments": pr['attachments'] ?? [],
-                    };
+                  "serial_numbers": (p.serialNumbers).where((s) => s.trim().isNotEmpty).toList(),
+                  "part_requests": (p.partRequests).map((pr) {
+                    return {"part_name": pr.partName, "qty": pr.qty, "remark": pr.remark, "attachments": pr.attachments};
                   }).toList(),
                 },
               )
@@ -1087,14 +1119,9 @@ class VisitController extends GetxController {
                     "usage_note": p.usageNote ?? "",
                     "work_remark": p.workRemark ?? "",
                     "attachments": p.attachments ?? [],
-                    "serial_numbers": (p.serialNumbers ?? []).where((s) => s.trim().isNotEmpty).toList(),
-                    "part_requests": (p.partRequests ?? []).map((pr) {
-                      return {
-                        "product_id": pr['product_id'],
-                        "qty": pr['qty'] ?? 1,
-                        "remark": pr['remark'] ?? "",
-                        "attachments": pr['attachments'] ?? [],
-                      };
+                    "serial_numbers": (p.serialNumbers).where((s) => s.trim().isNotEmpty).toList(),
+                    "part_requests": (p.partRequests).map((pr) {
+                      return {"part_name": pr.partName, "qty": pr.qty, "remark": pr.remark, "attachments": pr.attachments};
                     }).toList(),
                   },
                 )
@@ -1107,7 +1134,7 @@ class VisitController extends GetxController {
       final data = response.data;
       if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
         toastMessage(text: data['message'] ?? "Report saved successfully");
-        getFieldReport(visitId);
+        getFieldReport(visitId, isRefresh: true);
       } else {
         toastMessage(text: data['message'] ?? "Failed to save report");
       }
