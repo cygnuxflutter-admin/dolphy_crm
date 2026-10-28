@@ -37,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> initCall() async {
     await homeScreenController.getLocation();
     await homeScreenController.getCompany();
+    await homeScreenController.getAppVersion();
     homeScreenController.selectedLocationData.value = LocationDatum(id: Pref.getLocationId(), locName: Pref.getLocationName());
     homeScreenController.selectedCompanyData.value = CompanyDatum(id: Pref.getCompanyId(), companyName: Pref.getCompanyName());
     homeScreenController.selectedFinancialYears.value = Pref.getFinancialYears();
@@ -91,54 +92,85 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       drawer: _buildDrawer(),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Obx(
-          () => GridView.count(
-            crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 0.85,
-            children: [
-              if (permissionHandler.isInquiryViewAllowed)
-                _dashboardCard(
-                  title: "Inquiry",
-                  subtitle: "Manage your Inquiry",
-                  icon: Icons.person_add_alt_1,
-                  onTap: () => Get.toNamed(AppRoutes.inquiryScreen),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Obx(
+                  () => GridView.count(
+                    crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 0.85,
+                    children: [
+                      if (permissionHandler.isInquiryViewAllowed)
+                        _dashboardCard(
+                          title: "Inquiry",
+                          subtitle: "Manage your Inquiry",
+                          icon: Icons.person_add_alt_1,
+                          onTap: () => Get.toNamed(AppRoutes.inquiryScreen),
+                        ),
+                      if (permissionHandler.isDraftInquiryViewAllowed)
+                        _dashboardCard(
+                          title: "Draft Inquiry",
+                          subtitle: "Create draft inquiry",
+                          icon: Icons.edit_note_outlined,
+                          onTap: () => Get.toNamed(AppRoutes.draftInquiryScreen),
+                        ),
+                      if (permissionHandler.isLeadViewAllowed)
+                        _dashboardCard(title: "Lead", subtitle: "Track leads", icon: Icons.lightbulb_outline, onTap: () => Get.toNamed(AppRoutes.leadScreen)),
+                      if (permissionHandler.isPickingViewAllowed)
+                        _dashboardCard(
+                          title: "PickIn",
+                          subtitle: "Check your picking request",
+                          icon: Icons.local_shipping_outlined,
+                          onTap: () => Get.toNamed(AppRoutes.pickingListScreen),
+                        ),
+                      if (permissionHandler.isPackingViewAllowed)
+                        _dashboardCard(
+                          title: "Packing",
+                          subtitle: "Manage your packing list",
+                          icon: Icons.inventory_2_outlined,
+                          onTap: () => Get.toNamed(AppRoutes.packingScreen),
+                        ),
+                      if (permissionHandler.isVisitViewAllowed)
+                        _dashboardCard(
+                          title: "Visits",
+                          subtitle: "Track your visits",
+                          icon: Icons.directions_walk_outlined,
+                          onTap: () => Get.toNamed(AppRoutes.visitScreen),
+                        ),
+                      if (permissionHandler.isTechnicianExpenseViewAllowed)
+                        _dashboardCard(
+                          title: "Visit Technician",
+                          subtitle: "Technician expense",
+                          icon: Icons.engineering_outlined,
+                          onTap: () => Get.toNamed(AppRoutes.technicianExpenseScreen),
+                        ),
+                    ],
+                  ),
                 ),
-              if (permissionHandler.isLeadViewAllowed)
-                _dashboardCard(title: "Lead", subtitle: "Track leads", icon: Icons.lightbulb_outline, onTap: () => Get.toNamed(AppRoutes.leadScreen)),
-              if (permissionHandler.isPickingViewAllowed)
-                _dashboardCard(
-                  title: "PickIn",
-                  subtitle: "Check your picking request",
-                  icon: Icons.local_shipping_outlined,
-                  onTap: () => Get.toNamed(AppRoutes.pickingListScreen),
-                ),
-              if (permissionHandler.isPackingViewAllowed)
-                _dashboardCard(
-                  title: "Packing",
-                  subtitle: "Manage your packing list",
-                  icon: Icons.inventory_2_outlined,
-                  onTap: () => Get.toNamed(AppRoutes.packingScreen),
-                ),
-              if (permissionHandler.isVisitViewAllowed)
-                _dashboardCard(
-                  title: "Visits",
-                  subtitle: "Track your visits",
-                  icon: Icons.directions_walk_outlined,
-                  onTap: () => Get.toNamed(AppRoutes.visitScreen),
-                ),
-              if (permissionHandler.isTechnicianExpenseViewAllowed)
-                _dashboardCard(
-                  title: "Visit Technician",
-                  subtitle: "Technician expense",
-                  icon: Icons.engineering_outlined,
-                  onTap: () => Get.toNamed(AppRoutes.technicianExpenseScreen),
-                ),
-            ],
-          ),
+              ),
+            ),
+            Obx(
+              () => homeScreenController.appVersion.value.isEmpty
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(bottom: 12, top: 4),
+                      child: Text(
+                        homeScreenController.appVersion.value,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+            ),
+          ],
         ),
       ),
     );

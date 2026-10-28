@@ -1,0 +1,3 @@
+-keep class androidx.window.** { *; }
+-keep interface androidx.window.** { *; }
+-dontwarn androidx.window.**

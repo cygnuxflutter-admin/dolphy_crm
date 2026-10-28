@@ -59,14 +59,14 @@ class PackingDetailScreen extends GetView<PackingController> {
                 }
               },
               itemBuilder: (context) => [
-                if (data.status != "REJECTED" && data.status != "INVOICED")
+                if (data.status?.toUpperCase() != "DRAFT" && data.status != "REJECTED" && data.status != "INVOICED")
                   PopupMenuItem(
                     value: 'reject',
                     child: Row(
                       children: [
-                        Icon(data.status?.toUpperCase() == "DRAFT" ? Icons.cancel_outlined : Icons.block, color: AppColors.red500, size: 20),
+                        const Icon(Icons.block, color: AppColors.red500, size: 20),
                         const SizedBox(width: 8),
-                        Text(data.status?.toUpperCase() == "DRAFT" ? "Cancel" : "Reject", style: const TextStyle(color: AppColors.red500)),
+                        const Text("Reject", style: TextStyle(color: AppColors.red500)),
                       ],
                     ),
                   ),
@@ -99,25 +99,7 @@ class PackingDetailScreen extends GetView<PackingController> {
                       children: [
                         _buildOrderInfo(data),
                         const SizedBox(height: 20),
-                        if (data.items != null && data.items!.isNotEmpty) ...[
-                          const Text(
-                            "Items to Pack",
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-                          ),
-                          const SizedBox(height: 12),
-                          ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: data.items?.length ?? 0,
-                            separatorBuilder: (_, __) => const SizedBox(height: 12),
-                            itemBuilder: (context, index) {
-                              final item = data.items![index];
-                              return _buildItemCard(data, item);
-                            },
-                          ),
-                        ] else ...[
-                          _buildEmptyItemsTable(),
-                        ],
+                        _buildItemsTable(data),
                         const SizedBox(height: 20),
                         _buildLogsSection(context, data),
                         const SizedBox(height: 20),
@@ -224,7 +206,7 @@ class PackingDetailScreen extends GetView<PackingController> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(child: _infoCell(Icons.confirmation_number_outlined, "Picking No", data.picking?.pickingNo ?? "-")),
@@ -237,7 +219,7 @@ class PackingDetailScreen extends GetView<PackingController> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(
@@ -252,6 +234,36 @@ class PackingDetailScreen extends GetView<PackingController> {
                         Expanded(child: _infoCell(Icons.inventory_2_outlined, "Total Packages", "${data.totalPackages ?? "0"}")),
                       ],
                     ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: _infoCell(Icons.local_shipping_outlined, "Transporter Name", data.transporterName?.toString() ?? "-")),
+                        Expanded(child: _infoCell(Icons.person_outline, "Sales Person", data.salesPerson?.toString() ?? "-")),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: _infoCell(Icons.person_pin_outlined, "Customer Name", data.customerName?.toString() ?? "-")),
+                        Expanded(child: _infoCell(Icons.assignment_turned_in_outlined, "Dispatch Status", data.dispatchStatus?.toString() ?? "-")),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [Expanded(child: _infoCell(Icons.confirmation_number_outlined, "Dispatch No", data.dispatchNo?.toString() ?? "-"))],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _infoCell(
+                            Icons.comment_outlined,
+                            "PI Remarks",
+                            (data.piRemarks == null || data.piRemarks!.isEmpty) ? "---" : data.piRemarks!,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -261,8 +273,87 @@ class PackingDetailScreen extends GetView<PackingController> {
         _buildRejectionReason(data),
         const SizedBox(height: 20),
         _buildInvoiceDetails(data),
+        _buildAdvanceAttachmentSection(data),
         // if (data.invoice != null) ...[const SizedBox(height: 20), _buildRemarksAndAttachmentsTab(data)],
       ],
+    );
+  }
+
+  Widget _buildAdvanceAttachmentSection(PackingDetailData data) {
+    final attachments = data.invoice?.advanceAttachment?.split(',').map((e) => e.trim()).where((s) => s.isNotEmpty).toList() ?? [];
+    if (attachments.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 20),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gray200, width: 0.8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.gray200, width: 0.8)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.link, size: 16, color: AppColors.indigo600Main),
+                SizedBox(width: 8),
+                Text(
+                  "PI Attachment",
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "ADVANCED ATTACHMENTS",
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.gray500, letterSpacing: 0.5),
+                ),
+                const SizedBox(height: 12),
+                ...attachments.asMap().entries.map((entry) {
+                  int idx = entry.key + 1;
+                  String url = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: InkWell(
+                      onTap: () async {
+                        try {
+                          final uri = Uri.parse(url);
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } catch (e) {
+                          debugPrint("Error launching URL: $e");
+                          Get.snackbar("Error", "Could not open attachment link");
+                        }
+                      },
+                      child: Row(
+                        children: [
+                          const Icon(Icons.open_in_new, size: 14, color: AppColors.indigo600Main),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "Attachment $idx",
+                              style: const TextStyle(fontSize: 13, color: AppColors.indigo600Main, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -863,73 +954,6 @@ class PackingDetailScreen extends GetView<PackingController> {
     );
   }
 
-  Widget _buildItemCard(PackingDetailData data, DataItem item) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.gray200, width: 0.8),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 4))],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(color: AppColors.indigo600Main.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.inventory_2_outlined, color: AppColors.indigo600Main, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.product?.productName ?? "-",
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textPrimary),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.qr_code, size: 12, color: AppColors.gray400),
-                    const SizedBox(width: 4),
-                    Text(
-                      item.product?.productCode ?? "-",
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
-                  child: Divider(height: 1, color: AppColors.gray100),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _qtyColumn("Ordered", item.orderedQty ?? "0"),
-                    _qtyColumn("Picked", item.pickedQty ?? "0"),
-                    _qtyColumn(
-                      "Packed",
-                      item.packedQty ?? "0",
-                      /* isAction: data.status == "PACKED",
-                      onTap: data.status == "PACKED"
-                          ? () {
-                              _showPackedQtyDialog(data.id!, item);
-                            }
-                          : null,*/
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildLogsSection(BuildContext context, PackingDetailData detail) {
     final logs = detail.logs ?? [];
     if (logs.isEmpty && !controller.isLogNoteOpen.value) return const SizedBox.shrink();
@@ -1247,31 +1271,6 @@ class PackingDetailScreen extends GetView<PackingController> {
     );
   }
 
-  Widget _qtyColumn(String label, String value, {bool isAction = false, VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.gray500, letterSpacing: 0.5),
-          ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              Text(
-                value,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: isAction ? AppColors.indigo600Main : AppColors.textPrimary),
-              ),
-              if (isAction) ...[const SizedBox(width: 4), const Icon(Icons.edit, size: 12, color: AppColors.indigo600Main)],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showCancelPackingDialog(BuildContext context, String id) {
     Get.dialog(
       Dialog(
@@ -1388,48 +1387,40 @@ class PackingDetailScreen extends GetView<PackingController> {
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(color: AppColors.redColor, borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.block, size: 40, color: AppColors.red500),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      "Are you sure you want to reject this packing?",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      "This action cannot be undone.",
-                      style: TextStyle(fontSize: 14, color: AppColors.gray500),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Rejection Reason",
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.red500.withValues(alpha: 0.7)),
+                    RichText(
+                      text: const TextSpan(
+                        text: "Rejection Reason ",
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontFamily: 'Inter'),
+                        children: [
+                          TextSpan(
+                            text: "*",
+                            style: TextStyle(color: AppColors.red500),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     TextFormField(
                       controller: reasonController,
-                      maxLines: 3,
+                      maxLines: 4,
                       decoration: InputDecoration(
-                        hintText: "Enter reason for rejection...",
+                        hintText: "Enter rejection reason...",
                         hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppColors.gray300),
+                          borderSide: BorderSide(color: AppColors.red500.withValues(alpha: 0.5)),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppColors.gray300),
+                          borderSide: BorderSide(color: AppColors.red500.withValues(alpha: 0.5)),
                         ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: AppColors.red500),
+                        ),
+                        contentPadding: const EdgeInsets.all(12),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -1440,18 +1431,18 @@ class PackingDetailScreen extends GetView<PackingController> {
                     ),
                     const SizedBox(height: 24),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.gray600,
-                              side: const BorderSide(color: AppColors.gray300),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFF1F4F9),
+                            foregroundColor: AppColors.textPrimary,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
                           ),
+                          child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                         const SizedBox(width: 12),
                         Obx(
@@ -1463,17 +1454,15 @@ class PackingDetailScreen extends GetView<PackingController> {
                                       controller.rejectPacking(id, reason: reasonController.text);
                                     }
                                   },
-                            icon: controller.isLoading.value
-                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : const Icon(Icons.block, size: 18, color: Colors.white),
                             label: Text(
-                              controller.isLoading.value ? "Confirming..." : "Confirm",
+                              controller.isLoading.value ? "Confirming..." : "Confirm Reject",
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.red500,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              backgroundColor: AppColors.red500.withValues(alpha: 0.6),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 0,
                             ),
                           ),
                         ),
@@ -1767,13 +1756,15 @@ class PackingDetailScreen extends GetView<PackingController> {
     );
   }
 
-  Widget _buildEmptyItemsTable() {
+  Widget _buildItemsTable(PackingDetailData data) {
+    final items = data.items ?? [];
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.gray200, width: 0.8),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 6))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1784,13 +1775,22 @@ class PackingDetailScreen extends GetView<PackingController> {
               color: AppColors.white,
               border: Border(bottom: BorderSide(color: AppColors.gray200.withValues(alpha: 0.5), width: 0.8)),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.list, size: 18, color: AppColors.textSecondary),
-                SizedBox(width: 8),
-                Text(
+                const Icon(Icons.list, size: 18, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                const Text(
                   "Items",
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(4)),
+                  child: Text(
+                    "${items.length}",
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
                 ),
               ],
             ),
@@ -1818,20 +1818,105 @@ class PackingDetailScreen extends GetView<PackingController> {
                     ],
                   ),
                 ),
-                Container(
-                  width: 880,
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  child: const Center(
-                    child: Text(
-                      "No items found",
-                      style: TextStyle(color: AppColors.gray500, fontSize: 14, fontWeight: FontWeight.w500),
+                if (items.isEmpty)
+                  Container(
+                    width: 880,
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: const Center(
+                      child: Text(
+                        "No items found",
+                        style: TextStyle(color: AppColors.gray500, fontSize: 14, fontWeight: FontWeight.w500),
+                      ),
                     ),
-                  ),
-                ),
+                  )
+                else
+                  ...items.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final item = entry.value;
+                    return Container(
+                      decoration: BoxDecoration(
+                        border: Border(bottom: BorderSide(color: AppColors.gray200.withValues(alpha: 0.5), width: 0.8)),
+                      ),
+                      child: Row(
+                        children: [
+                          _tableCell("${index + 1}", width: 50),
+                          _tableImageCell(item.product?.imageUrl, width: 80),
+                          _tableCell(item.product?.productCode ?? "-", width: 120),
+                          _tableCell(item.product?.productName ?? "-", width: 180),
+                          _tableCell("${item.batchQuantity ?? 0}", width: 100),
+                          _tableBatchNumbersCell(item.batchNumbers, width: 150),
+                          _tableCell("${double.tryParse(item.pickedQty ?? "0")?.toInt() ?? 0}", width: 100, isBold: true),
+                          _tableCell("${double.tryParse(item.packedQty ?? "0")?.toInt() ?? 0}", width: 100, isBold: true),
+                        ],
+                      ),
+                    );
+                  }),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _tableCell(String text, {required double width, bool isBold = false}) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: AppColors.gray200.withValues(alpha: 0.5), width: 0.8)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 13, fontWeight: isBold ? FontWeight.bold : FontWeight.w500, color: AppColors.textPrimary),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  Widget _tableImageCell(String? imageUrl, {required double width}) {
+    return Container(
+      width: width,
+      height: 60,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: AppColors.gray200.withValues(alpha: 0.5), width: 0.8)),
+      ),
+      child: imageUrl != null && imageUrl.isNotEmpty
+          ? Image.network(
+              imageUrl,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Icon(Icons.image_not_supported, size: 20, color: AppColors.gray400),
+            )
+          : const Icon(Icons.image, size: 20, color: AppColors.gray400),
+    );
+  }
+
+  Widget _tableBatchNumbersCell(List<String>? batchNumbers, {required double width}) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: AppColors.gray200.withValues(alpha: 0.5), width: 0.8)),
+      ),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        alignment: WrapAlignment.center,
+        children: (batchNumbers ?? []).map((batch) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.blue500.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: AppColors.blue500.withValues(alpha: 0.3)),
+            ),
+            child: Text(
+              batch,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.blue500),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

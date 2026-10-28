@@ -89,7 +89,9 @@ class PickingListController extends GetxController {
       String url =
           "${ApiEndPoint.pickingList}?page=$pageToFetch&limit=50&search=${search ?? searchController.value.text}&company_id=${Pref.getCompanyId()}&location_id=${Pref.getLocationId()}";
 
-      if (effectiveStatus.isNotEmpty) {
+      if (effectiveStatus == "HISTORY") {
+        url += "&history=true";
+      } else if (effectiveStatus.isNotEmpty) {
         url += "&status=$effectiveStatus";
       }
 
@@ -136,8 +138,10 @@ class PickingListController extends GetxController {
       case 3:
         return "PICKED";
       case 4:
-        return "PACKING_REJECTED";
+        return "HISTORY";
       case 5:
+        return "PACKING_REJECTED";
+      case 6:
         return "REJECTED";
       default:
         return "";

@@ -33,10 +33,7 @@ class NotificationScreen extends GetView<NotificationController> {
                   padding: const EdgeInsets.only(right: 16.0),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.red500,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    decoration: BoxDecoration(color: AppColors.red500, borderRadius: BorderRadius.circular(12)),
                     child: Text(
                       "${controller.unreadCount.value} New",
                       style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
@@ -73,12 +70,19 @@ class NotificationScreen extends GetView<NotificationController> {
         return RefreshIndicator(
           onRefresh: () => controller.getNotifications(isRefresh: true),
           child: ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: controller.notificationList.length,
+            controller: controller.scrollController,
+            padding: EdgeInsets.only(top: 16, left: 16, right: 16, bottom: MediaQuery.of(context).padding.bottom),
+            itemCount: controller.notificationList.length + (controller.isLoadMore.value ? 1 : 0),
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              final notification = controller.notificationList[index];
-              return _buildNotificationItem(notification);
+              if (index < controller.notificationList.length) {
+                final notification = controller.notificationList[index];
+                return _buildNotificationItem(notification);
+              } else {
+                return const Center(
+                  child: Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: CircularProgressIndicator()),
+                );
+              }
             },
           ),
         );
@@ -102,32 +106,16 @@ class NotificationScreen extends GetView<NotificationController> {
         decoration: BoxDecoration(
           color: isRead ? Colors.white : AppColors.indigo50,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isRead ? AppColors.gray200 : AppColors.indigo100,
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(color: isRead ? AppColors.gray200 : AppColors.indigo100, width: 1),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: _getIconBackgroundColor(notification.type),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                _getIconData(notification.type),
-                color: _getIconColor(notification.type),
-                size: 20,
-              ),
+              decoration: BoxDecoration(color: _getIconBackgroundColor(notification.type), shape: BoxShape.circle),
+              child: Icon(_getIconData(notification.type), color: _getIconColor(notification.type), size: 20),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -140,42 +128,26 @@ class NotificationScreen extends GetView<NotificationController> {
                       Expanded(
                         child: Text(
                           notification.title ?? "Notification",
-                          style: TextStyle(
-                            fontWeight: isRead ? FontWeight.w600 : FontWeight.bold,
-                            fontSize: 14,
-                            color: AppColors.textPrimary,
-                          ),
+                          style: TextStyle(fontWeight: isRead ? FontWeight.w600 : FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
                         ),
                       ),
                       if (!isRead)
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppColors.indigo600Main,
-                            shape: BoxShape.circle,
-                          ),
+                          decoration: const BoxDecoration(color: AppColors.indigo600Main, shape: BoxShape.circle),
                         ),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
                     notification.message ?? "",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isRead ? AppColors.textSecondary : AppColors.gray800,
-                      height: 1.4,
-                    ),
+                    style: TextStyle(fontSize: 13, color: isRead ? AppColors.textSecondary : AppColors.gray800, height: 1.4),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    notification.createdAt != null
-                        ? DateFormat('dd MMM yyyy, hh:mm a').format(notification.createdAt!.toLocal())
-                        : "",
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.gray400,
-                    ),
+                    notification.createdAt != null ? DateFormat('dd MMM yyyy, hh:mm a').format(notification.createdAt!.toLocal()) : "",
+                    style: const TextStyle(fontSize: 11, color: AppColors.gray400),
                   ),
                 ],
               ),

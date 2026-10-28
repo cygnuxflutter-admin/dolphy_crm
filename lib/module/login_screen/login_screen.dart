@@ -137,30 +137,7 @@ class LoginScreen extends StatelessWidget {
                         }),
 
                         const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            Obx(() {
-                              return SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: Checkbox(
-                                  value: loginScreenController.rememberMe.value,
-                                  activeColor: AppColors.indigo600Main,
-                                  onChanged: (value) {
-                                    loginScreenController.rememberMe.value = value!;
-                                  },
-                                ),
-                              );
-                            }),
-                            const SizedBox(width: 8),
-                            const Text(
-                              "Remember Me",
-                              style: TextStyle(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 32),
+
                         Obx(() {
                           return commonButton(
                             name: "Login",

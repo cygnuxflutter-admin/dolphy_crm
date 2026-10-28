@@ -15,6 +15,7 @@ Widget commonTextField({
   TextEditingController? controller,
   ScrollController? scrollController,
   String? validationMessage,
+  String? Function(String? v)? validator,
   bool needValidation = false,
   bool isEmailValidator = false,
   bool isPasswordValidator = false,
@@ -146,27 +147,28 @@ Widget commonTextField({
         ),
       ),
 
-      validator: needValidation
-          ? (v) {
-              return TextFieldValidation.validation(
-                countryCode: countryCode,
-                isEmailValidator: isEmailValidator,
-                isCountryCode: isCountryCode,
-                isPasswordValidator: isPasswordValidator,
-                isPhoneNumberValidator: isPhoneNumberValidator,
-                isCVCValidator: isCVCValidator,
-                isExpiryMonthValidator: isExpiryMonthValidator,
-                isCardValidator: isCardValidator,
-                isExpiryYearValidator: isExpiryYearValidator,
-                message: validationMessage,
-                value: v!.trim(),
-                newPassValue2: newPassValue2,
-                isSamePasswordValidator: isSamePasswordValidator,
-                isTimeValidator: isTimeValidator,
-                startTime: startTime,
-              );
-            }
-          : null,
+      validator: validator ??
+          (needValidation
+              ? (v) {
+                  return TextFieldValidation.validation(
+                    countryCode: countryCode,
+                    isEmailValidator: isEmailValidator,
+                    isCountryCode: isCountryCode,
+                    isPasswordValidator: isPasswordValidator,
+                    isPhoneNumberValidator: isPhoneNumberValidator,
+                    isCVCValidator: isCVCValidator,
+                    isExpiryMonthValidator: isExpiryMonthValidator,
+                    isCardValidator: isCardValidator,
+                    isExpiryYearValidator: isExpiryYearValidator,
+                    message: validationMessage,
+                    value: v!.trim(),
+                    newPassValue2: newPassValue2,
+                    isSamePasswordValidator: isSamePasswordValidator,
+                    isTimeValidator: isTimeValidator,
+                    startTime: startTime,
+                  );
+                }
+              : null),
     ),
   );
 }

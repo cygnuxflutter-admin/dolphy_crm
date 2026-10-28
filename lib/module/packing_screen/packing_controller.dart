@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crm/config/app_routes.dart';
-import 'package:crm/module/packing_screen/model/transport_mode_responce_model.dart';
+import 'package:crm/module/packing_screen/model/transport_mode_responce_model.dart' as tm;
 import 'package:crm/module/packing_screen/model/vendor_responce_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,6 +27,7 @@ import 'model/packing_detail_responce_model.dart';
 import 'model/packing_list_detail_response_model.dart';
 import 'model/packing_list_response_model.dart';
 import 'model/physical_box_status_model.dart';
+import 'model/picking_request_responce_model.dart';
 import 'model/shipping_label_model.dart';
 
 class PackingController extends GetxController {
@@ -64,7 +65,11 @@ class PackingController extends GetxController {
   Rx<BoxSuggestionData?> boxSuggestionData = Rx<BoxSuggestionData?>(null);
   RxList<ProductSummary> productSummary = <ProductSummary>[].obs;
 
+  RxBool isPickingRequestLoading = false.obs;
+  Rx<PickingRequestResponseModel?> pickingRequestDetail = Rx<PickingRequestResponseModel?>(null);
+
   var isInvoiceExpanded = false.obs;
+  var isBoxSuggestionsExpanded = true.obs;
 
   RxInt selectedAttachmentTab = 0.obs;
 
@@ -78,11 +83,11 @@ class PackingController extends GetxController {
   RxList<BoxConfiguration> boxConfigs = <BoxConfiguration>[].obs;
 
   // E-Way Bill Form State
-  RxList<Item> transportModes = <Item>[].obs;
+  RxList<tm.Item> transportModes = <tm.Item>[].obs;
   RxList<Vendor> vendors = <Vendor>[].obs;
   List a = [];
 
-  Rx<Item?> selectedTransportMode = Rx(null);
+  Rx<tm.Item?> selectedTransportMode = Rx(null);
   Rx<Vendor?> selectedVendorId = Rx(null);
   final transporterGstinController = TextEditingController();
 
@@ -226,78 +231,128 @@ class PackingController extends GetxController {
 
   void updateDetailStatus() {
     if (packingDetail.value != null) {
-      detailStatusLabel.value = getStatusLabel(packingDetail.value!.status);
-      detailStatusColor.value = getBadgeColor(packingDetail.value!.status, detailStatusLabel.value);
+      detailStatusLabel.value = getStatusLabel(packingDetail.value!);
+      detailStatusColor.value = getBadgeColor(packingDetail.value!, detailStatusLabel.value);
     }
   }
 
   String getStatusLabel(dynamic item) {
-    if (item is PackingList) {
-      if (item.status?.toUpperCase() == "DRAFT") {
-        return "Start Packing";
-      }
-      return getStatusLabel(item.status);
-    }
+    String dispatchStatus = "";
     String status = "";
-    if (item is String) {
+    bool isPackingDetailSaved = false;
+    String lrNo = "";
+    String transportMode = "";
+    bool isRegularInvoiceApproved = false;
+
+    if (item is PackingList) {
+      dispatchStatus = item.dispatchStatus ?? "";
+      status = item.status ?? "";
+      isPackingDetailSaved = item.isPackingDetailSaved ?? false;
+      lrNo = item.lrNo ?? "";
+      transportMode = item.transportMode ?? "";
+      isRegularInvoiceApproved = item.isRegularInvoiceApproved ?? false;
+    } else if (item is PackingDetailData) {
+      dispatchStatus = item.dispatchStatus?.toString() ?? "";
+      status = item.status ?? "";
+      isPackingDetailSaved = item.isPackingDetailSaved ?? false;
+      lrNo = item.lrNo?.toString() ?? "";
+      transportMode = item.transportMode?.toString() ?? "";
+      isRegularInvoiceApproved = item.isRegularInvoiceApproved ?? false;
+    } else if (item is PackingListDetailData) {
+      dispatchStatus = item.dispatchStatus?.toString() ?? "";
+      status = item.status ?? "";
+      isPackingDetailSaved = item.isPackingDetailSaved ?? false;
+      lrNo = item.lrNo?.toString() ?? "";
+      transportMode = item.transportMode?.toString() ?? "";
+      isRegularInvoiceApproved = false;
+    } else if (item is String) {
       status = item;
-    } else if (item != null) {
-      status = item.toString();
     }
 
+    // Step 1 — Check dispatch_status first
+    if (dispatchStatus.isNotEmpty && dispatchStatus.toUpperCase() != "DRAFT") {
+      if (dispatchStatus.toUpperCase() == "DISPATCHED") return "Dispatched";
+      if (dispatchStatus.toUpperCase() == "DELIVERED") return "Delivered";
+      return formatStatus(dispatchStatus);
+    }
+
+    // Step 2 — If dispatch is not available or dispatch_status = DRAFT
     switch (status.toUpperCase()) {
-      case "NEW":
-        return "New Order";
-      case "PACKING":
-      case "PACKED":
-      case "IN_PACKING":
-        return "In Packing";
-      case "INVOICED":
-        return "Invoiced";
-      case "REJECTED":
-        return "Rejected";
-      case "COMPLETED":
-        return "Completed";
-      case "PENDING":
-        return "Pending";
-      case "CANCELLED":
-        return "Cancelled";
       case "DRAFT":
         return "Start Packing";
+      case "PACKING":
+      case "IN_PACKING":
+        return isPackingDetailSaved ? "Packing Done" : "In Packing";
+      case "PACKED":
+        if (!isPackingDetailSaved) return "In Packing";
+        if (lrNo.isEmpty || transportMode.isEmpty) return "Packing Done";
+        return "Packed";
+      case "INVOICED":
+        return isRegularInvoiceApproved ? "Ready For Dispatch" : "Invoiced";
+      case "DC_GENERATED":
+        return "DC Generated";
+      case "REJECTED":
+        return "Rejected";
       default:
-        return status.isNotEmpty ? status : "-";
+        return status.isNotEmpty ? formatStatus(status) : "-";
     }
   }
 
   Color getBadgeColor(dynamic item, String label) {
-    if (item is PackingList) {
-      return getBadgeColor(item.status, label);
-    }
-    String status = "";
-    if (item is String) {
-      status = item;
-    } else if (item != null) {
-      status = item.toString();
-    }
-
-    switch (status.toUpperCase()) {
-      case "NEW":
+    switch (label.toUpperCase()) {
+      case "START PACKING":
         return AppColors.indigo600Main;
-      case "PACKING":
-      case "PACKED":
       case "IN PACKING":
-      case "IN_PACKING":
-      case "DRAFT":
+      case "PACKING DONE":
         return AppColors.orangeColor;
+      case "IN TRANSIT":
+      case "INTRANSIT":
+        return AppColors.gray600;
+      case "PACKED":
+      case "DELIVERED":
       case "COMPLETED":
         return AppColors.green500Success;
+      case "DISPATCHED":
+        return AppColors.purple500;
       case "INVOICED":
         return AppColors.blue500;
+      case "DC GENERATED":
+        return const Color(0xFF26C6DA);
+      case "READY FOR DISPATCH":
+        return AppColors.blue600;
       case "REJECTED":
       case "CANCELLED":
         return AppColors.red500;
       default:
-        return AppColors.gray500;
+        // Fallback to original logic if label doesn't match
+        String status = "";
+        if (item is String) {
+          status = item;
+        } else if (item is PackingList) {
+          status = item.status ?? "";
+        } else if (item is PackingDetailData) {
+          status = item.status ?? "";
+        }
+
+        switch (status.toUpperCase()) {
+          case "NEW":
+            return AppColors.indigo600Main;
+          case "PACKING":
+          case "PACKED":
+          case "IN PACKING":
+          case "IN_PACKING":
+          case "DRAFT":
+            return AppColors.orangeColor;
+          case "COMPLETED":
+            return AppColors.green500Success;
+          case "INVOICED":
+            return AppColors.blue500;
+          case "REJECTED":
+          case "CANCELLED":
+            return AppColors.red500;
+          default:
+            return AppColors.gray500;
+        }
     }
   }
 
@@ -330,9 +385,9 @@ class PackingController extends GetxController {
           await fetchPhysicalBoxStatus(id);
 
           // If no physical boxes saved, then show AI suggestions
-          // if (boxConfigs.isEmpty) {
-          await autoFillWithAI(res.data!);
-          // }
+          if (boxConfigs.isEmpty) {
+            await autoFillWithAI(res.data!);
+          }
         }
       } else {
         listDetailError.value = data['message'] ?? "Failed to load details";
@@ -348,7 +403,7 @@ class PackingController extends GetxController {
   Future<void> fetchPhysicalBoxStatus(String packingId) async {
     try {
       final response = await ApiHandler.getRequest(
-        "${ApiEndPoint.packingPhysicalBoxStatus}?packing_id=$packingId&location_id=${Pref.getLocationId()}&company_id=${Pref.getCompanyId()}",
+        "${ApiEndPoint.packingPhysicalBoxStatus}?packing_id=$packingId&location_id=${packingListDetail.value?.locationId ?? Pref.getLocationId()}&company_id=${packingListDetail.value?.companyId ?? Pref.getCompanyId()}",
       );
       final data = json.decode(response.data);
       if (response.statusCode == 200 && data['status'] == 200) {
@@ -356,7 +411,7 @@ class PackingController extends GetxController {
         if (physicalBoxData != null) {
           if (physicalBoxData.configs != null) {
             final rawConfigs = physicalBoxData.configs!.map((config) => _mapConfigToBoxConfig(config)).toList();
-            boxConfigs.value = _groupConfigs(rawConfigs);
+            boxConfigs.assignAll(rawConfigs);
           }
           if (physicalBoxData.productSummary != null) {
             productSummary.value = physicalBoxData.productSummary!;
@@ -427,6 +482,7 @@ class PackingController extends GetxController {
       final data = response.data;
       if (response.statusCode == 201 && data['status'] == 201) {
         toastMessage(text: data['message'] ?? "Packing created successfully", color: Colors.green);
+        getPackingCounts();
         Get.back();
         fetchData();
       } else {
@@ -448,6 +504,7 @@ class PackingController extends GetxController {
       final data = response.data;
       if (response.statusCode == 201 && data['status'] == 201) {
         toastMessage(text: data['message'] ?? "Packing started", color: Colors.green);
+        getPackingCounts();
         fetchData();
         return true;
       } else {
@@ -549,17 +606,14 @@ class PackingController extends GetxController {
   Future<void> rejectPacking(String id, {String? reason}) async {
     isLoading.value = true;
     try {
-      final body = {
-        "rejection_reason": reason ?? "Rejected from mobile app",
-        "company_id": Pref.getCompanyId(),
-        "fin_year": Pref.getFinancialYears(),
-        "location_id": Pref.getLocationId(),
-      };
+      final body = {"rejection_reason": reason ?? "Rejected from mobile app"};
       final response = await ApiHandler.patchRequest(url: "${ApiEndPoint.packingReject}$id", body: body);
       final data = response.data;
       if (response.statusCode == 200 && data['status'] == 200) {
         toastMessage(text: data['message'] ?? "Packing rejected", color: Colors.green);
+        getPackingCounts();
         Get.back();
+        getPackingDetail(id);
         fetchData();
       } else {
         toastMessage(text: data['message'] ?? "Failed to reject packing", color: Colors.red);
@@ -579,6 +633,7 @@ class PackingController extends GetxController {
       final data = json.decode(response.data);
       if (response.statusCode == 200 && data['status'] == 200) {
         toastMessage(text: data['message'] ?? "Packing deleted", color: Colors.green);
+        getPackingCounts();
         if (Get.currentRoute == AppRoutes.packingDetailScreen) {
           Get.back();
         }
@@ -601,6 +656,7 @@ class PackingController extends GetxController {
       final data = response.data;
       if (response.statusCode == 201 && data['status'] == 201) {
         toastMessage(text: data['message'] ?? "Invoice requested successfully", color: Colors.green);
+        getPackingCounts();
         fetchData();
       } else {
         toastMessage(text: data['message'] ?? "Failed to request invoice", color: Colors.red);
@@ -677,6 +733,7 @@ class PackingController extends GetxController {
       final data = response.data;
       if (response.statusCode == 200 && data['status'] == 200) {
         toastMessage(text: data['message'] ?? "E-Way Bill details updated successfully", color: Colors.green);
+        getPackingCounts();
         Get.back();
         getPackingDetail(id);
         fetchData();
@@ -697,7 +754,9 @@ class PackingController extends GetxController {
 
       final modeData = json.decode(responses[0].data);
       if (responses[0].statusCode == 200 && modeData['status'] == 200) {
-        transportModes.assignAll(TransportModeResponseModel.fromJson(modeData).data?.expand((m) => m.items ?? <Item>[]).toList() ?? <Item>[]);
+        transportModes.assignAll(
+          tm.TransportModeResponseModel.fromJson(modeData).data?.expand((m) => m.items ?? <tm.Item>[]).toList() ?? <tm.Item>[],
+        );
       }
 
       final vendorData = json.decode(responses[1].data);
@@ -734,7 +793,7 @@ class PackingController extends GetxController {
     isLoading.value = true;
     try {
       final response = await ApiHandler.getRequest(
-        "${ApiEndPoint.packingPhysicalBoxStatus}?packing_id=$packingId&location_id=${Pref.getLocationId()}&company_id=${Pref.getCompanyId()}",
+        "${ApiEndPoint.packingPhysicalBoxStatus}?packing_id=$packingId&location_id=${packingListDetail.value?.locationId ?? Pref.getLocationId()}&company_id=${packingListDetail.value?.companyId ?? Pref.getCompanyId()}",
       );
 
       final data = json.decode(response.data);
@@ -1069,7 +1128,7 @@ class PackingController extends GetxController {
             if (fullBoxesCount > 0) {
               tempConfigs.add(
                 BoxConfiguration(
-                  id: "${DateTime.now().millisecondsSinceEpoch}_${boxIndex}_full",
+                  id: item.boxSuggestionItemId ?? "${DateTime.now().millisecondsSinceEpoch}_${boxIndex}_full",
                   boxName: fullBoxesCount > 1 ? "Boxes $boxIndex - ${boxIndex + fullBoxesCount - 1}" : "Box $boxIndex",
                   weight: 0.0,
                   fromBox: boxIndex,
@@ -1084,7 +1143,7 @@ class PackingController extends GetxController {
             if (remainingQty > 0) {
               tempConfigs.add(
                 BoxConfiguration(
-                  id: "${DateTime.now().millisecondsSinceEpoch}_${boxIndex}_rem",
+                  id: item.boxSuggestionItemId ?? "${DateTime.now().millisecondsSinceEpoch}_${boxIndex}_rem",
                   boxName: "Box $boxIndex",
                   weight: 0.0,
                   fromBox: boxIndex,
@@ -1131,8 +1190,9 @@ class PackingController extends GetxController {
     try {
       final body = {
         "packing_id": packingId,
-        "company_id": Pref.getCompanyId(),
-        "fin_year": Pref.getFinancialYears(),
+        "company_id": packingListDetail.value?.companyId ?? Pref.getCompanyId(),
+        "location_id": packingListDetail.value?.locationId ?? Pref.getLocationId(),
+        "fin_year": packingListDetail.value?.finYear ?? Pref.getFinancialYears(),
         "box_range_start": config.fromBox,
         "box_range_end": config.toBox,
         "length": config.length,
@@ -1272,6 +1332,7 @@ class PackingController extends GetxController {
       final data = response.data;
       if (response.statusCode == 200 && data['status'] == 200) {
         toastMessage(text: data['message'] ?? "Invoice requested successfully", color: Colors.green);
+        getPackingCounts();
         getPackingDetail(id);
       } else {
         toastMessage(text: data['message'] ?? "Failed to request invoice", color: Colors.red);
@@ -1284,55 +1345,21 @@ class PackingController extends GetxController {
     }
   }
 
-  List<BoxConfiguration> _groupConfigs(List<BoxConfiguration> configs) {
-    if (configs.isEmpty) return [];
-
-    // Sort by fromBox to ensure consecutive checking
-    configs.sort((a, b) => a.fromBox.compareTo(b.fromBox));
-
-    List<BoxConfiguration> grouped = [];
-    BoxConfiguration? current;
-
-    for (var config in configs) {
-      if (current == null) {
-        current = config;
-      } else if (_areConfigsGroupable(current, config)) {
-        current = current.copyWith(toBox: config.toBox, boxName: "Boxes ${current.fromBox} - ${config.toBox}");
+  Future<void> getPickingRequestDetail(String id) async {
+    isPickingRequestLoading.value = true;
+    try {
+      final response = await ApiHandler.getRequest("${ApiEndPoint.pickingRequestFind}$id");
+      final data = json.decode(response.data);
+      if (response.statusCode == 200 && data['status'] == 200) {
+        pickingRequestDetail.value = PickingRequestResponseModel.fromJson(data);
       } else {
-        grouped.add(current);
-        current = config;
+        toastMessage(text: data['message'] ?? "Failed to load picking request details", color: Colors.red);
       }
+    } catch (e) {
+      debugPrint("Error fetching picking request detail: $e");
+      toastMessage(text: "Something went wrong", color: Colors.red);
+    } finally {
+      isPickingRequestLoading.value = false;
     }
-    if (current != null) grouped.add(current);
-    return grouped;
-  }
-
-  bool _areConfigsGroupable(BoxConfiguration a, BoxConfiguration b) {
-    // If box numbers are not set or not consecutive, we can't group them into a single range card
-    if (a.fromBox == 0 || b.fromBox == 0) return false;
-    if (a.toBox + 1 != b.fromBox) return false;
-
-    // Compare dimensions
-    if ((a.length - b.length).abs() > 0.01 || (a.width - b.width).abs() > 0.01 || (a.height - b.height).abs() > 0.01 || a.dimUom != b.dimUom) {
-      return false;
-    }
-
-    // Compare weights
-    if ((a.netWeight - b.netWeight).abs() > 0.001 || (a.grossWeight - b.grossWeight).abs() > 0.001 || a.weightUom != b.weightUom) {
-      return false;
-    }
-
-    // Compare items
-    if (a.items.length != b.items.length) return false;
-
-    // Sort items by productId to ensure order-independent comparison
-    var itemsA = List<BoxConfigItem>.from(a.items)..sort((x, y) => x.productId.compareTo(y.productId));
-    var itemsB = List<BoxConfigItem>.from(b.items)..sort((x, y) => x.productId.compareTo(y.productId));
-
-    for (int i = 0; i < itemsA.length; i++) {
-      if (itemsA[i].productId != itemsB[i].productId || itemsA[i].qty != itemsB[i].qty) return false;
-    }
-
-    return true;
   }
 }

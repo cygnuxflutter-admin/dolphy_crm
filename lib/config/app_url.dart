@@ -1,10 +1,10 @@
 class ApiEndPoint {
-  static String baseUrl = "https://tradeapi.cygnux.in/api/v1/";
-  // static String baseUrl = "http://192.168.0.230:4032/api/v1/";
-  // static String baseUrl = "https://traderpuatapi.cygnux.in/api/v1/";
-  // static String baseUrl = "http://192.168.0.180:4032/api/v1/";
+  // static String baseUrl = "https://tradeapi.cygnux.in/api/v1/";
+  static String baseUrl = "https://dolphyapi.cygnux.in/api/v1/";
+  // static String baseUrl = "http://192.168.0.188:4032/api/v1/";
 
   static String logIn = "${baseUrl}auth/login";
+  static String latestVersion = "${baseUrl}version/latest";
   static String leadSource = "${baseUrl}commonMaster/findByGroup?type=Lead+Source";
   static String leadTags = "${baseUrl}commonMaster/findByGroup?type=Tag+Type";
   static String priceType = "${baseUrl}commonMaster/findByGroup?type=Price+Type";
@@ -50,7 +50,6 @@ class ApiEndPoint {
   static String getCustomerGroup = "${baseUrl}group-brand-master/find";
   static String getLocation = "${baseUrl}location/find";
   static String getCompany = "${baseUrl}company-master/find?exportData=false";
-  static String getFollowerAndViewer = "${baseUrl}company-master/find?exportData=false";
   static String getProbability = "${baseUrl}commonMaster/findByGroup?type=Probability";
   static String getOpportunitySection = "${baseUrl}section/find?page=1&limit=50&exportData=false";
   static String getOpportunitySectionUpdate = "${baseUrl}opportunity/section-update/";
@@ -74,16 +73,18 @@ class ApiEndPoint {
   static String shippingLabel = "${baseUrl}packing-list/shipping-label";
   static String shippingLabelPdf = "${baseUrl}packing-list/shipping-label-pdf/";
   static String packingPhysicalBoxStatus = "${baseUrl}packing-list/physical-box/status";
-  static String packingReject = "${baseUrl}picking-list/reject/";
+  static String packingReject = "${baseUrl}packing-list/reject/";
   static String transporters = "${baseUrl}vendor/transporters";
   static String transportMode = "${baseUrl}commonMaster/findByGroup?type=Transport+Mode";
   static String boxSuggestion = "${baseUrl}packing-list/box-suggestion";
   static String updateBoxConfig = "${baseUrl}packing-list/physical-box/update/";
   static String updateBoxSuggestion = "${baseUrl}packing-list/box-suggestion/update/by-packing";
+  static String pickingRequestFind = "${baseUrl}pick-request/find/";
 
   // Visit Endpoints
   static String serviceVisitCounts = "${baseUrl}service-visit/counts";
   static String serviceVisitList = "${baseUrl}service-visit/find";
+  static String serviceVisitHistory = "${baseUrl}service-visit/{visit_id}/history";
   static String syncToComplaintPreview = "${baseUrl}service-visit/{visit_id}/sync-to-complaint-preview";
   static String syncToComplaint = "${baseUrl}service-visit/{visit_id}/sync-to-complaint";
   static String technicianExpenseList = "${baseUrl}technician-expense/find";
@@ -93,4 +94,11 @@ class ApiEndPoint {
   // Notification Endpoints
   static String notifications = "${baseUrl}notifications/my";
   static String markReadNotifications = "${baseUrl}notifications/mark-read";
+
+  // Draft Inquiry Endpoints
+  static String draftInquiryCreate = "${baseUrl}draft-inquiry/create";
+  static String draftInquiryList = "${baseUrl}draft-inquiry/find";
+  static String draftInquiryDetail = "${baseUrl}draft-inquiry/find/";
+  static String draftInquiryUpdate = "${baseUrl}draft-inquiry/update/";
+  static String draftInquiryDelete = "${baseUrl}draft-inquiry/delete/";
 }

@@ -32,19 +32,32 @@ class PickingCounts {
   final int? cancelled;
   final int? packingReject;
   final int? rejected;
+  final int? history;
 
-  PickingCounts({this.all, this.draft, this.partial, this.picked, this.packingReject, this.rejected, this.assigned, this.cancelled, this.picking});
+  PickingCounts({
+    this.all,
+    this.draft,
+    this.partial,
+    this.picked,
+    this.packingReject,
+    this.rejected,
+    this.assigned,
+    this.cancelled,
+    this.picking,
+    this.history,
+  });
 
   factory PickingCounts.fromJson(Map<String, dynamic> json) => PickingCounts(
     all: int.tryParse(json["all"]?.toString() ?? ""),
     draft: int.tryParse(json["DRAFT"]?.toString() ?? ""),
     partial: int.tryParse(json["PARTIAL"]?.toString() ?? ""),
     picked: int.tryParse(json["PICKED"]?.toString() ?? ""),
-    packingReject: int.tryParse(json["PACKING_REJECT"]?.toString() ?? ""),
+    packingReject: int.tryParse(json["PACKING_REJECTED"]?.toString() ?? ""),
     rejected: int.tryParse(json["REJECTED"]?.toString() ?? ""),
     assigned: int.tryParse(json["ASSIGNED"]?.toString() ?? ""),
     cancelled: int.tryParse(json["CANCELLED"]?.toString() ?? ""),
     picking: int.tryParse(json["PICKING"]?.toString() ?? ""),
+    history: int.tryParse(json["history"]?.toString() ?? ""),
   );
 
   Map<String, dynamic> toJson() => {
@@ -57,5 +70,6 @@ class PickingCounts {
     "PICKING": picking,
     "ASSIGNED": assigned,
     "CANCELLED": cancelled,
+    "history": history,
   };
 }

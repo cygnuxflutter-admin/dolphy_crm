@@ -5,11 +5,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
+import 'package:location/location.dart' as loc;
 
 import '../../../config/app_shared_pref.dart';
 import '../../../config/app_url.dart';
 import '../../../utils/api_handler.dart';
 import '../../../widget/toast_message.dart';
+import '../../config/app_colors.dart';
 import '../expense_screen/model/technician_expense_model.dart';
 import '../lead_screen/model/lead_type.dart';
 import 'model/dispatched_serial_model.dart';
@@ -23,7 +25,31 @@ class VisitController extends GetxController {
   RxBool isLoading = false.obs;
   RxBool isActionLoading = false.obs;
   RxBool isCountsLoading = false.obs;
+  RxBool isLocationChecking = false.obs;
   RxString error = "".obs;
+
+  final GlobalKey endTrackingKey = GlobalKey();
+  final ScrollController fieldReportScrollController = ScrollController();
+
+  void scrollToEndTracking() {
+    try {
+      final context = endTrackingKey.currentContext;
+      if (context != null && context.mounted) {
+        Scrollable.ensureVisible(context, duration: const Duration(milliseconds: 600), curve: Curves.easeInOut, alignment: 0.05);
+        return;
+      }
+    } catch (e) {
+      debugPrint("Error scrolling to end tracking: $e");
+    }
+
+    if (fieldReportScrollController.hasClients) {
+      fieldReportScrollController.animateTo(
+        fieldReportScrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
 
   Rx<VisitCounts?> visitCounts = Rx<VisitCounts?>(null);
   RxList<VisitDatum> visitList = <VisitDatum>[].obs;
@@ -56,6 +82,8 @@ class VisitController extends GetxController {
   Rx<FieldReportData?> fieldReportDetail = Rx<FieldReportData?>(null);
   RxMap<String, bool> expandedProducts = <String, bool>{}.obs;
   RxMap<String, bool> expandedTechLogs = <String, bool>{}.obs;
+  RxMap<String, bool> expandedSerialSections = <String, bool>{}.obs;
+  RxMap<String, bool> expandedPartsSections = <String, bool>{}.obs;
 
   // Add Product to Visit Form
   Rx<TextEditingController> taxInvoiceNoController = TextEditingController().obs;
@@ -85,6 +113,19 @@ class VisitController extends GetxController {
   RxList<File> finalAttachments = <File>[].obs;
   RxList<String> finalAttachmentUrls = <String>[].obs;
 
+  // Attachment Upload Statuses
+  RxMap<String, bool> isUploadingProductAttachments = <String, bool>{}.obs;
+  RxMap<String, String> productAttachmentUploadProgress = <String, String>{}.obs;
+
+  RxMap<String, bool> isUploadingPartAttachments = <String, bool>{}.obs;
+  RxMap<String, String> partAttachmentUploadProgress = <String, String>{}.obs;
+
+  RxBool isUploadingFinalAttachments = false.obs;
+  RxString finalAttachmentUploadProgress = "".obs;
+
+  RxBool isUploadingSiteArrivalAttachments = false.obs;
+  RxString siteArrivalUploadProgress = "".obs;
+
   // Site Arrival
   RxList<String> siteArrivalAttachmentUrls = <String>[].obs;
   final siteArrivalRemarkController = TextEditingController().obs;
@@ -101,48 +142,82 @@ class VisitController extends GetxController {
   RxString overallRemarkError = "".obs;
   RxString finalUsageNoteError = "".obs;
 
-  Future<void> uploadFinalAttachment(File file) async {
-    isLoading.value = true;
+  Future<void> uploadFinalAttachments(List<File> files) async {
+    if (files.isEmpty) return;
+    isUploadingFinalAttachments.value = true;
+    int total = files.length;
+    int successCount = 0;
+
     try {
-      final response = await ApiHandler.uploadFile(file, folderName: 'service-visit-attachments');
-      final data = response.data;
-      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
-        String? fileUrl = data['data'] != null ? data['data']['url'] : null;
-        if (fileUrl != null) {
-          finalAttachmentUrls.add(fileUrl);
-          toastMessage(text: "File uploaded successfully");
+      for (int i = 0; i < total; i++) {
+        finalAttachmentUploadProgress.value = total == 1 ? "Uploading..." : "Uploading ${i + 1}/$total...";
+        final file = files[i];
+        try {
+          final response = await ApiHandler.uploadFile(file, folderName: 'service-visit-attachments');
+          final data = response.data;
+          if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+            String? fileUrl = data['data'] != null ? data['data']['url'] : null;
+            if (fileUrl != null) {
+              finalAttachmentUrls.add(fileUrl);
+              successCount++;
+            }
+          }
+        } catch (e) {
+          debugPrint("Error uploading final attachment: $e");
         }
-      } else {
-        toastMessage(text: data['message'] ?? "Upload failed");
       }
-    } catch (e) {
-      debugPrint("Error uploading file: $e");
-      toastMessage(text: "Upload error: $e");
+      if (successCount > 0) {
+        toastMessage(text: total == 1 ? "File uploaded successfully" : "$successCount of $total files uploaded successfully");
+      } else {
+        toastMessage(text: "File upload failed", color: AppColors.redColor);
+      }
     } finally {
-      isLoading.value = false;
+      isUploadingFinalAttachments.value = false;
+      finalAttachmentUploadProgress.value = "";
+    }
+  }
+
+  Future<void> uploadFinalAttachment(File file) async {
+    await uploadFinalAttachments([file]);
+  }
+
+  Future<void> uploadSiteArrivalAttachments(List<File> files) async {
+    if (files.isEmpty) return;
+    isUploadingSiteArrivalAttachments.value = true;
+    int total = files.length;
+    int successCount = 0;
+
+    try {
+      for (int i = 0; i < total; i++) {
+        siteArrivalUploadProgress.value = total == 1 ? "Uploading..." : "Uploading ${i + 1}/$total...";
+        final file = files[i];
+        try {
+          final response = await ApiHandler.uploadFile(file, folderName: 'service-visit-reached-attachments');
+          final data = response.data;
+          if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+            String? fileUrl = data['data'] != null ? data['data']['url'] : null;
+            if (fileUrl != null) {
+              siteArrivalAttachmentUrls.add(fileUrl);
+              successCount++;
+            }
+          }
+        } catch (e) {
+          debugPrint("Error uploading site arrival attachment: $e");
+        }
+      }
+      if (successCount > 0) {
+        toastMessage(text: total == 1 ? "File uploaded successfully" : "$successCount of $total files uploaded successfully");
+      } else {
+        toastMessage(text: "File upload failed", color: AppColors.redColor);
+      }
+    } finally {
+      isUploadingSiteArrivalAttachments.value = false;
+      siteArrivalUploadProgress.value = "";
     }
   }
 
   Future<void> uploadSiteArrivalAttachment(File file) async {
-    isLoading.value = true;
-    try {
-      final response = await ApiHandler.uploadFile(file, folderName: 'service-visit-reached-attachments');
-      final data = response.data;
-      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
-        String? fileUrl = data['data'] != null ? data['data']['url'] : null;
-        if (fileUrl != null) {
-          siteArrivalAttachmentUrls.add(fileUrl);
-          toastMessage(text: "File uploaded successfully");
-        }
-      } else {
-        toastMessage(text: data['message'] ?? "Upload failed");
-      }
-    } catch (e) {
-      debugPrint("Error uploading file: $e");
-      toastMessage(text: "Upload error: $e");
-    } finally {
-      isLoading.value = false;
-    }
+    await uploadSiteArrivalAttachments([file]);
   }
 
   void removeSiteArrivalAttachment(int index) {
@@ -455,6 +530,22 @@ class VisitController extends GetxController {
     }
   }
 
+  void toggleSerialSectionExpansion(String productId) {
+    if (expandedSerialSections.containsKey(productId)) {
+      expandedSerialSections[productId] = !expandedSerialSections[productId]!;
+    } else {
+      expandedSerialSections[productId] = true;
+    }
+  }
+
+  void togglePartsSectionExpansion(String productId) {
+    if (expandedPartsSections.containsKey(productId)) {
+      expandedPartsSections[productId] = !expandedPartsSections[productId]!;
+    } else {
+      expandedPartsSections[productId] = true;
+    }
+  }
+
   void updateSolveQty(String productId, String value) {
     if (fieldReportDetail.value == null) return;
     int? newQty = int.tryParse(value);
@@ -498,6 +589,29 @@ class VisitController extends GetxController {
     }
   }
 
+  void addSerialNumber(String productId, [String value = ""]) {
+    if (fieldReportDetail.value == null) return;
+    final productIndex = fieldReportDetail.value!.products.indexWhere((p) => p.id == productId);
+    if (productIndex != -1) {
+      final product = fieldReportDetail.value!.products[productIndex];
+      product.serialNumbers.add(value);
+      expandedSerialSections[productId] = true;
+      fieldReportDetail.refresh();
+    }
+  }
+
+  void removeSerialNumber(String productId, int index) {
+    if (fieldReportDetail.value == null) return;
+    final productIndex = fieldReportDetail.value!.products.indexWhere((p) => p.id == productId);
+    if (productIndex != -1) {
+      final product = fieldReportDetail.value!.products[productIndex];
+      if (index < product.serialNumbers.length) {
+        product.serialNumbers.removeAt(index);
+        fieldReportDetail.refresh();
+      }
+    }
+  }
+
   void updateWorkRemark(String productId, String value) {
     if (fieldReportDetail.value == null) return;
     final productIndex = fieldReportDetail.value!.products.indexWhere((p) => p.id == productId);
@@ -530,38 +644,50 @@ class VisitController extends GetxController {
     return [];
   }
 
-  Future<void> uploadProductAttachment(String productId, File file) async {
-    isLoading.value = true;
+  Future<void> uploadProductAttachments(String productId, List<File> files) async {
+    if (files.isEmpty) return;
+    isUploadingProductAttachments[productId] = true;
+    int total = files.length;
+    int successCount = 0;
+
     try {
-      debugPrint("Uploading file for product $productId: ${file.path}");
-      final response = await ApiHandler.uploadFile(file, folderName: 'service-visit-product-attachments');
-      debugPrint("Upload Response Status: ${response.statusCode}");
-      debugPrint("Upload Response Body: ${response.data}");
+      for (int i = 0; i < total; i++) {
+        productAttachmentUploadProgress[productId] = total == 1 ? "Uploading..." : "Uploading ${i + 1}/$total...";
+        final file = files[i];
+        try {
+          debugPrint("Uploading file for product $productId: ${file.path}");
+          final response = await ApiHandler.uploadFile(file, folderName: 'service-visit-product-attachments');
+          final data = response.data;
 
-      final data = response.data;
-
-      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
-        String? fileUrl = data['data'] != null ? data['data']['url'] : null;
-        if (fileUrl != null) {
-          final productIndex = fieldReportDetail.value!.products.indexWhere((p) => p.id == productId);
-          if (productIndex != -1) {
-            final product = fieldReportDetail.value!.products[productIndex];
-            product.attachments.add(fileUrl);
-            fieldReportDetail.refresh();
-            toastMessage(text: "File uploaded successfully");
+          if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+            String? fileUrl = data['data'] != null ? data['data']['url'] : null;
+            if (fileUrl != null) {
+              final productIndex = fieldReportDetail.value?.products.indexWhere((p) => p.id == productId) ?? -1;
+              if (productIndex != -1) {
+                final product = fieldReportDetail.value!.products[productIndex];
+                product.attachments.add(fileUrl);
+                fieldReportDetail.refresh();
+                successCount++;
+              }
+            }
           }
-        } else {
-          toastMessage(text: "File URL not found in response");
+        } catch (e) {
+          debugPrint("Error uploading product attachment: $e");
         }
-      } else {
-        toastMessage(text: data['message'] ?? "Upload failed");
       }
-    } catch (e) {
-      debugPrint("Error uploading file: $e");
-      toastMessage(text: "Upload error: $e");
+      if (successCount > 0) {
+        toastMessage(text: total == 1 ? "File uploaded successfully" : "$successCount of $total files uploaded successfully");
+      } else {
+        toastMessage(text: "File upload failed", color: AppColors.redColor);
+      }
     } finally {
-      isLoading.value = false;
+      isUploadingProductAttachments[productId] = false;
+      productAttachmentUploadProgress.remove(productId);
     }
+  }
+
+  Future<void> uploadProductAttachment(String productId, File file) async {
+    await uploadProductAttachments(productId, [file]);
   }
 
   void removeProductAttachment(String productId, int index) {
@@ -584,37 +710,56 @@ class VisitController extends GetxController {
       product.partRequests.add(
         PartRequest(id: "", partName: "", qty: 1, remark: "", attachments: [], status: "requested", createdAt: DateTime.now()),
       );
+      expandedPartsSections[productId] = true;
       fieldReportDetail.refresh();
     }
   }
 
-  Future<void> uploadPartAttachment(String productId, int partIndex, File file) async {
-    isLoading.value = true;
+  Future<void> uploadPartAttachments(String productId, int partIndex, List<File> files) async {
+    if (files.isEmpty) return;
+    final String key = "${productId}_$partIndex";
+    isUploadingPartAttachments[key] = true;
+    int total = files.length;
+    int successCount = 0;
+
     try {
-      final response = await ApiHandler.uploadFile(file, folderName: 'service-visit-part-attachments');
-      final data = response.data;
-      if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
-        String? fileUrl = data['data'] != null ? data['data']['url'] : null;
-        if (fileUrl != null) {
-          final productIndex = fieldReportDetail.value!.products!.indexWhere((p) => p.id == productId);
-          if (productIndex != -1) {
-            final product = fieldReportDetail.value!.products![productIndex];
-            if (partIndex < product.partRequests.length) {
-              product.partRequests[partIndex].attachments.add(fileUrl);
-              fieldReportDetail.refresh();
-              toastMessage(text: "File uploaded successfully");
+      for (int i = 0; i < total; i++) {
+        partAttachmentUploadProgress[key] = total == 1 ? "Uploading..." : "Uploading ${i + 1}/$total...";
+        final file = files[i];
+        try {
+          final response = await ApiHandler.uploadFile(file, folderName: 'service-visit-part-attachments');
+          final data = response.data;
+          if (response.statusCode == 200 && (data['status'] == 200 || data['success'] == true)) {
+            String? fileUrl = data['data'] != null ? data['data']['url'] : null;
+            if (fileUrl != null) {
+              final productIndex = fieldReportDetail.value?.products?.indexWhere((p) => p.id == productId) ?? -1;
+              if (productIndex != -1) {
+                final product = fieldReportDetail.value!.products![productIndex];
+                if (partIndex < product.partRequests.length) {
+                  product.partRequests[partIndex].attachments.add(fileUrl);
+                  fieldReportDetail.refresh();
+                  successCount++;
+                }
+              }
             }
           }
+        } catch (e) {
+          debugPrint("Error uploading part attachment: $e");
         }
-      } else {
-        toastMessage(text: data['message'] ?? "Upload failed");
       }
-    } catch (e) {
-      debugPrint("Error uploading file: $e");
-      toastMessage(text: "Upload error: $e");
+      if (successCount > 0) {
+        toastMessage(text: total == 1 ? "File uploaded successfully" : "$successCount of $total files uploaded successfully");
+      } else {
+        toastMessage(text: "File upload failed", color: AppColors.redColor);
+      }
     } finally {
-      isLoading.value = false;
+      isUploadingPartAttachments[key] = false;
+      partAttachmentUploadProgress.remove(key);
     }
+  }
+
+  Future<void> uploadPartAttachment(String productId, int partIndex, File file) async {
+    await uploadPartAttachments(productId, partIndex, [file]);
   }
 
   void removePartAttachment(String productId, int partIndex, int attachmentIndex) {
@@ -912,31 +1057,78 @@ class VisitController extends GetxController {
     }
   }
 
-  Future<Position?> _handleLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+  Future<bool> checkAndRequestLocation() async {
+    isLocationChecking.value = true;
+    try {
+      final loc.Location location = loc.Location();
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      toastMessage(text: "Location services are disabled.");
-      return null;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        toastMessage(text: "Location permissions are denied");
-        return null;
+      // 1. Check and request location permission (shows system default dialog)
+      loc.PermissionStatus permission = await location.hasPermission();
+      if (permission == loc.PermissionStatus.denied) {
+        permission = await location.requestPermission();
+        if (permission != loc.PermissionStatus.granted && permission != loc.PermissionStatus.grantedLimited) {
+          toastMessage(text: "Location permission is required");
+          return false;
+        }
+      } else if (permission == loc.PermissionStatus.deniedForever) {
+        toastMessage(text: "Location permission is permanently denied. Please enable it in Settings.");
+        await Geolocator.openAppSettings();
+        return false;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
-      toastMessage(text: "Location permissions are permanently denied");
+      // 2. Check and request location service (shows system default turn-on dialog)
+      bool serviceEnabled = await location.serviceEnabled();
+      if (!serviceEnabled) {
+        serviceEnabled = await location.requestService();
+        if (!serviceEnabled) {
+          toastMessage(text: "Location service must be enabled");
+          return false;
+        }
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint("Error checking location: $e");
+      toastMessage(text: "Failed to verify location settings");
+      return false;
+    } finally {
+      isLocationChecking.value = false;
+    }
+  }
+
+  Future<Position?> _handleLocation() async {
+    final bool isReady = await checkAndRequestLocation();
+    if (!isReady) {
       return null;
     }
 
-    return await Geolocator.getCurrentPosition();
+    try {
+      return await Geolocator.getCurrentPosition();
+    } catch (e) {
+      debugPrint("Error getting position via Geolocator: $e");
+      try {
+        final loc.Location location = loc.Location();
+        final locData = await location.getLocation();
+        if (locData.latitude != null && locData.longitude != null) {
+          return Position(
+            latitude: locData.latitude!,
+            longitude: locData.longitude!,
+            timestamp: DateTime.now(),
+            accuracy: locData.accuracy ?? 0.0,
+            altitude: locData.altitude ?? 0.0,
+            altitudeAccuracy: 0.0,
+            heading: locData.heading ?? 0.0,
+            headingAccuracy: 0.0,
+            speed: locData.speed ?? 0.0,
+            speedAccuracy: locData.speedAccuracy ?? 0.0,
+          );
+        }
+      } catch (e2) {
+        debugPrint("Error getting position via Location fallback: $e2");
+      }
+      toastMessage(text: "Failed to get current location");
+      return null;
+    }
   }
 
   Future<void> _updateVisitStatus(String visitId, String action, String successMsg, {Map<String, dynamic>? extraBody}) async {
@@ -1025,7 +1217,7 @@ class VisitController extends GetxController {
     await _updateVisitStatus(visitId, "resume", "Visit resumed successfully");
   }
 
-  Future<void> stopVisit(String visitId) async {
+  bool validateEndTrackingForm() {
     // Reset errors
     serviceReceivedByError.value = "";
     contactNumberError.value = "";
@@ -1058,9 +1250,15 @@ class VisitController extends GetxController {
     if (finalAttachmentUrls.isEmpty) {
       toastMessage(text: "At least one attachment is required");
       hasError = true;
+    } else if (hasError) {
+      toastMessage(text: "Please fill all required fields");
     }
 
-    if (hasError) return;
+    return !hasError;
+  }
+
+  Future<void> stopVisit(String visitId) async {
+    if (!validateEndTrackingForm()) return;
 
     final extraBody = {
       "site_receiver_name": serviceReceivedByController.value.text.trim(),
