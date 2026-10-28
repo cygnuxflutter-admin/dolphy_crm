@@ -237,6 +237,8 @@ class VisitScreen extends GetView<VisitController> {
           Get.toNamed(AppRoutes.visitViewScreen, arguments: item.id);
         } else if (value == 'field_report') {
           Get.toNamed(AppRoutes.visitFieldReportScreen, arguments: item.id);
+        } else if (value == 'history') {
+          Get.toNamed(AppRoutes.visitHistoryScreen, arguments: item.id);
         } else if (value == 'cancel') {
           _showCancelVisitDialog(context, item);
         } else if (value == 'add_expense') {
@@ -257,6 +259,10 @@ class VisitScreen extends GetView<VisitController> {
         const PopupMenuItem(
           value: 'field_report',
           child: Row(children: [Icon(Icons.assignment_outlined, size: 16), SizedBox(width: 8), Text("Field Report")]),
+        ),
+        const PopupMenuItem(
+          value: 'history',
+          child: Row(children: [Icon(Icons.history, size: 16), SizedBox(width: 8), Text("History")]),
         ),
         if (isCompleted)
           const PopupMenuItem(

@@ -80,6 +80,12 @@ class PermissionHandler extends GetxService {
   bool get isInquiryUpdateAllowed => _checkPermission('Operations', 'Inquiry', 'update');
   bool get isInquiryDeleteAllowed => _checkPermission('Operations', 'Inquiry', 'delete');
 
+  // Draft Inquiry
+  bool get isDraftInquiryViewAllowed => _checkPermission('Operations', 'Draft Inquiry', 'view') || isInquiryViewAllowed;
+  bool get isDraftInquiryCreateAllowed => _checkPermission('Operations', 'Draft Inquiry', 'create') || isInquiryCreateAllowed;
+  bool get isDraftInquiryUpdateAllowed => _checkPermission('Operations', 'Draft Inquiry', 'update') || isInquiryUpdateAllowed;
+  bool get isDraftInquiryDeleteAllowed => _checkPermission('Operations', 'Draft Inquiry', 'delete') || isInquiryDeleteAllowed;
+
   // Lead (Opportunity)
   bool get isLeadViewAllowed => _checkPermission('Operations', 'Opportunity', 'view');
   bool get isLeadCreateAllowed => _checkPermission('Operations', 'Opportunity', 'create');

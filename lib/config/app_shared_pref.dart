@@ -12,10 +12,10 @@ class SharedPrefKey {
   static String companyId = "companyId";
   static String companyName = "companyName";
   static String userInfo = "user_info";
-  static String isRememberMe = "isRememberMe";
   static String userEmail = "userEmail";
   static String userPassword = "userPassword";
   static String rememberedUsers = "rememberedUsers";
+  static String fcmToken = "fcmToken";
 }
 
 class Pref {
@@ -55,12 +55,18 @@ class Pref {
     return pref?.getString(SharedPrefKey.financialYears) ?? '';
   }
 
-  static bool isRememberMe() {
-    return pref?.getBool(SharedPrefKey.isRememberMe) ?? false;
-  }
-
   static String getUserEmail() {
     return pref?.getString(SharedPrefKey.userEmail) ?? '';
+  }
+
+  static Map<String, dynamic>? getUserInfo() {
+    String? userInfo = pref?.getString(SharedPrefKey.userInfo);
+    if (userInfo == null) return null;
+    try {
+      return json.decode(userInfo);
+    } catch (e) {
+      return null;
+    }
   }
 
   static String getUserPassword() {
@@ -111,15 +117,19 @@ class Pref {
     await pref!.setString(SharedPrefKey.userInfo, value);
   }
 
-  static Future<void> setRememberMe(bool value) async {
-    await pref!.setBool(SharedPrefKey.isRememberMe, value);
-  }
-
   static Future<void> setUserEmail(String value) async {
     await pref!.setString(SharedPrefKey.userEmail, value);
   }
 
   static Future<void> setUserPassword(String value) async {
     await pref!.setString(SharedPrefKey.userPassword, value);
+  }
+
+  static String getFcmToken() {
+    return pref?.getString(SharedPrefKey.fcmToken) ?? '';
+  }
+
+  static Future<void> setFcmToken(String value) async {
+    await pref?.setString(SharedPrefKey.fcmToken, value);
   }
 }

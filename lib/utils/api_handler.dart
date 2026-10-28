@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crm/config/app_url.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
@@ -42,6 +43,16 @@ class ApiHandler {
     );
   }
 
+  static void _logResponse({required String method, required String url, required Response? response}) {
+    if (response != null) {
+      logger.i("API URL: $url\nMethod: $method\nStatus: ${response.statusCode}\nResponse: ${response.data}");
+    }
+  }
+
+  static void _logError({required String method, required String url, required dynamic error, Response? response}) {
+    logger.e("API URL: $url\nMethod: $method\nError: $error${response != null ? '\nResponse: ${response.data}' : ''}");
+  }
+
   /// get api
   static Future<Response> getRequest(String url) async {
     logger.i("get $url");
@@ -51,7 +62,7 @@ class ApiHandler {
       options: Options(headers: await getHeaders(), responseType: ResponseType.plain),
     );
 
-    logger.i(response);
+    _logResponse(method: "GET", url: url, response: response);
     return response;
   }
 
@@ -63,30 +74,32 @@ class ApiHandler {
       options: Options(headers: await getHeaders(), responseType: ResponseType.plain),
     );
 
-    logger.i(response);
+    _logResponse(method: "DELETE", url: url, response: response);
     return response;
   }
 
   /// post api
   static Future<Response> postRequest({required String url, required Map body, Map<String, dynamic>? headers}) async {
     logger.i("post $url");
-    logger.i(JsonEncoder.withIndent("" * 4).convert(body));
+    logger.i(JsonEncoder.withIndent(" " * 4).convert(body));
     try {
       Response response = await createRequest().post(
         url,
         data: body,
         options: Options(headers: headers ?? await getHeaders()),
       );
-      logger.i("Response Data: ${response.data}");
+      _logResponse(method: "POST", url: url, response: response);
       return response;
     } on DioException catch (e) {
       debugPrint("DioError ===> ${e.type} : ${e.message}");
       if (e.error is SocketException) {
         debugPrint("SocketException: Check if your server is reachable at $url");
       }
+      _logError(method: "POST", url: url, error: e.message, response: e.response);
       return Response(requestOptions: e.requestOptions, data: {"message": "Connection error: ${e.message}", "status": 500}, statusCode: 500);
     } catch (e) {
       debugPrint("General Error ===> $e");
+      _logError(method: "POST", url: url, error: e);
       return Response(
         requestOptions: RequestOptions(path: url),
         data: {"message": "Something went wrong: $e", "status": 500},
@@ -96,7 +109,7 @@ class ApiHandler {
   }
 
   static Future<Response> putRequest({required String url, required Map body, Map<String, dynamic>? headers}) async {
-    logger.i("post $url");
+    logger.i("put $url");
     logger.i(JsonEncoder.withIndent("" * 4).convert(body));
     Response? response;
     try {
@@ -105,9 +118,10 @@ class ApiHandler {
         data: body,
         options: Options(headers: headers ?? await getHeaders()),
       );
-      logger.i(JsonEncoder.withIndent(" " * 4).convert(json.encode(response.data)));
+      _logResponse(method: "PUT", url: url, response: response);
       return response;
     } catch (e) {
+      _logError(method: "PUT", url: url, error: e);
       print("error === $e");
       return Response(requestOptions: RequestOptions(data: {"message": "Something went wrong!"}));
     }
@@ -124,9 +138,10 @@ class ApiHandler {
         data: body,
         options: Options(headers: headers ?? await getHeaders()),
       );
-      logger.i(JsonEncoder.withIndent(" " * 4).convert(json.encode(response.data)));
+      _logResponse(method: "PATCH", url: url, response: response);
       return response;
     } catch (e) {
+      _logError(method: "PATCH", url: url, error: e);
       print("error === $e");
       return Response(requestOptions: RequestOptions(data: {"message": "Something went wrong!"}));
     }
@@ -134,7 +149,7 @@ class ApiHandler {
 
   /// post token api
   static Future<Response> postTokenRequest({required String url, required String body}) async {
-    logger.i(url);
+    logger.i("postToken $url");
     logger.i(body);
     // logger.i(JsonEncoder.withIndent(" " * 4).convert(body));
     Response response = await dio.post(
@@ -146,12 +161,12 @@ class ApiHandler {
         responseType: ResponseType.json,
       ),
     );
-    logger.i(response);
+    _logResponse(method: "POST TOKEN", url: url, response: response);
     return response;
   }
 
   static Future<Response> patchTokenRequest({required String url, required String body}) async {
-    logger.i(url);
+    logger.i("patchToken $url");
     logger.i(body);
     Response response = await dio.patch(
       url,
@@ -162,7 +177,7 @@ class ApiHandler {
         responseType: ResponseType.plain,
       ),
     );
-    logger.i(response);
+    _logResponse(method: "PATCH TOKEN", url: url, response: response);
     return response;
   }
 
@@ -187,11 +202,21 @@ class ApiHandler {
     var headers = await getHeaders();
     headers.remove('Content-Type'); // Important: Remove Content-Type for Multipart requests
 
-    return await createRequest().post(
-      'https://tradeapi.cygnux.in/api/v1/file/upload',
-      data: formData,
-      options: Options(headers: headers),
-    );
+    final String url = '${ApiEndPoint.baseUrl}file/upload';
+    logger.i("upload $url");
+
+    try {
+      Response response = await createRequest().post(
+        url,
+        data: formData,
+        options: Options(headers: headers),
+      );
+      _logResponse(method: "UPLOAD", url: url, response: response);
+      return response;
+    } catch (e) {
+      _logError(method: "UPLOAD", url: url, error: e);
+      rethrow;
+    }
   }
 }
 

@@ -87,6 +87,7 @@ class PackingListDetailData {
   final dynamic dispatchNo;
   final List<PackingListLog>? logs;
   final PackingListSummary? summary;
+  final bool? isRegularInvoiceApproved;
 
   PackingListDetailData({
     this.id,
@@ -151,6 +152,7 @@ class PackingListDetailData {
     this.dispatchNo,
     this.logs,
     this.summary,
+    this.isRegularInvoiceApproved,
   });
 
   factory PackingListDetailData.fromJson(Map<String, dynamic> json) => PackingListDetailData(
@@ -224,6 +226,7 @@ class PackingListDetailData {
         ? null
         : List<PackingListLog>.from((json["logs"] as List).map((x) => PackingListLog.fromJson(x as Map<String, dynamic>))),
     summary: json["summary"] == null ? null : PackingListSummary.fromJson(json["summary"] as Map<String, dynamic>),
+    isRegularInvoiceApproved: json["is_regular_invoice_approved"] as bool?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -289,6 +292,7 @@ class PackingListDetailData {
     "dispatch_no": dispatchNo,
     "logs": logs?.map((x) => x.toJson()).toList(),
     "summary": summary?.toJson(),
+    "is_regular_invoice_approved": isRegularInvoiceApproved,
   };
 }
 

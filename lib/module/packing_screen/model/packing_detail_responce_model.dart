@@ -90,6 +90,7 @@ class PackingDetailData {
   final dynamic dispatchNo;
   final List<Log>? logs;
   final bool? isRegularInvoiceApproved;
+  final bool? isPackingDetailSaved;
 
   PackingDetailData({
     this.id,
@@ -153,6 +154,7 @@ class PackingDetailData {
     this.dispatchNo,
     this.logs,
     this.isRegularInvoiceApproved,
+    this.isPackingDetailSaved,
   });
 
   factory PackingDetailData.fromJson(Map<String, dynamic> json) => PackingDetailData(
@@ -219,6 +221,7 @@ class PackingDetailData {
     dispatchNo: json["dispatch_no"],
     logs: json["logs"] == null ? [] : List<Log>.from(json["logs"]!.map((x) => Log.fromJson(x))),
     isRegularInvoiceApproved: json["is_regular_invoice_approved"],
+    isPackingDetailSaved: json["is_packing_detail_saved"],
   );
 
   Map<String, dynamic> toJson() => {
@@ -284,6 +287,7 @@ class PackingDetailData {
     "dispatch_no": dispatchNo,
     "logs": logs == null ? [] : List<dynamic>.from(logs!.map((x) => x.toJson())),
     "is_regular_invoice_approved": isRegularInvoiceApproved,
+    "is_packing_detail_saved": isPackingDetailSaved,
   };
 }
 
@@ -1994,7 +1998,7 @@ class Metadata {
   final String? confirmedBy;
   final bool? proformaConfirmation;
   final String? invoiceType;
-  final int? totalAmount;
+  final num? totalAmount;
 
   Metadata({
     this.to,

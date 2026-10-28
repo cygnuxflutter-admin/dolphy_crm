@@ -1,15 +1,14 @@
 import 'package:crm/config/app_colors.dart';
 import 'package:crm/config/app_routes.dart';
 import 'package:crm/module/packing_screen/model/packing_list_response_model.dart';
-import 'package:crm/module/packing_screen/model/transport_mode_responce_model.dart';
-import 'package:crm/module/packing_screen/model/vendor_responce_model.dart';
 import 'package:crm/module/packing_screen/packing_controller.dart';
-import 'package:crm/widget/textfield.dart';
+import 'package:crm/module/picking_list/picking_binding.dart';
+import 'package:crm/module/picking_list/sub_screen/picking_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
-import '../../widget/dropdown.dart';
+import '../../config/app_images.dart';
 
 class PackingScreen extends GetView<PackingController> {
   const PackingScreen({super.key});
@@ -35,31 +34,50 @@ class PackingScreen extends GetView<PackingController> {
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
         child: Column(
           children: [
-            _buildCountCards(),
             _searchBar(),
+            _buildCountCards(),
             Expanded(
               child: Obx(() {
                 if (controller.isLoading.value && controller.packingList.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator(color: AppColors.indigo600Main));
                 }
                 if (controller.error.isNotEmpty && controller.packingList.isEmpty) {
-                  return Center(child: Text(controller.error.value));
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 60, color: Colors.red.shade300),
+                        const SizedBox(height: 16),
+                        Text(
+                          controller.error.value,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 16, color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => controller.fetchAllData(),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.indigo600Main),
+                          child: const Text("Retry", style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  );
                 }
                 if (controller.packingList.isEmpty) {
-                  return const Center(child: Text("No Data Found"));
+                  return Center(child: Image.asset(AppImages.noDataFound, scale: 3));
                 }
                 return Column(
                   children: [
                     Expanded(
                       child: RefreshIndicator(
-                        onRefresh: () => controller.fetchData(),
+                        onRefresh: () => controller.fetchAllData(),
                         child: ListView.separated(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.only(bottom: 14, left: 14, right: 14),
                           itemCount: controller.packingList.length,
                           separatorBuilder: (_, index) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final item = controller.packingList[index];
-                            return _buildPackingCard(context, item);
+                            return _ExpandablePackingCard(item: item, index: index, controller: controller);
                           },
                         ),
                       ),
@@ -76,95 +94,87 @@ class PackingScreen extends GetView<PackingController> {
   }
 
   Widget _buildCountCards() {
-    return Container(
-      height: 100,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Obx(() {
-        final counts = controller.packingCounts.value;
-        final selectedIndex = controller.selectedTabIndex.value;
-        final List<Map<String, dynamic>> tabs = [
-          {"label": "ALL", "count": counts?.all ?? 0, "icon": Icons.playlist_add_check, "color": AppColors.gray500},
-          {"label": "NEW ORDER", "count": counts?.readyToPack ?? 0, "icon": Icons.add, "color": const Color(0xFF5C6BC0)},
-          {"label": "IN PACKING", "count": counts?.inPacking ?? 0, "icon": Icons.schedule, "color": const Color(0xFF26C6DA)},
-          {"label": "INVOICE UNDER PROGRESS", "count": counts?.invoiced ?? 0, "icon": Icons.description, "color": const Color(0xFF66BB6A)},
-          {"label": "READY FOR DISPATCH", "count": counts?.readyForDispatch ?? 0, "icon": Icons.send, "color": const Color(0xFFEF5350)},
-          {"label": "REJECTED", "count": counts?.rejected ?? 0, "icon": Icons.block, "color": const Color(0xFFF44336)},
-        ];
+    return Obx(() {
+      final counts = controller.packingCounts.value;
+      final selectedIndex = controller.selectedTabIndex.value;
 
-        return ListView.builder(
+      if (counts == null && controller.isLoading.value) {
+        return const SizedBox(height: 80, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+      }
+
+      final items = [
+        {'label': 'All', 'count': counts?.all ?? 0, 'index': 0, 'color': AppColors.indigo600Main},
+        {'label': 'NEW ORDER', 'count': counts?.readyToPack ?? 0, 'index': 1, 'color': AppColors.indigo600Main},
+        {'label': 'IN PACKING', 'count': counts?.inPacking ?? 0, 'index': 2, 'color': AppColors.orangeColor},
+        {'label': 'READY DISPATCH', 'count': counts?.readyForDispatch ?? 0, 'index': 4, 'color': const Color(0xFFEF5350)},
+        {'label': 'INVOICE PROCESS', 'count': counts?.invoiced ?? 0, 'index': 3, 'color': const Color(0xFF66BB6A)},
+        // {'label': 'REJECTED', 'count': counts?.rejected ?? 0, 'index': 5, 'color': AppColors.red500},
+      ];
+
+      return Container(
+        height: 80,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: tabs.length,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          itemCount: items.length,
           itemBuilder: (context, index) {
-            final tab = tabs[index];
-            final isSelected = selectedIndex == index;
-            final Color statusColor = tab['color'];
+            final item = items[index];
+            final isSelected = selectedIndex == item['index'];
+            final color = item['color'] as Color;
 
             return GestureDetector(
-              onTap: () => controller.onTabChanged(index),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.only(right: 12),
-                width: 140,
+              onTap: () => controller.onTabChanged(item['index'] as int),
+              child: Container(
+                width: 110,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isSelected ? statusColor : AppColors.gray200, width: isSelected ? 2 : 1),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
+                  color: isSelected ? color : AppColors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isSelected ? color : AppColors.gray200),
+                  boxShadow: [
+                    if (isSelected)
+                      BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))
+                    else
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2)),
+                  ],
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Stack(
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            tab['label'],
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.textSecondary, letterSpacing: 0.5),
-                          ),
-                          const Spacer(),
-                          Text(
-                            "${tab['count']}",
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: isSelected ? statusColor : AppColors.textPrimary),
-                          ),
-                        ],
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      item['count'].toString(),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isSelected ? AppColors.white : AppColors.textPrimary),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item['label'] as String,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? AppColors.white.withOpacity(0.9) : AppColors.textSecondary,
                       ),
-                      /*     Positioned(
-                        top: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: statusColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: statusColor.withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2))],
-                          ),
-                          child: Icon(tab['icon'], size: 16, color: Colors.white),
-                        ),
-                      ),*/
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             );
           },
-        );
-      }),
-    );
+        ),
+      );
+    });
   }
 
   Widget _searchBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.only(bottom: 0, left: 14, right: 14, top: 8),
       child: TextField(
         controller: controller.searchController.value,
         onChanged: controller.onSearch,
         decoration: InputDecoration(
-          hintText: "Search by Order No / Customer",
-          prefixIcon: const Icon(Icons.search, size: 20),
+          hintText: "Search Packing List...",
+          prefixIcon: const Icon(Icons.search, color: AppColors.indigo600Main, size: 20),
           filled: true,
           fillColor: AppColors.white,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
@@ -174,114 +184,271 @@ class PackingScreen extends GetView<PackingController> {
     );
   }
 
-  Widget _buildPackingCard(BuildContext context, PackingList item) {
-    return GestureDetector(
-      onTap: () => Get.toNamed(AppRoutes.packingDetailScreen, arguments: item.id),
-      child: Container(
-        clipBehavior: Clip.antiAlias,
+  Widget _buildPagination() {
+    return Obx(() {
+      if (controller.totalPages <= 1) return const SizedBox.shrink();
+
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.gray200, width: 0.8),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
+          border: Border(top: BorderSide(color: AppColors.gray200, width: 0.5)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            _paginationButton(
+              icon: Icons.keyboard_double_arrow_left,
+              onTap: controller.currentPage.value > 1 ? () => controller.onPageChanged(1) : null,
+            ),
+            const SizedBox(width: 8),
+            _paginationButton(
+              icon: Icons.keyboard_arrow_left,
+              onTap: controller.currentPage.value > 1 ? () => controller.onPageChanged(controller.currentPage.value - 1) : null,
+            ),
+            const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-              decoration: BoxDecoration(
-                color: AppColors.indigo600Main.withValues(alpha: 0.05),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.inventory_2_outlined, color: AppColors.indigo600Main, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      item.packingNo ?? "No Packing Number",
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.indigo600Main),
-                    ),
-                  ),
-                  _actionButton(context, item),
-                ],
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(color: AppColors.indigo600Main, shape: BoxShape.circle),
+              child: Center(
+                child: Text(
+                  "${controller.currentPage.value}",
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _compactBadge(controller.getStatusLabel(item), controller.getBadgeColor(item, controller.getStatusLabel(item))),
-                      if (item.isRegularInvoiceApproved != null)
-                        _compactBadge(
-                          item.isRegularInvoiceApproved! ? "Approved" : "Pending",
-                          item.isRegularInvoiceApproved! ? AppColors.green500Normal : AppColors.orangeColor,
-                        ),
-                    ],
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Divider(height: 1, color: AppColors.gray100),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(child: _infoCell(Icons.confirmation_number_outlined, "Picking No", item.pickingNo ?? "-")),
-                      Expanded(child: _infoCell(Icons.inventory_2_outlined, "Packages", "${item.totalPackages ?? 0}")),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(child: _infoCell(Icons.receipt_long_outlined, "Inv No", item.tax_invoice_no ?? "-")),
-                      Expanded(child: _infoCell(Icons.description_outlined, "PI No", item.invoiceNo ?? "-")),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(child: _infoCell(Icons.person_outline, "Customer", item.customerName ?? "-", isFullWidth: true)),
-                      Expanded(child: _infoCell(Icons.person_outline, "Sales Person", item.salesPerson ?? "-", isFullWidth: true)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _infoCell(
-                          Icons.access_time,
-                          "Picking Date",
-                          item.createdAt != null
-                              ? DateFormat('dd/MM/yyyy hh:mm a').format(item.createdAt!.toLocal())
-                              : (item.createdAt != null ? DateFormat('dd/MM/yyyy hh:mm a').format(item.pickingDate!.toLocal()) : "-"),
-                        ),
-                      ),
-                      Expanded(
-                        child: _infoCell(
-                          Icons.access_time,
-                          "Packing Date",
-                          item.createdAt != null
-                              ? DateFormat('dd/MM/yyyy hh:mm a').format(item.createdAt!.toLocal())
-                              : (item.createdAt != null ? DateFormat('dd/MM/yyyy hh:mm a').format(item.packingDate!.toLocal()) : "-"),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  _infoCell(Icons.currency_rupee, "Amount", item.invoiceAmount ?? "-", valueColor: AppColors.indigo600Main),
-                ],
-              ),
+            const SizedBox(width: 8),
+            _paginationButton(
+              icon: Icons.keyboard_arrow_right,
+              onTap: controller.currentPage.value < controller.totalPages ? () => controller.onPageChanged(controller.currentPage.value + 1) : null,
+            ),
+            const SizedBox(width: 8),
+            _paginationButton(
+              icon: Icons.keyboard_double_arrow_right,
+              onTap: controller.currentPage.value < controller.totalPages ? () => controller.onPageChanged(controller.totalPages) : null,
             ),
           ],
+        ),
+      );
+    });
+  }
+
+  Widget _paginationButton({required IconData icon, VoidCallback? onTap}) {
+    bool isDisabled = onTap == null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))],
+        ),
+        child: Icon(icon, size: 18, color: isDisabled ? AppColors.gray300 : AppColors.gray600),
+      ),
+    );
+  }
+}
+
+class _ExpandablePackingCard extends StatefulWidget {
+  final PackingList item;
+  final int index;
+  final PackingController controller;
+
+  const _ExpandablePackingCard({required this.item, required this.index, required this.controller});
+
+  @override
+  State<_ExpandablePackingCard> createState() => _ExpandablePackingCardState();
+}
+
+class _ExpandablePackingCardState extends State<_ExpandablePackingCard> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final controller = widget.controller;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200, width: 0.8),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            setState(() {
+              _isExpanded = !_isExpanded;
+            });
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.indigo600Main.withValues(alpha: 0.05),
+                  borderRadius: _isExpanded ? const BorderRadius.vertical(top: Radius.circular(12)) : BorderRadius.circular(12),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 28,
+                      width: 28,
+                      margin: const EdgeInsets.only(top: 4),
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(color: AppColors.indigo600Main, shape: BoxShape.circle),
+                      child: Text(
+                        "${widget.index + 1}",
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.invoiceNo ?? "No Packing Number",
+                            style: const TextStyle(fontSize: 16, color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Text(
+                                "location: ",
+                                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 11, color: AppColors.black),
+                              ),
+                              Text(
+                                item.locationCode ?? "-",
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: AppColors.indigo600Main),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              if (item.priority != null && item.priority!.isNotEmpty) _compactBadge(item.priority!, _getPriorityColor(item.priority)),
+                              _compactBadge(controller.getStatusLabel(item), controller.getBadgeColor(item, controller.getStatusLabel(item))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Padding(padding: const EdgeInsets.only(top: 4), child: _actionButton(context, item, controller)),
+                  ],
+                ),
+              ),
+              if (_isExpanded)
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    children: [
+                      // Row(
+                      //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      //   children: [
+                      //     _compactBadge(controller.getStatusLabel(item), controller.getBadgeColor(item, controller.getStatusLabel(item))),
+                      //     if (item.isRegularInvoiceApproved != null)
+                      //       _compactBadge(
+                      //         item.isRegularInvoiceApproved! ? "Approved" : "Pending",
+                      //         item.isRegularInvoiceApproved! ? AppColors.green500Normal : AppColors.orangeColor,
+                      //       ),
+                      //   ],
+                      // ),
+                      // const Padding(
+                      //   padding: EdgeInsets.symmetric(vertical: 8),
+                      //   child: Divider(height: 1, color: AppColors.gray100),
+                      // ),
+                      Row(
+                        children: [
+                          Expanded(child: _infoCell(Icons.confirmation_number_outlined, "Picking No", item.pickingNo ?? "-")),
+                          Expanded(child: _infoCell(Icons.inventory_2_outlined, "Packages", "${item.totalPackages ?? 0}")),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(child: _infoCell(Icons.receipt_long_outlined, "Inv No", item.tax_invoice_no ?? "-")),
+                          Expanded(child: _infoCell(Icons.description_outlined, "PI No", item.invoiceNo ?? "-")),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(child: _infoCell(Icons.person_outline, "Customer", item.customerName ?? "-", isFullWidth: true)),
+                          Expanded(child: _infoCell(Icons.person_outline, "Sales Person", item.salesPerson ?? "-", isFullWidth: true)),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _infoCell(
+                              Icons.access_time,
+                              "Picking Date",
+                              item.createdAt != null
+                                  ? DateFormat('dd/MM/yyyy hh:mm a').format(item.createdAt!.toLocal())
+                                  : (item.pickingDate != null ? DateFormat('dd/MM/yyyy hh:mm a').format(item.pickingDate!.toLocal()) : "-"),
+                            ),
+                          ),
+                          Expanded(
+                            child: _infoCell(
+                              Icons.access_time,
+                              "Packing Date",
+                              item.packingDate != null ? DateFormat('dd/MM/yyyy hh:mm a').format(item.packingDate!.toLocal()) : "-",
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(child: _infoCell(Icons.currency_rupee, "Amount", item.invoiceAmount ?? "-", valueColor: AppColors.indigo600Main)),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.comment_outlined, size: 14, color: AppColors.gray400),
+                              SizedBox(width: 6),
+                              Text(
+                                "PI Remarks",
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.gray500, letterSpacing: 0.5),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item.piRemarks ?? "---",
+                            overflow: TextOverflow.clip,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _actionButton(BuildContext context, PackingList item) {
+  Widget _actionButton(BuildContext context, PackingList item, PackingController controller) {
     final status = (item.status ?? "").trim().toUpperCase();
     List<PopupMenuItem<String>> menuItems = [];
 
@@ -291,12 +458,17 @@ class PackingScreen extends GetView<PackingController> {
           _buildMenuItem(value: 'view', icon: Icons.visibility_outlined, label: "View"),
           _buildMenuItem(value: 'create', icon: Icons.add, label: "Create Packing"),
           _buildMenuItem(value: 'cancel', icon: Icons.cancel_outlined, label: "Cancel", color: AppColors.red500),
+          _buildMenuItem(value: 'Download', icon: Icons.download_outlined, label: "Download"),
+          _buildMenuItem(value: 'view_pi', icon: Icons.download_outlined, label: "View PI"),
         ];
         break;
       case "PICKED":
         menuItems = [
+          _buildMenuItem(value: 'view', icon: Icons.visibility_outlined, label: "View"),
           _buildMenuItem(value: 'start', icon: Icons.play_arrow, label: "Start Packing"),
           _buildMenuItem(value: 'reject', icon: Icons.block, label: "Reject", color: AppColors.red500),
+          _buildMenuItem(value: 'Download', icon: Icons.download_outlined, label: "Download"),
+          _buildMenuItem(value: 'view_pi', icon: Icons.download_outlined, label: "View PI"),
         ];
         break;
       case "INVOICED":
@@ -304,9 +476,8 @@ class PackingScreen extends GetView<PackingController> {
         menuItems = [
           _buildMenuItem(value: 'view', icon: Icons.visibility_outlined, label: "View"),
           _buildMenuItem(value: 'view_packing_list', icon: Icons.format_list_bulleted, label: "Packing List"),
-          _buildMenuItem(value: 'request_e_way_bill', icon: Icons.send_outlined, label: "Request for Eway Bill"),
-          _buildMenuItem(value: 'box_wise', icon: Icons.file_download_outlined, label: "Boxwise List"),
-          _buildMenuItem(value: 'print_label', icon: Icons.print_outlined, label: "Print Label"),
+          _buildMenuItem(value: 'Download', icon: Icons.download_outlined, label: "Download"),
+          _buildMenuItem(value: 'view_pi', icon: Icons.download_outlined, label: "View PI"),
         ];
         break;
       case "PACKING":
@@ -315,16 +486,22 @@ class PackingScreen extends GetView<PackingController> {
         menuItems = [
           _buildMenuItem(value: 'view', icon: Icons.visibility_outlined, label: "View"),
           _buildMenuItem(value: 'view_packing_list', icon: Icons.format_list_bulleted, label: "Packing List"),
-          _buildMenuItem(value: 'request_invoice', icon: Icons.send_outlined, label: "Request for Invoice", enabled: status == "PACKED"),
-          _buildMenuItem(value: 'box_wise', icon: Icons.file_download_outlined, label: "Boxwise List"),
-          _buildMenuItem(value: 'print_label', icon: Icons.print_outlined, label: "Print Label"),
-          _buildMenuItem(value: 'generate_dc', icon: Icons.file_present_outlined, label: "Generate Delivery Challan", enabled: item.isDCFlow == true),
+          _buildMenuItem(value: 'Download', icon: Icons.download_outlined, label: "Download"),
+          _buildMenuItem(value: 'view_pi', icon: Icons.download_outlined, label: "View PI"),
+        ];
+        break;
+      case "REJECTED":
+        menuItems = [
+          _buildMenuItem(value: 'view', icon: Icons.visibility_outlined, label: "View"),
+          _buildMenuItem(value: 'view_packing_list', icon: Icons.format_list_bulleted, label: "Packing List"),
+          _buildMenuItem(value: 'Download', icon: Icons.download_outlined, label: "Download"),
+          _buildMenuItem(value: 'view_pi', icon: Icons.download_outlined, label: "View PI"),
         ];
         break;
     }
 
     if (menuItems.isEmpty) {
-      return const Icon(Icons.arrow_forward_ios, color: AppColors.indigo600Main, size: 12);
+      return const Icon(Icons.remove_red_eye, size: 16, color: AppColors.gray400);
     }
 
     return PopupMenuButton<String>(
@@ -332,16 +509,26 @@ class PackingScreen extends GetView<PackingController> {
       constraints: const BoxConstraints(),
       icon: const Icon(Icons.more_vert, color: AppColors.indigo600Main, size: 20),
       onSelected: (value) {
-        if (value == 'view') Get.toNamed(AppRoutes.packingDetailScreen, arguments: item.id);
-        if (value == 'create') _showCreatePackingDialog(context, item.pickingId ?? item.id!);
-        if (value == 'cancel') _showCancelPackingDialog(context, item.id!);
-        if (value == 'start') _showStartPackingDialog(context, item);
-        if (value == 'reject') _showRejectPackingDialog(context, item.id!);
+        if (value == 'view') {
+          if (item.status?.toUpperCase() == "PICKED") {
+            Get.to(() => PickingDetailScreen(pickingId: item.id!), binding: PickingListBinding());
+          } else {
+            Get.toNamed(AppRoutes.packingDetailScreen, arguments: item.id);
+          }
+        }
+        if (value == 'create') _showCreatePackingDialog(context, item.pickingId ?? item.id!, controller);
+        if (value == 'cancel') _showCancelPackingDialog(context, item.id!, controller);
+        if (value == 'start') _showStartPackingDialog(context, item, controller);
+        if (value == 'reject') _showRejectPackingDialog(context, item.id!, controller);
         if (value == 'view_packing_list') Get.toNamed(AppRoutes.packingListScreen, arguments: item.id);
-        if (value == 'request_invoice') _showRequestInvoiceDialog(context, item);
-        if (value == 'request_e_way_bill') _showRequestEWayBillBottomSheet(context, item);
-        if (value == 'box_wise') controller.viewBoxWisePackingList(item.id!);
-        if (value == 'print_label') controller.printShippingLabel(item.id!);
+        if (value == 'Download') Get.toNamed(AppRoutes.pickingRequestDetailScreen, arguments: item.pickRequestId ?? item.pickingId ?? item.id);
+        if (value == 'view_pi') {
+          if (item.invoiceId != null) {
+            Get.toNamed(AppRoutes.viewPiScreen, arguments: item.invoiceId);
+          } else {
+            Get.snackbar("Error", "Invoice ID not found", backgroundColor: Colors.red, colorText: Colors.white);
+          }
+        }
       },
       itemBuilder: (context) => menuItems,
     );
@@ -363,17 +550,31 @@ class PackingScreen extends GetView<PackingController> {
 
   Widget _compactBadge(String label, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color, width: 1),
       ),
       child: Text(
-        label.toUpperCase(),
-        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: color),
+        label,
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
       ),
     );
+  }
+
+  Color _getPriorityColor(String? priority) {
+    switch (priority?.toUpperCase()) {
+      case 'HIGH':
+      case 'URGENT':
+        return AppColors.red500;
+      case 'MEDIUM':
+        return AppColors.orangeColor;
+      case 'LOW':
+        return AppColors.green500Success;
+      default:
+        return AppColors.indigo600Main;
+    }
   }
 
   Widget _infoCell(IconData icon, String label, String value, {bool isFullWidth = false, Color? valueColor}) {
@@ -394,20 +595,16 @@ class PackingScreen extends GetView<PackingController> {
         Text(
           value,
           maxLines: isFullWidth ? 2 : 1,
-          overflow: TextOverflow.ellipsis,
+          overflow: isFullWidth ? TextOverflow.clip : TextOverflow.ellipsis,
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: valueColor ?? AppColors.textPrimary),
         ),
       ],
     );
   }
 
-  void _showCreatePackingDialog(BuildContext context, String id) {
+  void _showCreatePackingDialog(BuildContext context, String id, PackingController controller) {
     final TextEditingController remarksController = TextEditingController();
     final RxBool isShrinkWrapped = false.obs;
-
-    controller.fetchEWayBillRequiredData();
-    controller.selectedTransportMode.value = null;
-    controller.selectedVendorId.value = null;
 
     Get.dialog(
       Dialog(
@@ -444,53 +641,6 @@ class PackingScreen extends GetView<PackingController> {
                       child: const Icon(Icons.inventory_2_outlined, size: 40, color: AppColors.indigo600Main),
                     ),
                     const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text("Is this package shrink wrapped?", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                        /*   Obx(
-                          () => Transform.scale(
-                            scale: 0.8,
-                            child: Switch(
-                              value: isShrinkWrapped.value,
-                              onChanged: (value) => isShrinkWrapped.value = value,
-                              activeThumbColor: AppColors.indigo600Main,
-                            ),
-                          ),
-                        ),*/
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text("Transport Mode", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Obx(
-                          () => CustomDropdown<Item>(
-                            hintText: "Select Transport Mode",
-                            items: (filter, loadProps) => Future.value(controller.transportModes.toList()),
-                            itemAsString: (item) => item.name ?? "",
-                            compareFn: (item, selectedItem) => item?.id == selectedItem?.id,
-                            selectedItem: controller.selectedTransportMode.value,
-                            onChanged: (val) => controller.selectedTransportMode.value = val,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text("Vendor", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Obx(
-                          () => CustomDropdown<Vendor>(
-                            hintText: "Select Vendor",
-                            items: (filter, loadProps) => Future.value(controller.vendors),
-                            itemAsString: (item) => item.name ?? "",
-                            compareFn: (item, selectedItem) => item?.id == selectedItem?.id,
-                            selectedItem: controller.selectedVendorId.value,
-                            onChanged: (val) => controller.selectedVendorId.value = val,
-                          ),
-                        ),
-                      ],
-                    ),
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerLeft,
@@ -539,9 +689,6 @@ class PackingScreen extends GetView<PackingController> {
                                         pickingId: id,
                                         isShrinkWrapped: isShrinkWrapped.value,
                                         remarks: remarksController.text,
-                                        transportMode: controller.selectedTransportMode.value?.id,
-                                        vendorId: controller.selectedVendorId.value?.id,
-                                        transporterName: controller.selectedVendorId.value?.name,
                                       );
                                     },
                               style: ElevatedButton.styleFrom(
@@ -571,7 +718,7 @@ class PackingScreen extends GetView<PackingController> {
     );
   }
 
-  void _showCancelPackingDialog(BuildContext context, String id) {
+  void _showCancelPackingDialog(BuildContext context, String id, PackingController controller) {
     Get.dialog(
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -653,7 +800,7 @@ class PackingScreen extends GetView<PackingController> {
     );
   }
 
-  void _showStartPackingDialog(BuildContext context, PackingList item) {
+  void _showStartPackingDialog(BuildContext context, PackingList item, PackingController controller) {
     Get.dialog(
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -754,7 +901,7 @@ class PackingScreen extends GetView<PackingController> {
     );
   }
 
-  void _showRejectPackingDialog(BuildContext context, String id) {
+  void _showRejectPackingDialog(BuildContext context, String id, PackingController controller) {
     final TextEditingController reasonController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
@@ -875,81 +1022,19 @@ class PackingScreen extends GetView<PackingController> {
                               child: Container(
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: AppColors.red500),
-                                // pick whatever fits your "Confirm" label comfortably
-                                height: 44, // optional, locks height too
+                                height: 44,
                                 child: controller.isLoading.value
-                                    ? Center(
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                          constraints: BoxConstraints(maxHeight: 20, minHeight: 20, maxWidth: 20, minWidth: 20),
-                                        ),
+                                    ? const Center(
+                                        child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
                                       )
-                                    : Text(
+                                    : const Text(
                                         "Confirm",
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                                       ),
                               ),
                             ),
                           ),
                         ),
-                        // Obx(
-                        //   () => Expanded(
-                        //     child: SizedBox(
-                        //       // pick whatever fits your "Confirm" label comfortably
-                        //       height: 44, // optional, locks height too
-                        //       child: ElevatedButton.icon(
-                        //         onPressed: controller.isLoading.value
-                        //             ? null
-                        //             : () {
-                        //                 if (formKey.currentState!.validate()) {
-                        //                   controller.rejectPacking(id, reason: reasonController.text);
-                        //                 }
-                        //               },
-                        //         icon: controller.isLoading.value
-                        //             ? const SizedBox(width: 18, height: 18, child: CircularProgressInd // Obx(
-                        //                         //   () => Expanded(
-                        //                         //     child: SizedBox(
-                        //                         //       // pick whatever fits your "Confirm" label comfortably
-                        //                         //       height: 44, // optional, locks height too
-                        //                         //       child: ElevatedButton.icon(
-                        //                         //         onPressed: controller.isLoading.value
-                        //                         //             ? null
-                        //                         //             : () {
-                        //                         //                 if (formKey.currentState!.validate()) {
-                        //                         //                   controller.rejectPacking(id, reason: reasonController.text);
-                        //                         //                 }
-                        //                         //               },
-                        //                         //         icon: controller.isLoading.value
-                        //                         //             ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        //                         //             : SizedBox(),
-                        //                         //         label: Text(
-                        //                         //           controller.isLoading.value ? "" : "Confirm",
-                        //                         //           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        //                         //         ),
-                        //                         //         style: ElevatedButton.styleFrom(
-                        //                         //           backgroundColor: AppColors.red500,
-                        //                         //           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        //                         //           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        //                         //         ),
-                        //                         //       ),
-                        //                         //     ),
-                        //                         //   ),
-                        //                         // ),icator(color: Colors.white, strokeWidth: 2))
-                        //             : SizedBox(),
-                        //         label: Text(
-                        //           controller.isLoading.value ? "" : "Confirm",
-                        //           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        //         ),
-                        //         style: ElevatedButton.styleFrom(
-                        //           backgroundColor: AppColors.red500,
-                        //           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        //           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        //         ),
-                        //       ),
-                        //     ),
-                        //   ),
-                        // ),
                       ],
                     ),
                   ],
@@ -958,407 +1043,6 @@ class PackingScreen extends GetView<PackingController> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _showRequestEWayBillBottomSheet(BuildContext context, PackingList item) async {
-    await controller.fetchEWayBillRequiredData();
-
-    controller.selectedTransportMode.value = controller.transportModes.firstWhereOrNull(
-      (e) => e.name == item.transportMode || e.id == item.transportMode,
-    );
-    controller.selectedVendorId.value = controller.vendors.firstWhereOrNull((e) => e.id == item.transporterId);
-
-    controller.transporterGstinController.text = item.transporterGstin ?? "";
-    controller.vehicleNoController.text = item.vehicleNo ?? "";
-    controller.lrAwbController.text = item.lrNo ?? "";
-    controller.eWayBillNoController.text = item.ewayBillNo ?? "";
-    controller.driverNameController.text = item.driverName ?? "";
-    controller.driverContactController.text = item.driverContact ?? "";
-    controller.remarksController.text = item.remarks ?? "";
-
-    controller.selectedVendorId.refresh();
-    controller.selectedTransportMode.refresh();
-
-    if (context.mounted) {
-      Get.bottomSheet(
-        Container(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.send_outlined, size: 20, color: AppColors.indigo600Main),
-                    const SizedBox(width: 8),
-                    const Text(
-                      "Request For E-Way Bill",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close, size: 20, color: AppColors.gray400),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: AppColors.indigo600Main.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.info_outline, color: AppColors.indigo600Main, size: 20),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: RichText(
-                                text: TextSpan(
-                                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontFamily: 'Inter'),
-                                  children: [
-                                    const TextSpan(text: "Requesting e-way bill for Packing List: "),
-                                    TextSpan(
-                                      text: item.packingNo ?? "-",
-                                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Obx(
-                              () => CustomDropdown<Item>(
-                                hintText: "Transport",
-                                items: (filter, loadProps) => Future.value(controller.transportModes.toList()),
-                                itemAsString: (item) => item.name ?? "",
-                                compareFn: (item, selectedItem) => item?.name == selectedItem?.name,
-                                selectedItem: controller.transportModes.firstWhereOrNull((e) => e.id == controller.selectedTransportMode.value?.id),
-                                onChanged: (val) {
-                                  controller.selectedTransportMode.value = val;
-                                },
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Obx(
-                              () => CustomDropdown<Vendor>(
-                                hintText: "Vendor",
-                                items: (filter, loadProps) => Future.value(controller.vendors),
-                                itemAsString: (item) => item.name ?? "",
-                                compareFn: (item, selectedItem) => item?.name == selectedItem?.name,
-                                selectedItem: controller.vendors.firstWhereOrNull((e) => e.name == controller.selectedVendorId.value?.name),
-                                onChanged: (val) {
-                                  controller.selectedVendorId.value = val;
-                                  if (val != null && val.gstNo != null && val.gstNo!.isNotEmpty) {
-                                    controller.transporterGstinController.text = val.gstNo!.first;
-                                  }
-                                },
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: commonTextField(
-                              labelText: "Transporter GSTIN",
-                              hintText: "ENTER GSTIN",
-                              controller: controller.transporterGstinController,
-                              isGstInputValidator: true,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: commonTextField(labelText: "Vehicle No", hintText: "MH 12 AB 1234", controller: controller.vehicleNoController),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: commonTextField(labelText: "LR / AWB Number", hintText: "Enter LR No", controller: controller.lrAwbController),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: commonTextField(
-                              labelText: "E-Way Bill Number",
-                              hintText: "Enter E-Way Bill Number",
-                              controller: controller.eWayBillNoController,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: commonTextField(
-                              labelText: "Driver Name",
-                              hintText: "Enter driver name",
-                              controller: controller.driverNameController,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: commonTextField(
-                              labelText: "Driver Contact",
-                              hintText: "Phone number",
-                              controller: controller.driverContactController,
-                              isPhoneNumberValidator: true,
-                              textInputType: TextInputType.phone,
-                            ),
-                          ),
-                        ],
-                      ),
-                      commonTextField(
-                        labelText: "Additional Remarks",
-                        hintText: "Enter transport remarks if any...",
-                        controller: controller.remarksController,
-                        maxLine: 3,
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFF1F4F9),
-                                foregroundColor: AppColors.textPrimary,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                elevation: 0,
-                              ),
-                              child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.of(context).pop();
-                                controller.requestForEWayBill(item.id!);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.indigo600Main,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                elevation: 0,
-                              ),
-                              child: const Text(
-                                "Confirm & Proceed",
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-      );
-    }
-  }
-
-  void _showRequestInvoiceDialog(BuildContext context, PackingList item) {
-    Get.dialog(
-      Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  const Icon(Icons.send_outlined, size: 20, color: AppColors.indigo600Main),
-                  const SizedBox(width: 8),
-                  const Text(
-                    "Request For Invoice",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, size: 20, color: AppColors.gray400),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(color: AppColors.indigo600Main.withValues(alpha: 0.1), shape: BoxShape.circle),
-                    child: Center(
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: const BoxDecoration(color: AppColors.indigo600Main, shape: BoxShape.circle),
-                        child: const Icon(Icons.check, color: Colors.white, size: 32),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text("Are you sure?", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  RichText(
-                    textAlign: TextAlign.center,
-                    text: TextSpan(
-                      style: const TextStyle(fontSize: 14, color: AppColors.gray500, fontFamily: 'Inter'),
-                      children: [
-                        const TextSpan(text: "You are about to request an invoice for Packing List "),
-                        TextSpan(
-                          text: item.packingNo ?? "-",
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                        ),
-                        const TextSpan(text: "."),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF1F4F9),
-                            foregroundColor: AppColors.textPrimary,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            elevation: 0,
-                          ),
-                          child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            controller.requestForInvoice(item.id!);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.indigo600Main,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            "Confirm",
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPagination() {
-    return Obx(() {
-      if (controller.totalPages <= 1) return const SizedBox.shrink();
-
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          border: Border(top: BorderSide(color: AppColors.gray200, width: 0.5)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _paginationButton(
-              icon: Icons.keyboard_double_arrow_left,
-              onTap: controller.currentPage.value > 1 ? () => controller.onPageChanged(1) : null,
-            ),
-            const SizedBox(width: 8),
-            _paginationButton(
-              icon: Icons.keyboard_arrow_left,
-              onTap: controller.currentPage.value > 1 ? () => controller.onPageChanged(controller.currentPage.value - 1) : null,
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(color: AppColors.indigo600Main, shape: BoxShape.circle),
-              child: Center(
-                child: Text(
-                  "${controller.currentPage.value}",
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            _paginationButton(
-              icon: Icons.keyboard_arrow_right,
-              onTap: controller.currentPage.value < controller.totalPages ? () => controller.onPageChanged(controller.currentPage.value + 1) : null,
-            ),
-            const SizedBox(width: 8),
-            _paginationButton(
-              icon: Icons.keyboard_double_arrow_right,
-              onTap: controller.currentPage.value < controller.totalPages ? () => controller.onPageChanged(controller.totalPages) : null,
-            ),
-          ],
-        ),
-      );
-    });
-  }
-
-  Widget _paginationButton({required IconData icon, VoidCallback? onTap}) {
-    bool isDisabled = onTap == null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))],
-        ),
-        child: Icon(icon, size: 18, color: isDisabled ? AppColors.gray300 : AppColors.gray600),
       ),
     );
   }

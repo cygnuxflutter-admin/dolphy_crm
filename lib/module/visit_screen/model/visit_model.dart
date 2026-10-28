@@ -95,6 +95,7 @@ class VisitDatum {
   String? advanceBalance;
   bool? canEdit;
   bool? canCancel;
+  bool? isCurrent;
 
   VisitDatum({
     this.id,
@@ -151,6 +152,7 @@ class VisitDatum {
     this.advanceBalance,
     this.canEdit,
     this.canCancel,
+    this.isCurrent,
   });
 
   factory VisitDatum.fromJson(Map<String, dynamic> json) => VisitDatum(
@@ -208,6 +210,7 @@ class VisitDatum {
         advanceBalance: json["advance_balance"]?.toString(),
         canEdit: json["can_edit"],
         canCancel: json["can_cancel"],
+        isCurrent: json["is_current"],
       );
 
   Map<String, dynamic> toJson() => {
@@ -265,6 +268,7 @@ class VisitDatum {
         "advance_balance": advanceBalance,
         "can_edit": canEdit,
         "can_cancel": canCancel,
+        "is_current": isCurrent,
       };
 }
 

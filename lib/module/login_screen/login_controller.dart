@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crm/module/home_screen/home_binding.dart';
 import 'package:crm/module/home_screen/home_screen.dart';
+import 'package:crm/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -14,14 +15,14 @@ import '../../utils/permission_handler.dart';
 import '../../widget/toast_message.dart';
 
 class LoginScreenController extends GetxController {
-  final TextEditingController emailController = TextEditingController(text: "dipl@gmail.com");
-  final TextEditingController passwordController = TextEditingController(text: "TenantAdmin#2025");
+  final TextEditingController emailController = TextEditingController(text: "");
+  final TextEditingController passwordController = TextEditingController(text: "");
   final FocusNode emailFocusNode = FocusNode();
   final FocusNode passwordFocusNode = FocusNode();
 
   RxBool obSecure = true.obs;
   RxBool isLoading = false.obs;
-  RxBool rememberMe = false.obs;
+
   RxBool isManualMode = false.obs;
   RxList<Map<String, String>> rememberedUsers = <Map<String, String>>[].obs;
 
@@ -29,11 +30,6 @@ class LoginScreenController extends GetxController {
   void onInit() {
     super.onInit();
     loadRememberedUsers();
-    rememberMe.value = Pref.isRememberMe();
-    if (rememberMe.value) {
-      emailController.text = Pref.getUserEmail();
-      passwordController.text = Pref.getUserPassword();
-    }
   }
 
   void loadRememberedUsers() {
@@ -43,7 +39,7 @@ class LoginScreenController extends GetxController {
   void selectUser(Map<String, String> user) {
     emailController.text = user['email'] ?? '';
     passwordController.text = user['password'] ?? '';
-    rememberMe.value = true;
+
     isManualMode.value = false;
   }
 
@@ -137,26 +133,24 @@ class LoginScreenController extends GetxController {
   Future<void> login() async {
     isLoading.value = true;
     try {
-      var response = await ApiHandler.postRequest(
-        url: ApiEndPoint.logIn,
-        body: {"email": emailController.text.trim(), "password": passwordController.text},
-      );
+      String fcmToken = Pref.getFcmToken();
+      if (fcmToken.isEmpty) {
+        fcmToken = await NotificationService().getToken() ?? '';
+      }
+
+      Map<String, dynamic> body = {"email": emailController.text.trim(), "password": passwordController.text};
+
+      if (fcmToken.isNotEmpty) {
+        body["fcm_token"] = fcmToken;
+      }
+
+      var response = await ApiHandler.postRequest(url: ApiEndPoint.logIn, body: body);
 
       final data = response.data;
       debugPrint("Login Response: $data");
 
       if (response.statusCode == 200) {
         if (data != null && data['status'] == 200) {
-          if (rememberMe.value) {
-            await Pref.setRememberMe(true);
-            await Pref.setUserEmail(emailController.text.trim());
-            await Pref.setUserPassword(passwordController.text);
-            await Pref.saveRememberedUser(emailController.text.trim(), passwordController.text);
-            loadRememberedUsers();
-          } else {
-            await Pref.setRememberMe(false);
-          }
-
           await Pref.setToken(data['accessToken'] ?? "");
           await Pref.setUserId(data['data']?['id']?.toString() ?? "");
           await Pref.setUserName("${data['data']?['first_name'] ?? ""} ${data['data']?['last_name'] ?? ""}");

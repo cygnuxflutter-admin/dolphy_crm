@@ -14,10 +14,7 @@ class SplashScreen extends GetView<SplashController> {
           builder: (controller) {
             return FadeTransition(
               opacity: controller.animation,
-              child: ScaleTransition(
-                scale: controller.animation,
-                child: Image.asset(AppImages.logo, scale: 3),
-              ),
+              child: ScaleTransition(scale: controller.animation, child: Image.asset(AppImages.logoBlack, scale: 3)),
             );
           },
         ),

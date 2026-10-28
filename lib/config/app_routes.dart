@@ -12,11 +12,15 @@ class AppRoutes {
   static const String packingScreen = '/packingScreen';
   static const String packingDetailScreen = '/packingDetailScreen';
   static const String packingListScreen = '/packingListScreen';
+  static const String pickingRequestDetailScreen = '/pickingRequestDetailScreen';
   static const String visitScreen = '/visitScreen';
   static const String visitViewScreen = '/visitViewScreen';
   static const String visitFieldReportScreen = '/visitFieldReportScreen';
+  static const String visitHistoryScreen = '/visitHistoryScreen';
   static const String addVisitScreen = '/addVisitScreen';
   static const String addExpenseScreen = '/addExpenseScreen';
+  static String viewPiScreen = '/viewPiScreen';
   static const String technicianExpenseScreen = '/technicianExpenseScreen';
   static const String notificationScreen = '/notificationScreen';
+  static const String draftInquiryScreen = '/draftInquiryScreen';
 }

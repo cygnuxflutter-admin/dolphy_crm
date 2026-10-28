@@ -20,8 +20,11 @@ class FieldReportScreen extends GetView<VisitController> {
 
   @override
   Widget build(BuildContext context) {
-    final String visitId = Get.arguments ?? "";
-    if (visitId.isNotEmpty && controller.fieldReportDetail.value?.id != visitId) {
+    final dynamic args = Get.arguments;
+    final String visitId = args is Map ? (args["visit_id"] ?? "") : (args is String ? args : "");
+    final bool isViewOnly = args is Map ? (args["is_view_only"] == true) : false;
+
+    if (visitId.isNotEmpty && (controller.fieldReportDetail.value?.id != visitId || isViewOnly)) {
       Future.microtask(() => controller.getFieldReport(visitId));
     }
 
@@ -35,11 +38,11 @@ class FieldReportScreen extends GetView<VisitController> {
           icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.white),
           onPressed: () => Get.back(),
         ),
-        title: const Text(
-          "Field Service Report",
-          style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.white),
+        title: Text(
+          isViewOnly ? "Visit Field Report" : "Field Service Report",
+          style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.white),
         ),
-        actions: [
+        /*        actions: [
           Obx(() {
             final data = controller.fieldReportDetail.value;
             if (data == null) return const SizedBox.shrink();
@@ -63,7 +66,7 @@ class FieldReportScreen extends GetView<VisitController> {
             }
             return const SizedBox.shrink();
           }),
-        ],
+        ],*/
       ),
       body: Obx(() {
         if (controller.isFieldReportLoading.value) {
@@ -75,6 +78,41 @@ class FieldReportScreen extends GetView<VisitController> {
         final data = controller.fieldReportDetail.value;
         if (data == null) {
           return const Center(child: Text("No Report Data Found"));
+        }
+
+        if (isViewOnly) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTopHeaderViewOnly(data),
+                  const SizedBox(height: 14),
+                  _buildVisitInfoCardViewOnly(data),
+                  const SizedBox(height: 18),
+                  _buildProductComplaintDetailsViewOnly(data),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF64748B),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                      onPressed: () => Get.back(),
+                      child: const Text("Close", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          );
         }
 
         final currentUserId = Pref.getUserId();
@@ -89,16 +127,17 @@ class FieldReportScreen extends GetView<VisitController> {
         return Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
           child: SingleChildScrollView(
+            controller: controller.fieldReportScrollController,
             padding: const EdgeInsets.only(top: 16, right: 16, left: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildTopHeader(data, visitId),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
                 _buildVisitInfoCard(data),
-                const SizedBox(height: 24),
+                const SizedBox(height: 15),
                 _buildSiteArrivalCard(data, visitId),
-                const SizedBox(height: 24),
+                const SizedBox(height: 15),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -136,23 +175,40 @@ class FieldReportScreen extends GetView<VisitController> {
                       child: Text("No products added to this report", style: TextStyle(color: AppColors.gray500)),
                     ),
                   ),
-                if (showEndButton) ...[const SizedBox(height: 24), _buildEndTrackingForm(visitId)],
+                if (showEndButton) ...[
+                  const SizedBox(height: 24),
+                  KeyedSubtree(key: controller.endTrackingKey, child: _buildEndTrackingForm(visitId)),
+                ],
                 const SizedBox(height: 0),
                 Row(
                   children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Get.back(),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.redColor,
-                          side: const BorderSide(color: AppColors.redColor),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                    if (showEndButton) ...[
+                      Expanded(
+                        child: Obx(
+                          () => ElevatedButton.icon(
+                            onPressed: controller.isLoading.value
+                                ? null
+                                : () {
+                                    if (controller.validateEndTrackingForm()) {
+                                      _showEndVisitConfirmation(visitId);
+                                    }
+                                  },
+                            icon: controller.isLoading.value
+                                ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                : const Icon(Icons.stop_circle_outlined, size: 18),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.redColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 0,
+                            ),
+                            label: Text(controller.isLoading.value ? "Ending..." : "End", style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ),
                         ),
-                        child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
-                    ),
-                    const SizedBox(width: 12),
+                      const SizedBox(width: 12),
+                    ],
                     Expanded(
                       child: Obx(
                         () => ElevatedButton(
@@ -172,6 +228,7 @@ class FieldReportScreen extends GetView<VisitController> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 10),
               ],
             ),
           ),
@@ -204,7 +261,13 @@ class FieldReportScreen extends GetView<VisitController> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    "${data.visitNo}  Complaint ${data.complaintNo}",
+                    "Visit No.: ${data.visitNo}  ",
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Complaint No.: ${data.complaintNo}",
                     style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -227,7 +290,7 @@ class FieldReportScreen extends GetView<VisitController> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 5),
         Row(
           children: [
             _statusBadge(data.statusName),
@@ -292,7 +355,7 @@ class FieldReportScreen extends GetView<VisitController> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
-                    onPressed: controller.isLoading.value ? null : () => _showEndVisitConfirmation(visitId),
+                    onPressed: controller.isLoading.value ? null : () => controller.scrollToEndTracking(),
                     icon: controller.isLoading.value
                         ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : const Icon(Icons.stop_circle_outlined, size: 18),
@@ -329,7 +392,7 @@ class FieldReportScreen extends GetView<VisitController> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
-                    onPressed: controller.isLoading.value ? null : () => _showEndVisitConfirmation(visitId),
+                    onPressed: controller.isLoading.value ? null : () => controller.scrollToEndTracking(),
                     icon: controller.isLoading.value
                         ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : const Icon(Icons.stop_circle_outlined, size: 18),
@@ -386,7 +449,7 @@ class FieldReportScreen extends GetView<VisitController> {
   Widget _buildVisitInfoCard(FieldReportData data) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(left: 16, right: 16, top: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -407,12 +470,12 @@ class FieldReportScreen extends GetView<VisitController> {
             ],
           ),
           const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
+            padding: EdgeInsets.symmetric(vertical: 5),
             child: Divider(height: 1, color: AppColors.gray100),
           ),
           _buildResponsiveInfoGrid([
-            _infoItem("VISIT NO.", data.visitNo ?? "-"),
-            _infoItem("COMPLAINT NO.", data.complaintNo ?? "-"),
+            // _infoItem("VISIT NO.", data.visitNo ?? "-"),
+            // _infoItem("COMPLAINT NO.", data.complaintNo ?? "-"),
             _infoItem("CUSTOMER", data.customerName ?? "-"),
             _infoItem("STATUS", data.statusName ?? "-"),
             _infoItem("VISIT PURPOSE", data.visitPurposeName ?? "-"),
@@ -431,7 +494,7 @@ class FieldReportScreen extends GetView<VisitController> {
         int first = index * 2;
         int second = first + 1;
         return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.only(bottom: 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -445,7 +508,7 @@ class FieldReportScreen extends GetView<VisitController> {
     );
   }
 
-  Widget _infoItem(String label, String value) {
+  Widget _infoItem(String label, String value, {Color? valueColor}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -456,7 +519,512 @@ class FieldReportScreen extends GetView<VisitController> {
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: valueColor ?? AppColors.textPrimary),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopHeaderViewOnly(FieldReportData data) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.green500Success.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.assignment_turned_in_outlined, color: AppColors.green500Success, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                "Visit Field Report",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (data.visitNo.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.blue500,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    data.visitNo,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              if (data.complaintNo.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.indigo50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: AppColors.indigo100),
+                  ),
+                  child: Text(
+                    "Complaint #${data.complaintNo}",
+                    style: const TextStyle(
+                      color: AppColors.indigo600Main,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              _statusBadge(data.statusName),
+            ],
+          ),
+          if (data.customerName.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              "Customer: ${data.customerName}",
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.gray600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVisitInfoCardViewOnly(FieldReportData data) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.info_outline, size: 18, color: AppColors.blue500),
+              SizedBox(width: 8),
+              Text(
+                "Visit Info",
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.blue500),
+              ),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: Divider(height: 1, color: AppColors.gray100),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _infoItem("VISIT NO.", data.visitNo.isNotEmpty ? data.visitNo : "-")),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _infoItem(
+                  "COMPLAINT NO.",
+                  data.complaintNo.isNotEmpty ? data.complaintNo : "-",
+                  valueColor: AppColors.blue600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _infoItem("CUSTOMER", data.customerName.isNotEmpty ? data.customerName : "-")),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "STATUS",
+                      style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    _statusBadge(data.statusName),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _infoItem("VISIT PURPOSE", data.visitPurposeName.isNotEmpty ? data.visitPurposeName : "-")),
+              const SizedBox(width: 12),
+              Expanded(child: _infoItem("TECHNICIAN", data.technicianNames ?? data.primaryTechnicianName ?? "-")),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _infoItem(
+                  "VISIT START DATE & TIME",
+                  DateFormat('dd/MM/yyyy hh:mm a').format(data.visitStartDatetime.toLocal()),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _infoItem(
+                  "VISIT END DATE & TIME",
+                  DateFormat('dd/MM/yyyy hh:mm a').format(data.visitEndDatetime.toLocal()),
+                ),
+              ),
+            ],
+          ),
+          if (data.address.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _infoItem("ADDRESS", data.address, valueColor: AppColors.blue600),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductComplaintDetailsViewOnly(FieldReportData data) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.inventory_2_outlined, color: Color(0xFFEAB308), size: 18),
+            const SizedBox(width: 8),
+            const Text(
+              "Product Complaint Details",
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFEAB308)),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF9C3),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                "${data.products.length}",
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF854D0E),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (data.products.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.gray200),
+            ),
+            child: const Center(
+              child: Text("No products added to this report", style: TextStyle(color: AppColors.gray500, fontSize: 13)),
+            ),
+          )
+        else
+          ...data.products.asMap().entries.map((entry) => _buildProductItemViewOnly(entry.key + 1, entry.value)),
+      ],
+    );
+  }
+
+  Widget _buildProductItemViewOnly(int index, Product p) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.blue500,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    "$index",
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              p.productName,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (p.productCode.isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.gray100,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                p.productCode,
+                                style: const TextStyle(fontSize: 10, color: AppColors.gray700, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _miniBadge(Icons.assignment_outlined, "Complaint: ${p.complaintQty ?? 0}"),
+                          _miniBadge(
+                            Icons.check_circle_outline,
+                            "Solve: ${p.solveQty ?? 0}",
+                            color: (p.solveQty != null && p.solveQty! > 0) ? AppColors.green500Success : AppColors.gray500,
+                          ),
+                          _miniBadge(
+                            Icons.verified_user_outlined,
+                            "Warranty: ${p.warrantyTypeName ?? 'Under Warranty'}",
+                            color: AppColors.blue600,
+                          ),
+                          _miniBadge(
+                            Icons.repeat_on_outlined,
+                            "Repeat: ${p.repeatServiceStatus ?? 'First Service'}",
+                            color: AppColors.indigo600Main,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Row(
+              children: [
+                Icon(Icons.report_problem_outlined, size: 14, color: Color(0xFFEF4444)),
+                SizedBox(width: 6),
+                Text(
+                  "Issue Description",
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.gray700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                p.issueDescription ?? "No description",
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.gray200),
+              ),
+              child: Row(
+                children: [
+                  Expanded(child: _readonlyQtyItem("Complaint Qty", "${p.complaintQty ?? 0}")),
+                  Expanded(child: _readonlyQtyItem("Installed Qty", "${p.installedQty ?? 0}")),
+                  Expanded(child: _readonlyQtyItem("Client Side Qty", "${p.clientSideQty ?? 0}")),
+                  Expanded(
+                    child: _readonlyQtyItem(
+                      "Solve Qty",
+                      "${p.solveQty ?? 0}",
+                      valueColor: (p.solveQty != null && p.solveQty! > 0) ? AppColors.green500Success : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (p.serialNumbers != null && p.serialNumbers!.isNotEmpty && p.serialNumbers![0].isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.qr_code, size: 14, color: AppColors.indigo600Main),
+                  const SizedBox(width: 6),
+                  const Text(
+                    "Serial Number: ",
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.gray600),
+                  ),
+                  Expanded(
+                    child: Text(
+                      p.serialNumbers!.join(', '),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (p.workRemark.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.notes, size: 14, color: AppColors.gray500),
+                  const SizedBox(width: 6),
+                  const Text(
+                    "Work Remark: ",
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.gray600),
+                  ),
+                  Expanded(
+                    child: Text(
+                      p.workRemark,
+                      style: const TextStyle(fontSize: 11, color: AppColors.textPrimary),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (p.attachments != null && p.attachments!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              const Text(
+                "ATTACHMENTS",
+                style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: p.attachments!.map((url) {
+                  return InkWell(
+                    onTap: () {
+                      Get.dialog(
+                        Dialog(
+                          child: Stack(
+                            children: [
+                              InteractiveViewer(child: Image.network(url, fit: BoxFit.contain)),
+                              Positioned(
+                                right: 8,
+                                top: 8,
+                                child: IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.white),
+                                  onPressed: () => Get.back(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        url,
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 50,
+                          height: 50,
+                          color: AppColors.gray200,
+                          child: const Icon(Icons.image, size: 24, color: AppColors.gray400),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _readonlyQtyItem(String label, String value, {Color? valueColor}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.gray500),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: valueColor ?? AppColors.textPrimary),
         ),
       ],
     );
@@ -481,44 +1049,73 @@ class FieldReportScreen extends GetView<VisitController> {
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
-                      child: Text(
-                        "$index",
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
                                 child: Text(
-                                  p.productName,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
+                                  "$index",
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              if (p.productCode.isNotEmpty)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: AppColors.indigo50, borderRadius: BorderRadius.circular(4)),
-                                  child: Text(
-                                    p.productCode,
-                                    style: const TextStyle(fontSize: 9, color: AppColors.indigo600Main, fontWeight: FontWeight.bold),
-                                  ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Tooltip(
+                                            message: p.productName,
+                                            triggerMode: TooltipTriggerMode.longPress,
+                                            waitDuration: Duration.zero,
+                                            showDuration: const Duration(seconds: 4),
+                                            preferBelow: false,
+                                            verticalOffset: 16,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            margin: const EdgeInsets.symmetric(horizontal: 16),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF1E293B),
+                                              borderRadius: BorderRadius.circular(8),
+                                              boxShadow: [
+                                                BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 4)),
+                                              ],
+                                            ),
+                                            textStyle: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500, height: 1.3),
+                                            child: Text(
+                                              p.productName,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        if (p.productCode.isNotEmpty)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(color: AppColors.indigo50, borderRadius: BorderRadius.circular(4)),
+                                            child: Text(
+                                              p.productCode,
+                                              style: const TextStyle(fontSize: 9, color: AppColors.indigo600Main, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                  ],
                                 ),
+                              ),
+                              const SizedBox(width: 8),
                             ],
                           ),
-                          const SizedBox(height: 8),
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: Row(
@@ -544,7 +1141,6 @@ class FieldReportScreen extends GetView<VisitController> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -622,13 +1218,13 @@ class FieldReportScreen extends GetView<VisitController> {
                     ),
                     const SizedBox(height: 20),
                     _buildQuantitySection(p),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     _buildSerialSection(p),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     _buildWorkAttachmentsSection(p),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 10),
                     _buildPartsAvailableSection(p),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     _buildPartsRequiredSection(p),
                   ],
                 ),
@@ -649,7 +1245,7 @@ class FieldReportScreen extends GetView<VisitController> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _formLabelWithIcon(Icons.inventory_2_outlined, "Parts Available"),
-          const SizedBox(height: 8),
+
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
@@ -708,31 +1304,17 @@ class FieldReportScreen extends GetView<VisitController> {
 
   Widget _productMainDetails(Product p) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: AppColors.gray50, borderRadius: BorderRadius.circular(8)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 8,
         children: [
-          const Text(
-            "PRODUCT",
-            style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "[${p.productCode ?? ''}] ${p.productName ?? '-'}",
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.indigo600Main),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              _iconText(Icons.receipt_outlined, "Tax Invoice: ${p.taxInvoiceNo ?? '-'}"),
-              _iconText(Icons.receipt_outlined, "Tax Date: ${p.taxInvoiceDate ?? '-'}"),
-              _iconText(Icons.verified_user_outlined, "Warranty: ${p.warrantyTypeName ?? '-'}"),
-              _iconText(Icons.repeat_on_outlined, "Repeat: ${p.repeatServiceStatus ?? 'First Service'}"),
-            ],
-          ),
+          _iconText(Icons.receipt_outlined, "Tax Invoice: ${p.taxInvoiceNo ?? '-'}"),
+          _iconText(Icons.receipt_outlined, "Tax Date: ${p.taxInvoiceDate ?? '-'}"),
+          _iconText(Icons.verified_user_outlined, "Warranty: ${p.warrantyTypeName ?? '-'}"),
+          _iconText(Icons.repeat_on_outlined, "Repeat: ${p.repeatServiceStatus ?? 'First Service'}"),
         ],
       ),
     );
@@ -776,141 +1358,194 @@ class FieldReportScreen extends GetView<VisitController> {
 
   Widget _buildSerialSection(Product p) {
     final String visitId = controller.fieldReportDetail.value?.id ?? Get.arguments ?? "";
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _formLabelWithIcon(Icons.qr_code, "Serial Number"),
-        const SizedBox(height: 8),
-        if (p.serialNumbers != null && p.serialNumbers!.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return RawAutocomplete<DispatchedSerialData>(
-                  optionsBuilder: (TextEditingValue textEditingValue) async {
-                    return await controller.getDispatchedSerialSuggestions(
-                      visitId: visitId,
-                      visitItemId: p.id ?? "",
-                      productId: p.productId ?? "",
-                      query: textEditingValue.text,
-                    );
-                  },
-                  displayStringForOption: (DispatchedSerialData option) => option.serialNumber ?? "",
-                  fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-                    if (textEditingController.text.isEmpty && p.serialNumbers![0].isNotEmpty) {
-                      textEditingController.text = p.serialNumbers![0];
-                    }
-                    return TextFormField(
-                      controller: textEditingController,
-                      focusNode: focusNode,
-                      style: const TextStyle(fontSize: 13),
-                      onChanged: (val) => controller.updateSerialNumber(p.id ?? "", 0, val),
-                      onFieldSubmitted: (value) => onFieldSubmitted(),
-                      onTap: () {
-                        // Force call optionsBuilder when tapped
-                        final String currentText = textEditingController.text;
-                        textEditingController.value = TextEditingValue(
-                          text: currentText,
-                          selection: TextSelection.collapsed(offset: currentText.length),
-                        );
-                      },
-                      decoration: InputDecoration(
-                        hintText: "Type dispatched serial number",
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppColors.gray200),
+    return Obx(() {
+      final bool isExpanded = controller.expandedSerialSections[p.id ?? ""] ?? false;
+      final bool hasSerial = p.serialNumbers != null && p.serialNumbers!.isNotEmpty && p.serialNumbers![0].isNotEmpty;
+
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.gray200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: () => controller.toggleSerialSectionExpansion(p.id ?? ""),
+              borderRadius: BorderRadius.vertical(top: const Radius.circular(8), bottom: Radius.circular(isExpanded ? 0 : 8)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    const Icon(Icons.qr_code, size: 16, color: AppColors.indigo600Main),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Serial Number",
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+                    ),
+                    const SizedBox(width: 8),
+                    if (hasSerial)
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: AppColors.indigo50, borderRadius: BorderRadius.circular(4)),
+                          child: Text(
+                            p.serialNumbers!.length > 1 ? "${p.serialNumbers![0]} (+${p.serialNumbers!.length - 1})" : p.serialNumbers![0],
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppColors.gray200),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: AppColors.indigo600Main),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(4)),
+                        child: const Text(
+                          "Not entered",
+                          style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.w500),
                         ),
                       ),
-                    );
-                  },
-                  onSelected: (DispatchedSerialData selection) {
-                    controller.updateSerialNumber(p.id ?? "", 0, selection.serialNumber ?? "");
-                  },
-                  optionsViewBuilder: (context, onSelected, options) {
-                    return Align(
-                      alignment: Alignment.topLeft,
-                      child: Material(
-                        elevation: 4.0,
-                        borderRadius: BorderRadius.circular(8),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(maxHeight: 250, maxWidth: constraints.maxWidth),
-                          child: Container(
-                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                            child: ListView.separated(
-                              padding: EdgeInsets.zero,
-                              shrinkWrap: true,
-                              itemCount: options.length,
-                              separatorBuilder: (context, index) => const Divider(height: 1),
-                              itemBuilder: (BuildContext context, int index) {
-                                final option = options.elementAt(index);
-                                return InkWell(
-                                  onTap: () => onSelected(option),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12.0),
-                                    child: RichText(
-                                      text: TextSpan(
-                                        style: const TextStyle(color: Colors.black, fontSize: 13),
-                                        children: [
-                                          TextSpan(
-                                            text: option.serialNumber ?? "",
-                                            style: const TextStyle(fontWeight: FontWeight.bold),
-                                          ),
-                                          if (option.dispatchNumber != null)
-                                            TextSpan(
-                                              text: " (${option.dispatchNumber})",
-                                              style: const TextStyle(color: AppColors.gray500),
+                    const Spacer(),
+                    Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: AppColors.indigo600Main),
+                  ],
+                ),
+              ),
+            ),
+            if (isExpanded) ...[
+              const Divider(height: 1, color: AppColors.gray200),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: p.serialNumbers != null && p.serialNumbers!.isNotEmpty
+                    ? LayoutBuilder(
+                        builder: (context, constraints) {
+                          return RawAutocomplete<DispatchedSerialData>(
+                            optionsBuilder: (TextEditingValue textEditingValue) async {
+                              return await controller.getDispatchedSerialSuggestions(
+                                visitId: visitId,
+                                visitItemId: p.id ?? "",
+                                productId: p.productId ?? "",
+                                query: textEditingValue.text,
+                              );
+                            },
+                            displayStringForOption: (DispatchedSerialData option) => option.serialNumber ?? "",
+                            fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                              if (textEditingController.text.isEmpty && p.serialNumbers![0].isNotEmpty) {
+                                textEditingController.text = p.serialNumbers![0];
+                              }
+                              return TextFormField(
+                                controller: textEditingController,
+                                focusNode: focusNode,
+                                style: const TextStyle(fontSize: 13),
+                                onChanged: (val) => controller.updateSerialNumber(p.id ?? "", 0, val),
+                                onFieldSubmitted: (value) => onFieldSubmitted(),
+                                onTap: () {
+                                  // Force call optionsBuilder when tapped
+                                  final String currentText = textEditingController.text;
+                                  textEditingController.value = TextEditingValue(
+                                    text: currentText,
+                                    selection: TextSelection.collapsed(offset: currentText.length),
+                                  );
+                                },
+                                decoration: InputDecoration(
+                                  hintText: "Type dispatched serial number",
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: AppColors.gray200),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: AppColors.gray200),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: const BorderSide(color: AppColors.indigo600Main),
+                                  ),
+                                ),
+                              );
+                            },
+                            onSelected: (DispatchedSerialData selection) {
+                              controller.updateSerialNumber(p.id ?? "", 0, selection.serialNumber ?? "");
+                            },
+                            optionsViewBuilder: (context, onSelected, options) {
+                              return Align(
+                                alignment: Alignment.topLeft,
+                                child: Material(
+                                  elevation: 4.0,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(maxHeight: 250, maxWidth: constraints.maxWidth),
+                                    child: Container(
+                                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                                      child: ListView.separated(
+                                        padding: EdgeInsets.zero,
+                                        shrinkWrap: true,
+                                        itemCount: options.length,
+                                        separatorBuilder: (context, index) => const Divider(height: 1),
+                                        itemBuilder: (BuildContext context, int index) {
+                                          final option = options.elementAt(index);
+                                          return InkWell(
+                                            onTap: () => onSelected(option),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(12.0),
+                                              child: RichText(
+                                                text: TextSpan(
+                                                  style: const TextStyle(color: Colors.black, fontSize: 13),
+                                                  children: [
+                                                    TextSpan(
+                                                      text: option.serialNumber ?? "",
+                                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                                    ),
+                                                    if (option.dispatchNumber != null)
+                                                      TextSpan(
+                                                        text: " (${option.dispatchNumber})",
+                                                        style: const TextStyle(color: AppColors.gray500),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
                                             ),
-                                        ],
+                                          );
+                                        },
                                       ),
                                     ),
                                   ),
-                                );
-                              },
-                            ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      )
+                    : InkWell(
+                        onTap: () => controller.updateSolveQty(p.id ?? "", "1"),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.gray200),
+                            borderRadius: BorderRadius.circular(8),
+                            color: AppColors.gray50,
+                          ),
+                          child: Column(
+                            children: const [
+                              Icon(Icons.add_circle_outline, size: 24, color: AppColors.gray400),
+                              SizedBox(height: 8),
+                              Text(
+                                "No serial number entered",
+                                style: TextStyle(fontSize: 13, color: AppColors.gray500, fontWeight: FontWeight.bold),
+                              ),
+                              Text("Tap here to add serial number", style: TextStyle(fontSize: 11, color: AppColors.gray400)),
+                            ],
                           ),
                         ),
                       ),
-                    );
-                  },
-                );
-              },
-            ),
-          )
-        else
-          InkWell(
-            onTap: () => controller.updateSolveQty(p.id ?? "", "1"),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.gray200),
-                borderRadius: BorderRadius.circular(8),
-                color: AppColors.gray50,
               ),
-              child: Column(
-                children: [
-                  const Icon(Icons.add_circle_outline, size: 24, color: AppColors.gray400),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "No serial number entered",
-                    style: TextStyle(fontSize: 13, color: AppColors.gray500, fontWeight: FontWeight.bold),
-                  ),
-                  const Text("Tap here to add serial number", style: TextStyle(fontSize: 11, color: AppColors.gray400)),
-                ],
-              ),
-            ),
-          ),
-      ],
-    );
+            ],
+          ],
+        ),
+      );
+    });
   }
 
   Widget _buildQuantitySection(Product p) {
@@ -925,15 +1560,11 @@ class FieldReportScreen extends GetView<VisitController> {
           Row(
             children: [
               Expanded(child: _qtyField("Complaint Qty", "${p.complaintQty ?? 0}")),
-              const SizedBox(width: 12),
+              const SizedBox(width: 20),
               Expanded(child: _qtyField("Installed Qty", "${p.installedQty ?? 0}")),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
+              const SizedBox(width: 20),
               Expanded(child: _qtyField("Client Side Qty", "${p.clientSideQty ?? 0}")),
-              const SizedBox(width: 12),
+              const SizedBox(width: 20),
               Expanded(
                 child: _qtyField(
                   "Solve Qty *",
@@ -953,11 +1584,14 @@ class FieldReportScreen extends GetView<VisitController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.gray600),
+        SizedBox(
+          height: 30,
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.gray600),
+          ),
         ),
-        const SizedBox(height: 6),
+        // const SizedBox(height: 6),
         isEditable
             ? TextFormField(
                 key: ValueKey(value),
@@ -984,15 +1618,32 @@ class FieldReportScreen extends GetView<VisitController> {
                   ),
                 ),
               )
-            : Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.gray200),
+            : TextFormField(
+                key: ValueKey(value),
+                initialValue: value,
+                readOnly: true,
+                enabled: false,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                onChanged: onChanged,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.gray200),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.gray200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.indigo600Main),
+                  ),
                 ),
-                child: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
               ),
       ],
     );
@@ -1040,38 +1691,82 @@ class FieldReportScreen extends GetView<VisitController> {
             style: TextStyle(fontSize: 10, color: AppColors.gray500, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.gray200),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                InkWell(
-                  onTap: () => _pickFile(p.id ?? ""),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: const BoxDecoration(
-                      color: AppColors.gray50,
-                      borderRadius: BorderRadius.horizontal(left: Radius.circular(8)),
-                      border: Border(right: BorderSide(color: AppColors.gray200)),
-                    ),
-                    child: const Text("Choose Files", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Obx(() {
+            final bool isUploading = controller.isUploadingProductAttachments[p.id ?? ""] ?? false;
+            final String progressText = controller.productAttachmentUploadProgress[p.id ?? ""] ?? "Uploading...";
+
+            return Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                border: Border.all(color: isUploading ? AppColors.indigo600Main.withValues(alpha: 0.5) : AppColors.gray200),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      InkWell(
+                        onTap: isUploading ? null : () => _pickFile(p.id ?? ""),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isUploading ? AppColors.indigo50.withValues(alpha: 0.5) : AppColors.gray50,
+                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(7)),
+                            border: const Border(right: BorderSide(color: AppColors.gray200)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isUploading) ...[
+                                const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.indigo600Main),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              Text(
+                                isUploading ? "Uploading..." : "Choose Files",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isUploading ? AppColors.indigo600Main : AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: isUploading
+                              ? Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        progressText,
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.indigo600Main),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(
+                                  p.attachments != null && p.attachments!.isNotEmpty ? "${p.attachments!.length} files chosen" : "No file chosen",
+                                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      p.attachments != null && p.attachments!.isNotEmpty ? "${p.attachments!.length} files chosen" : "No file chosen",
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+                  if (isUploading) const LinearProgressIndicator(minHeight: 2.5, backgroundColor: AppColors.indigo50, color: AppColors.indigo600Main),
+                ],
+              ),
+            );
+          }),
           if (p.attachments != null && p.attachments!.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
@@ -1128,271 +1823,431 @@ class FieldReportScreen extends GetView<VisitController> {
 
   Future<void> _pickPartFile(String productId, int partIndex) async {
     ImagePickerUtils.showOptions(
+      multiImage: true,
+      onMultiImageSelected: (files) {
+        controller.uploadPartAttachments(productId, partIndex, files);
+      },
       onImageSelected: (file) {
-        controller.uploadPartAttachment(productId, partIndex, file);
+        controller.uploadPartAttachments(productId, partIndex, [file]);
       },
     );
   }
 
   Future<void> _pickFile(String productId) async {
     ImagePickerUtils.showOptions(
+      multiImage: true,
+      onMultiImageSelected: (files) {
+        controller.uploadProductAttachments(productId, files);
+      },
       onImageSelected: (file) {
-        controller.uploadProductAttachment(productId, file);
+        controller.uploadProductAttachments(productId, [file]);
       },
     );
   }
 
   Widget _buildPartsRequiredSection(Product p) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _formLabelWithIcon(Icons.settings_input_component_outlined, "Parts Required"),
-              TextButton.icon(
-                onPressed: () => controller.addPartRequest(p.id ?? ""),
-                icon: const Icon(Icons.add, size: 14),
-                label: const Text("Add Part", style: TextStyle(fontSize: 12)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (p.partRequests != null && p.partRequests!.isNotEmpty)
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.gray200),
-              ),
-              child: Column(
-                children: [
-                  ...p.partRequests!.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final part = entry.value;
-                    return Container(
-                      padding: const EdgeInsets.all(12.0),
-                      decoration: BoxDecoration(
-                        border: Border(bottom: index == p.partRequests!.length - 1 ? BorderSide.none : const BorderSide(color: AppColors.gray100)),
+    return Obx(() {
+      final bool isExpanded = controller.expandedPartsSections[p.id ?? ""] ?? false;
+      final int partCount = p.partRequests?.length ?? 0;
+
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.gray200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: () => controller.togglePartsSectionExpansion(p.id ?? ""),
+              borderRadius: BorderRadius.vertical(top: const Radius.circular(8), bottom: Radius.circular(isExpanded ? 0 : 8)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    const Icon(Icons.settings_input_component_outlined, size: 16, color: AppColors.indigo600Main),
+                    const SizedBox(width: 8),
+                    const Flexible(
+                      child: Text(
+                        "Parts Required",
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: partCount > 0 ? AppColors.indigo50 : AppColors.gray100,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        partCount > 0 ? "$partCount Part${partCount > 1 ? 's' : ''}" : "0 Parts",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: partCount > 0 ? AppColors.indigo600Main : AppColors.gray500,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    InkWell(
+                      onTap: () {
+                        controller.addPartRequest(p.id ?? "");
+                        if (!isExpanded) {
+                          controller.togglePartsSectionExpansion(p.id ?? "");
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add, size: 14, color: AppColors.indigo600Main),
+                            SizedBox(width: 2),
+                            Text(
+                              "Add",
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: AppColors.indigo600Main, size: 20),
+                  ],
+                ),
+              ),
+            ),
+            if (isExpanded) ...[
+              const Divider(height: 1, color: AppColors.gray200),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (p.partRequests != null && p.partRequests!.isNotEmpty)
+                      Column(
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                "PART #${index + 1}",
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+                          ...p.partRequests!.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final part = entry.value;
+                            return Container(
+                              margin: EdgeInsets.only(bottom: index == p.partRequests!.length - 1 ? 0 : 12),
+                              padding: const EdgeInsets.all(12.0),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.gray200),
                               ),
-                              Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  if (part.status.isNotEmpty)
-                                    Container(
-                                      margin: const EdgeInsets.only(right: 8),
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: (part.status == 'requested' ? AppColors.orangeColor : AppColors.green500Success).withValues(
-                                          alpha: 0.1,
-                                        ),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        part.status.toUpperCase(),
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
-                                          color: part.status == 'requested' ? AppColors.orangeColor : AppColors.green500Success,
-                                        ),
-                                      ),
-                                    ),
-                                  IconButton(
-                                    onPressed: () => controller.removePartRequest(p.id ?? "", index),
-                                    icon: const Icon(Icons.delete_outline, color: AppColors.redColor, size: 20),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          _formLabel("Part Name"),
-                          CustomDropdown<dynamic>(
-                            hintText: "Search part...",
-                            items: (filter, loadProps) async => await controller.searchProducts(filter),
-                            itemAsString: (item) {
-                              if (item is PartRequest) return item.partName;
-                              if (item is Map) return "[${item['product_code'] ?? ''}] ${item['product_name'] ?? '-'}";
-                              return item.toString();
-                            },
-                            selectedItem: part.partName.isNotEmpty ? part : null,
-                            compareFn: (i, s) {
-                              if (i is PartRequest && s is PartRequest) return i.id == s.id;
-                              if (i is Map && s is Map) return (i['id'] ?? i['product_id']) == (s['id'] ?? s['product_id']);
-                              if (i is PartRequest && s is Map) return i.partName.contains(s['product_name'] ?? '');
-                              return false;
-                            },
-                            onChanged: (val) => controller.updatePartRequest(p.id ?? "", index, 'product', val),
-                            showSearchBox: true,
-                            padding: 0,
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _formLabel("Qty"),
-                                    TextFormField(
-                                      initialValue: "${part.qty}",
-                                      keyboardType: TextInputType.number,
-                                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                      style: const TextStyle(fontSize: 12),
-                                      onChanged: (val) => controller.updatePartRequest(p.id ?? "", index, 'qty', int.tryParse(val) ?? 1),
-                                      decoration: InputDecoration(
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                          borderSide: const BorderSide(color: AppColors.gray200),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                          borderSide: const BorderSide(color: AppColors.gray200),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                flex: 2,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _formLabel("Remark"),
-                                    TextFormField(
-                                      initialValue: part.remark,
-                                      style: const TextStyle(fontSize: 12),
-                                      onChanged: (val) => controller.updatePartRequest(p.id ?? "", index, 'remark', val),
-                                      decoration: InputDecoration(
-                                        hintText: "Enter remark",
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                          borderSide: const BorderSide(color: AppColors.gray200),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                          borderSide: const BorderSide(color: AppColors.gray200),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          _formLabel("Attachment"),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: AppColors.gray200),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      InkWell(
-                                        onTap: () => _pickPartFile(p.id ?? "", index),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                          decoration: const BoxDecoration(
-                                            color: AppColors.gray50,
-                                            borderRadius: BorderRadius.horizontal(left: Radius.circular(8)),
-                                            border: Border(right: BorderSide(color: AppColors.gray200)),
+                                      Text(
+                                        "PART #${index + 1}",
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+                                      ),
+                                      Row(
+                                        children: [
+                                          if (part.status.isNotEmpty)
+                                            Container(
+                                              margin: const EdgeInsets.only(right: 8),
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: (part.status == 'requested' ? AppColors.orangeColor : AppColors.green500Success).withValues(
+                                                  alpha: 0.1,
+                                                ),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                part.status.toUpperCase(),
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: part.status == 'requested' ? AppColors.orangeColor : AppColors.green500Success,
+                                                ),
+                                              ),
+                                            ),
+                                          IconButton(
+                                            onPressed: () => controller.removePartRequest(p.id ?? "", index),
+                                            icon: const Icon(Icons.delete_outline, color: AppColors.redColor, size: 20),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
                                           ),
-                                          child: const Text("Choose Files", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  _formLabel("Part Name"),
+                                  CustomDropdown<dynamic>(
+                                    hintText: "Search part...",
+                                    items: (filter, loadProps) async => await controller.searchProducts(filter),
+                                    itemAsString: (item) {
+                                      if (item is PartRequest) return item.partName;
+                                      if (item is Map) return "[${item['product_code'] ?? ''}] ${item['product_name'] ?? '-'}";
+                                      return item.toString();
+                                    },
+                                    selectedItem: part.partName.isNotEmpty ? part : null,
+                                    compareFn: (i, s) {
+                                      if (i is PartRequest && s is PartRequest) return i.id == s.id;
+                                      if (i is Map && s is Map) return (i['id'] ?? i['product_id']) == (s['id'] ?? s['product_id']);
+                                      if (i is PartRequest && s is Map) return i.partName.contains(s['product_name'] ?? '');
+                                      return false;
+                                    },
+                                    onChanged: (val) => controller.updatePartRequest(p.id ?? "", index, 'product', val),
+                                    showSearchBox: true,
+                                    padding: 0,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            _formLabel("Qty"),
+                                            TextFormField(
+                                              initialValue: "${part.qty}",
+                                              keyboardType: TextInputType.number,
+                                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                              style: const TextStyle(fontSize: 12),
+                                              onChanged: (val) => controller.updatePartRequest(p.id ?? "", index, 'qty', int.tryParse(val) ?? 1),
+                                              decoration: InputDecoration(
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                                border: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  borderSide: const BorderSide(color: AppColors.gray200),
+                                                ),
+                                                enabledBorder: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  borderSide: const BorderSide(color: AppColors.gray200),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
+                                      const SizedBox(width: 12),
                                       Expanded(
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                                          child: Text(
-                                            part.attachments.isNotEmpty ? "${part.attachments.length} files" : "No file chosen",
-                                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
+                                        flex: 2,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            _formLabel("Remark"),
+                                            TextFormField(
+                                              initialValue: part.remark,
+                                              style: const TextStyle(fontSize: 12),
+                                              onChanged: (val) => controller.updatePartRequest(p.id ?? "", index, 'remark', val),
+                                              decoration: InputDecoration(
+                                                hintText: "Enter remark",
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                                border: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  borderSide: const BorderSide(color: AppColors.gray200),
+                                                ),
+                                                enabledBorder: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  borderSide: const BorderSide(color: AppColors.gray200),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (part.attachments.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            ...List.generate(part.attachments.length, (attIndex) {
-                              final url = part.attachments[attIndex];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 4),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        url.split('/').last,
-                                        style: const TextStyle(fontSize: 11, color: AppColors.indigo600Main),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                  const SizedBox(height: 12),
+                                  _formLabel("Attachment"),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Obx(() {
+                                          final String partKey = "${p.id ?? ''}_$index";
+                                          final bool isUploading = controller.isUploadingPartAttachments[partKey] ?? false;
+                                          final String progressText = controller.partAttachmentUploadProgress[partKey] ?? "Uploading...";
+
+                                          return Container(
+                                            clipBehavior: Clip.antiAlias,
+                                            decoration: BoxDecoration(
+                                              border: Border.all(
+                                                color: isUploading ? AppColors.indigo600Main.withValues(alpha: 0.5) : AppColors.gray200,
+                                              ),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    InkWell(
+                                                      onTap: isUploading ? null : () => _pickPartFile(p.id ?? "", index),
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                                        decoration: BoxDecoration(
+                                                          color: isUploading ? AppColors.indigo50.withValues(alpha: 0.5) : AppColors.gray50,
+                                                          borderRadius: const BorderRadius.horizontal(left: Radius.circular(7)),
+                                                          border: const Border(right: BorderSide(color: AppColors.gray200)),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            if (isUploading) ...[
+                                                              const SizedBox(
+                                                                width: 12,
+                                                                height: 12,
+                                                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.indigo600Main),
+                                                              ),
+                                                              const SizedBox(width: 6),
+                                                            ],
+                                                            Text(
+                                                              isUploading ? "Uploading..." : "Choose Files",
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                fontWeight: FontWeight.w600,
+                                                                color: isUploading ? AppColors.indigo600Main : AppColors.textPrimary,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    Expanded(
+                                                      child: Padding(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                                        child: isUploading
+                                                            ? Text(
+                                                                progressText,
+                                                                style: const TextStyle(
+                                                                  fontSize: 11,
+                                                                  fontWeight: FontWeight.w600,
+                                                                  color: AppColors.indigo600Main,
+                                                                ),
+                                                                overflow: TextOverflow.ellipsis,
+                                                              )
+                                                            : Text(
+                                                                part.attachments.isNotEmpty ? "${part.attachments.length} files" : "No file chosen",
+                                                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                                                overflow: TextOverflow.ellipsis,
+                                                              ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                if (isUploading)
+                                                  const LinearProgressIndicator(
+                                                    minHeight: 2,
+                                                    backgroundColor: AppColors.indigo50,
+                                                    color: AppColors.indigo600Main,
+                                                  ),
+                                              ],
+                                            ),
+                                          );
+                                        }),
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    InkWell(
-                                      onTap: () => controller.removePartAttachment(p.id ?? "", index, attIndex),
-                                      child: const Icon(Icons.delete_outline, size: 16, color: AppColors.redColor),
-                                    ),
+                                    ],
+                                  ),
+                                  if (part.attachments.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    ...List.generate(part.attachments.length, (attIndex) {
+                                      final url = part.attachments[attIndex];
+                                      return Padding(
+                                        padding: const EdgeInsets.only(bottom: 4),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                url.split('/').last,
+                                                style: const TextStyle(fontSize: 11, color: AppColors.indigo600Main),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            InkWell(
+                                              onTap: () => controller.removePartAttachment(p.id ?? "", index, attIndex),
+                                              child: const Icon(Icons.delete_outline, size: 16, color: AppColors.redColor),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }),
                                   ],
-                                ),
-                              );
-                            }),
-                          ],
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          const SizedBox(height: 10),
+                          InkWell(
+                            onTap: () => controller.addPartRequest(p.id ?? ""),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: AppColors.indigo50.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.indigo600Main.withValues(alpha: 0.2)),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.add, size: 16, color: AppColors.indigo600Main),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    "Add Another Part",
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.indigo600Main),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
+                      )
+                    else
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.gray200),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.inventory_2_outlined, color: AppColors.gray300, size: 36),
+                            const SizedBox(height: 8),
+                            const Text("No parts requested yet.", style: TextStyle(color: AppColors.gray400, fontSize: 13)),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: () => controller.addPartRequest(p.id ?? ""),
+                              icon: const Icon(Icons.add, size: 16),
+                              label: const Text("Add Part", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.indigo600Main,
+                                side: const BorderSide(color: AppColors.indigo600Main),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    );
-                  }).toList(),
-                ],
+                  ],
+                ),
               ),
-            )
-          else
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(30),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.gray200),
-              ),
-              child: Column(
-                children: const [
-                  Icon(Icons.inventory_2_outlined, color: AppColors.gray300, size: 40),
-                  SizedBox(height: 12),
-                  Text("No parts requested yet.", style: TextStyle(color: AppColors.gray400, fontSize: 13)),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
+            ],
+          ],
+        ),
+      );
+    });
   }
 
   Widget _formLabel(String text) {
@@ -1594,48 +2449,88 @@ class FieldReportScreen extends GetView<VisitController> {
           ),
           const SizedBox(height: 20),
           _formLabel("ATTACHMENTS *"),
-          Obx(
-            () => Container(
+          Obx(() {
+            final bool isUploading = controller.isUploadingFinalAttachments.value;
+            final String progressText = controller.finalAttachmentUploadProgress.value.isNotEmpty
+                ? controller.finalAttachmentUploadProgress.value
+                : "Uploading...";
+
+            return Container(
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                border: Border.all(color: controller.finalAttachmentUrls.isEmpty ? AppColors.redColor : AppColors.gray200),
+                border: Border.all(color: isUploading ? AppColors.indigo600Main.withValues(alpha: 0.5) : AppColors.gray200),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  InkWell(
-                    onTap: () => _pickFinalFile(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: AppColors.gray50,
-                        borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
-                        border: Border(right: BorderSide(color: controller.finalAttachmentUrls.isEmpty ? AppColors.redColor : AppColors.gray200)),
+                  Row(
+                    children: [
+                      InkWell(
+                        onTap: isUploading ? null : () => _pickFinalFile(),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isUploading ? AppColors.indigo50.withValues(alpha: 0.5) : AppColors.gray50,
+                            borderRadius: const BorderRadius.horizontal(left: Radius.circular(7)),
+                            border: const Border(right: BorderSide(color: AppColors.gray200)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isUploading) ...[
+                                const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.indigo600Main),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              Text(
+                                isUploading ? "Uploading..." : "Choose Files",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isUploading ? AppColors.indigo600Main : AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: const Text("Choose Files", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        controller.finalAttachmentUrls.isNotEmpty ? "${controller.finalAttachmentUrls.length} files chosen" : "No file chosen",
-                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                        overflow: TextOverflow.ellipsis,
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: isUploading
+                              ? Text(
+                                  progressText,
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.indigo600Main),
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : Text(
+                                  controller.finalAttachmentUrls.isNotEmpty
+                                      ? "${controller.finalAttachmentUrls.length} files chosen"
+                                      : "No file chosen",
+                                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
+                  if (isUploading) const LinearProgressIndicator(minHeight: 2.5, backgroundColor: AppColors.indigo50, color: AppColors.indigo600Main),
                 ],
               ),
-            ),
-          ),
-          Obx(
+            );
+          }),
+          /* Obx(
             () => controller.finalAttachmentUrls.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.only(top: 8),
                     child: Text("At least one attachment is required", style: TextStyle(color: AppColors.redColor, fontSize: 11)),
                   )
                 : const SizedBox.shrink(),
-          ),
+          ),*/
           const SizedBox(height: 12),
           Obx(
             () => controller.finalAttachmentUrls.isNotEmpty
@@ -1796,8 +2691,12 @@ class FieldReportScreen extends GetView<VisitController> {
 
   Future<void> _pickFinalFile() async {
     ImagePickerUtils.showOptions(
+      multiImage: true,
+      onMultiImageSelected: (files) {
+        controller.uploadFinalAttachments(files);
+      },
       onImageSelected: (file) {
-        controller.uploadFinalAttachment(file);
+        controller.uploadFinalAttachments([file]);
       },
     );
   }
@@ -1827,15 +2726,12 @@ class FieldReportScreen extends GetView<VisitController> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          const Text(
+          const SizedBox(height: 8),
+          /*          const Text(
             "Each technician must mark Reached at Site with location and attachment before starting the visit.",
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Divider(height: 1, color: AppColors.gray100),
-          ),
+          const SizedBox(height: 8),*/
           Wrap(spacing: 16, runSpacing: 16, children: [...technicians.map((tech) => _buildTechnicianArrivalCard(tech, visitId))]),
         ],
       ),
@@ -1861,18 +2757,23 @@ class FieldReportScreen extends GetView<VisitController> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(tech.name ?? "-", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                child: Row(
+                  children: [
+                    Text(tech.name ?? "-", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    SizedBox(width: 10),
+                    if (tech.isPrimary == true) ...[const SizedBox(height: 4), _primaryBadge()],
+                  ],
+                ),
               ),
-              _statusBadgeSmall(isReached ? "Reached" : "Pending", isReached),
             ],
           ),
-          if (tech.isPrimary == true) ...[const SizedBox(height: 4), _primaryBadge()],
+
           if (isReached) ...[
             const SizedBox(height: 12),
-            _arrivalInfoItem(Icons.access_time, DateFormat('dd/MM/yyyy hh:mm a').format(tech.reachedAt!.toLocal())),
+            _arrivalInfoItem(Icons.access_time, DateFormat('dd/MM/yyyy hh:mm a').format(tech.reachedAt!.toLocal()), isReached),
             const SizedBox(height: 8),
-            _arrivalInfoItem(Icons.location_on_outlined, "${tech.reachedLatitude ?? '-'}, ${tech.reachedLongitude ?? '-'}"),
-            if (tech.reachedAttachments != null && tech.reachedAttachments!.isNotEmpty) ...[
+            _arrivalInfoItem(Icons.location_on_outlined, "${tech.reachedLatitude ?? '-'}, ${tech.reachedLongitude ?? '-'}", false),
+            if (tech.reachedAttachments != null && tech.reachedAttachments.isNotEmpty) ...[
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -1900,17 +2801,30 @@ class FieldReportScreen extends GetView<VisitController> {
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _showArrivalDialog(visitId),
-                icon: const Icon(Icons.location_on_outlined, size: 18),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.green500Success,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  elevation: 0,
+              child: Obx(
+                () => ElevatedButton.icon(
+                  onPressed: controller.isLocationChecking.value
+                      ? null
+                      : () async {
+                          final bool isLocationReady = await controller.checkAndRequestLocation();
+                          if (isLocationReady) {
+                            _showArrivalDialog(visitId);
+                          }
+                        },
+                  icon: controller.isLocationChecking.value
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.location_on_outlined, size: 18),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.green500Success,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    elevation: 0,
+                  ),
+                  label: controller.isLocationChecking.value
+                      ? const Text("Checking location...", style: TextStyle(fontWeight: FontWeight.bold))
+                      : const Text("Reached at Site", style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
-                label: const Text("Reached at Site", style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -1951,50 +2865,89 @@ class FieldReportScreen extends GetView<VisitController> {
               const SizedBox(height: 20),
               const Text("Attachments *", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              Obx(
-                () => Container(
+              Obx(() {
+                final bool isUploading = controller.isUploadingSiteArrivalAttachments.value;
+                final String progressText = controller.siteArrivalUploadProgress.value.isNotEmpty
+                    ? controller.siteArrivalUploadProgress.value
+                    : "Uploading...";
+
+                return Container(
+                  clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.gray300),
+                    border: Border.all(color: isUploading ? AppColors.indigo600Main.withValues(alpha: 0.5) : AppColors.gray300),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible(
-                        flex: 2,
-                        child: InkWell(
-                          onTap: () => _pickSiteArrivalFile(),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                            decoration: const BoxDecoration(
-                              border: Border(right: BorderSide(color: AppColors.gray300)),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                "Choose Files",
-                                style: TextStyle(fontSize: 13, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                      Row(
+                        children: [
+                          Flexible(
+                            flex: 2,
+                            child: InkWell(
+                              onTap: isUploading ? null : () => _pickSiteArrivalFile(),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: isUploading ? AppColors.indigo50.withValues(alpha: 0.5) : Colors.transparent,
+                                  border: const Border(right: BorderSide(color: AppColors.gray300)),
+                                ),
+                                child: Center(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      if (isUploading) ...[
+                                        const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.indigo600Main),
+                                        ),
+                                        const SizedBox(width: 6),
+                                      ],
+                                      Text(
+                                        isUploading ? "Uploading..." : "Choose Files",
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isUploading ? AppColors.indigo600Main : AppColors.textPrimary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                      Flexible(
-                        flex: 3,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text(
-                            controller.siteArrivalAttachmentUrls.isNotEmpty
-                                ? "${controller.siteArrivalAttachmentUrls.length} files chosen"
-                                : "No file chosen",
-                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          Flexible(
+                            flex: 3,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: isUploading
+                                  ? Text(
+                                      progressText,
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.indigo600Main),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    )
+                                  : Text(
+                                      controller.siteArrivalAttachmentUrls.isNotEmpty
+                                          ? "${controller.siteArrivalAttachmentUrls.length} files chosen"
+                                          : "No file chosen",
+                                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
+                      if (isUploading)
+                        const LinearProgressIndicator(minHeight: 2.5, backgroundColor: AppColors.indigo50, color: AppColors.indigo600Main),
                     ],
                   ),
-                ),
-              ),
+                );
+              }),
               Obx(() {
                 if (controller.siteArrivalAttachmentUrls.isNotEmpty) {
                   return Padding(
@@ -2068,7 +3021,7 @@ class FieldReportScreen extends GetView<VisitController> {
                         child: controller.isLoading.value
                             ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                             : const Text(
-                                "Submit & Mark Reached",
+                                "Reached",
                                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                 textAlign: TextAlign.center,
                                 maxLines: 1,
@@ -2088,18 +3041,24 @@ class FieldReportScreen extends GetView<VisitController> {
 
   Future<void> _pickSiteArrivalFile() async {
     ImagePickerUtils.showOptions(
+      multiImage: true,
+      onMultiImageSelected: (files) {
+        controller.uploadSiteArrivalAttachments(files);
+      },
       onImageSelected: (file) {
-        controller.uploadSiteArrivalAttachment(file);
+        controller.uploadSiteArrivalAttachments([file]);
       },
     );
   }
 
-  Widget _arrivalInfoItem(IconData icon, String text) {
+  Widget _arrivalInfoItem(IconData icon, String text, bool isReached) {
     return Row(
       children: [
         Icon(icon, size: 14, color: AppColors.gray500),
         const SizedBox(width: 8),
         Text(text, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        Spacer(),
+        if (isReached) _statusBadgeSmall(isReached ? "Reached" : "Pending", isReached),
       ],
     );
   }

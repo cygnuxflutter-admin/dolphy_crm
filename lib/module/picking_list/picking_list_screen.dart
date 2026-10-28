@@ -131,12 +131,14 @@ class _PickingListScreenState extends State<PickingListScreen> with TickerProvid
       }
 
       final items = [
-        {'label': 'NEW ORDER', 'count': counts?.all ?? 0, 'index': 0, 'color': AppColors.indigo600Main},
-        {'label': 'PENDING', 'count': counts?.draft ?? 0, 'index': 1, 'color': AppColors.yellow500},
+        {'label': 'All', 'count': counts?.all ?? 0, 'index': 0, 'color': AppColors.indigo600Main},
+        {'label': 'NEW ORDER', 'count': counts?.draft ?? 0, 'index': 1, 'color': AppColors.indigo600Main},
+        // {'label': 'PENDING', 'count': counts?.picking ?? 0, 'index': 2, 'color': AppColors.yellow500},
         {'label': 'PARTIAL', 'count': counts?.picking ?? 0, 'index': 2, 'color': AppColors.orangeColor},
         {'label': 'PICKED', 'count': counts?.picked ?? 0, 'index': 3, 'color': AppColors.green500Success},
-        {'label': 'PICKING REJECT', 'count': counts?.packingReject ?? 0, 'index': 4, 'color': AppColors.red500},
-        {'label': 'REJECT', 'count': counts?.rejected ?? 0, 'index': 5, 'color': AppColors.gray600},
+        {'label': 'History', 'count': counts?.history ?? 0, 'index': 4, 'color': AppColors.green500Success},
+        {'label': 'PICKING REJECT', 'count': counts?.packingReject ?? 0, 'index': 5, 'color': AppColors.red500},
+        {'label': 'REJECT', 'count': counts?.rejected ?? 0, 'index': 6, 'color': AppColors.gray600},
       ];
 
       return Container(
